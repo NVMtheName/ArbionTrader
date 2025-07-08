@@ -11,10 +11,11 @@ from app import db
 class TaskScheduler:
     """Background task scheduler for automated trading and system maintenance"""
     
-    def __init__(self):
+    def __init__(self, use_celery=False):
         self.logger = logging.getLogger(__name__)
         self.running = False
         self.scheduler_thread = None
+        self.use_celery = use_celery
         
     def start(self):
         """Start the background scheduler"""
@@ -25,19 +26,27 @@ class TaskScheduler:
         self.running = True
         self.logger.info("Starting task scheduler...")
         
-        # Schedule auto-trading tasks
-        schedule.every(15).minutes.do(self._run_auto_trading)
-        
-        # Schedule system maintenance tasks
-        schedule.every(1).hour.do(self._cleanup_old_logs)
-        schedule.every(6).hours.do(self._update_api_status)
-        schedule.every().day.at("00:00").do(self._daily_maintenance)
-        
-        # Start scheduler in a separate thread
-        self.scheduler_thread = threading.Thread(target=self._scheduler_loop)
-        self.scheduler_thread.daemon = True
-        self.scheduler_thread.start()
-        
+        if self.use_celery:
+            self.logger.info("Using Celery for task scheduling - tasks will be handled by Celery Beat")
+            # Celery beat will handle scheduling automatically
+            return
+        else:
+            # Fall back to threading for local development
+            self.logger.info("Using threading for task scheduling")
+            
+            # Schedule auto-trading tasks
+            schedule.every(15).minutes.do(self._run_auto_trading)
+            
+            # Schedule system maintenance tasks
+            schedule.every(1).hour.do(self._cleanup_old_logs)
+            schedule.every(6).hours.do(self._update_api_status)
+            schedule.every().day.at("00:00").do(self._daily_maintenance)
+            
+            # Start scheduler in a separate thread
+            self.scheduler_thread = threading.Thread(target=self._scheduler_loop)
+            self.scheduler_thread.daemon = True
+            self.scheduler_thread.start()
+            
         self.logger.info("Task scheduler started successfully")
     
     def stop(self):
@@ -270,12 +279,25 @@ class TaskScheduler:
             self.logger.error(f"Error adding custom task: {str(e)}")
 
 # Global scheduler instance
-scheduler = TaskScheduler()
+_scheduler = None
 
 def start_scheduler():
     """Start the global task scheduler"""
-    scheduler.start()
+    try:
+        global _scheduler
+        if _scheduler is None:
+            # Check if running in Heroku/production environment with Redis
+            use_celery = os.environ.get('REDIS_URL') is not None
+            _scheduler = TaskScheduler(use_celery=use_celery)
+        _scheduler.start()
+    except Exception as e:
+        logging.error(f"Failed to start scheduler: {e}")
 
 def stop_scheduler():
     """Stop the global task scheduler"""
-    scheduler.stop()
+    try:
+        global _scheduler
+        if _scheduler is not None:
+            _scheduler.stop()
+    except Exception as e:
+        logging.error(f"Failed to stop scheduler: {e}")
