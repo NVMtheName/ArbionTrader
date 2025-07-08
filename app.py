@@ -34,8 +34,8 @@ def create_app():
     }
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     
-    # Proxy fix for Heroku
-    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+    # Proxy fix for Heroku and custom domains
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_for=1)
     
     # Initialize extensions
     db.init_app(app)

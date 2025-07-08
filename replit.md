@@ -140,6 +140,8 @@ Changelog:
   - Updated scheduler to support both Celery (production) and threading (development)
   - Added Redis dependency for Celery task queue
   - Complete production-ready OAuth2 system with encrypted token storage
+  - Fixed PostgreSQL dialect compatibility for newer SQLAlchemy versions
+  - Added custom domain setup documentation and scripts for arbion.ai
 
 ## User Preferences
 
