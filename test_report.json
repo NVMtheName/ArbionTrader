@@ -1,0 +1,57 @@
+{
+  "timestamp": "2025-07-08T17:57:40.692685",
+  "total_tests": 7,
+  "passed_tests": 5,
+  "failed_tests": 2,
+  "success_rate": 71.42857142857143,
+  "results": {
+    "encryption": {
+      "status": "PASS",
+      "message": "Encryption/decryption working correctly"
+    },
+    "market_data": {
+      "status": "PASS",
+      "message": "Market data provider working. SPY: $621.20, BTC: $108985.00",
+      "details": {
+        "spy_quote": true,
+        "btc_price": true,
+        "historical_data": true
+      }
+    },
+    "risk_management": {
+      "status": "PASS",
+      "message": "Risk management working. Position size: 20",
+      "details": {
+        "position_size": 20,
+        "calculation_successful": true
+      }
+    },
+    "technical_indicators": {
+      "status": "PASS",
+      "message": "Technical indicators working. RSI: 73.44, Sentiment: 33.3%",
+      "details": {
+        "rsi": 73.44,
+        "macd": 9.32,
+        "sma_20": 607.33,
+        "sentiment_score": 33.3
+      }
+    },
+    "option_chain": {
+      "status": "PASS",
+      "message": "Option chain working. Calls: 64, Puts: 81",
+      "details": {
+        "calls_count": 64,
+        "puts_count": 81,
+        "expiration": "2025-07-08"
+      }
+    },
+    "openai_integration": {
+      "status": "FAIL",
+      "message": "OpenAI integration test error: cannot import name 'User' from partially initialized module 'models' (most likely due to a circular import) (/home/runner/workspace/models.py)"
+    },
+    "auto_trading_engine": {
+      "status": "FAIL",
+      "message": "Auto-trading engine test error: cannot import name 'User' from partially initialized module 'models' (most likely due to a circular import) (/home/runner/workspace/models.py)"
+    }
+  }
+}

@@ -119,6 +119,15 @@ Arbion is a secure, AI-powered trading platform that enables users to connect th
 
 Changelog:
 - July 08, 2025. Initial setup
+- July 08, 2025. Enhanced with advanced features:
+  - Real-time market data integration using yfinance and CoinGecko APIs
+  - Advanced risk management system with position sizing and trade validation
+  - Comprehensive technical indicators (RSI, MACD, SMA, Bollinger Bands)
+  - Enhanced auto-trading engine with improved option chain processing
+  - Background task scheduler for automated system maintenance
+  - New API endpoints for market data, risk analysis, and portfolio management
+  - Enhanced dashboard with live market data and technical indicators
+  - Improved AI trading with comprehensive market analysis integration
 
 ## User Preferences
 

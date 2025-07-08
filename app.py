@@ -84,5 +84,12 @@ def create_app():
 
 app = create_app()
 
+# Start the background scheduler
+try:
+    from utils.scheduler import start_scheduler
+    start_scheduler()
+except Exception as e:
+    logging.error(f"Failed to start scheduler: {str(e)}")
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)

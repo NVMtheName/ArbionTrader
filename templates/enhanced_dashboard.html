@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enhanced Dashboard - Arbion AI Trading</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-900 text-white">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-gray-800 border-b border-gray-700 px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <h1 class="text-2xl font-bold text-blue-400">Arbion AI</h1>
+                    <span class="text-gray-400">Enhanced Dashboard</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <span class="text-green-400">● Live</span>
+                    <button onclick="refreshData()" class="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg">
+                        <i data-feather="refresh-cw" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="p-6 space-y-6">
+            <!-- Market Overview -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">SPY</p>
+                            <p class="text-2xl font-bold" id="spy-price">$--</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-green-400 text-sm" id="spy-change">--</p>
+                            <p class="text-gray-400 text-xs">Market</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">QQQ</p>
+                            <p class="text-2xl font-bold" id="qqq-price">$--</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-green-400 text-sm" id="qqq-change">--</p>
+                            <p class="text-gray-400 text-xs">Tech</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">BTC</p>
+                            <p class="text-2xl font-bold" id="btc-price">$--</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-green-400 text-sm" id="btc-change">--</p>
+                            <p class="text-gray-400 text-xs">Crypto</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-400 text-sm">Portfolio</p>
+                            <p class="text-2xl font-bold text-blue-400" id="portfolio-value">$--</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-green-400 text-sm" id="portfolio-change">--</p>
+                            <p class="text-gray-400 text-xs">Total</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Trading Insights -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i data-feather="brain" class="w-5 h-5 mr-2"></i>
+                        AI Market Analysis
+                    </h3>
+                    <div id="ai-analysis" class="space-y-4">
+                        <!-- AI analysis will be populated here -->
+                        <div class="bg-gray-700 rounded-lg p-4">
+                            <div class="flex items-center justify-between">
+                                <span class="text-sm text-gray-300">SPY Analysis</span>
+                                <span class="text-blue-400 text-sm">Analyzing...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-800 rounded-lg p-6">
+                    <h3 class="text-lg font-semibold mb-4 flex items-center">
+                        <i data-feather="shield" class="w-5 h-5 mr-2"></i>
+                        Risk Management
+                    </h3>
+                    <div id="risk-metrics" class="space-y-4">
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-300">Risk Score</span>
+                            <div class="flex items-center space-x-2">
+                                <div class="w-16 h-2 bg-gray-700 rounded-full">
+                                    <div id="risk-score-bar" class="h-full bg-green-500 rounded-full" style="width: 0%"></div>
+                                </div>
+                                <span id="risk-score-text" class="text-sm text-gray-400">--</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-300">Concentration Risk</span>
+                            <span id="concentration-risk" class="text-sm text-gray-400">--%</span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-gray-300">Win Rate</span>
+                            <span id="win-rate" class="text-sm text-gray-400">--%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Technical Indicators -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h3 class="text-lg font-semibold mb-4 flex items-center">
+                    <i data-feather="trending-up" class="w-5 h-5 mr-2"></i>
+                    Technical Indicators
+                </h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="space-y-4">
+                        <h4 class="text-sm font-medium text-gray-300">SPY Indicators</h4>
+                        <div id="spy-indicators" class="space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-400">RSI</span>
+                                <span class="text-xs text-gray-300" id="spy-rsi">--</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-400">MACD</span>
+                                <span class="text-xs text-gray-300" id="spy-macd">--</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-400">SMA 20</span>
+                                <span class="text-xs text-gray-300" id="spy-sma20">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <h4 class="text-sm font-medium text-gray-300">QQQ Indicators</h4>
+                        <div id="qqq-indicators" class="space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-400">RSI</span>
+                                <span class="text-xs text-gray-300" id="qqq-rsi">--</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-400">MACD</span>
+                                <span class="text-xs text-gray-300" id="qqq-macd">--</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-400">SMA 20</span>
+                                <span class="text-xs text-gray-300" id="qqq-sma20">--</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <h4 class="text-sm font-medium text-gray-300">Market Sentiment</h4>
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-400">SPY Sentiment</span>
+                                <span class="text-xs text-gray-300" id="spy-sentiment">--%</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-400">QQQ Sentiment</span>
+                                <span class="text-xs text-gray-300" id="qqq-sentiment">--%</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Trades -->
+            <div class="bg-gray-800 rounded-lg p-6">
+                <h3 class="text-lg font-semibold mb-4 flex items-center">
+                    <i data-feather="activity" class="w-5 h-5 mr-2"></i>
+                    Recent Trades
+                </h3>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead class="text-gray-400 border-b border-gray-700">
+                            <tr>
+                                <th class="text-left py-2">Symbol</th>
+                                <th class="text-left py-2">Side</th>
+                                <th class="text-left py-2">Quantity</th>
+                                <th class="text-left py-2">Price</th>
+                                <th class="text-left py-2">Status</th>
+                                <th class="text-left py-2">Strategy</th>
+                                <th class="text-left py-2">Time</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-trades" class="text-gray-300">
+                            <!-- Recent trades will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize dashboard
+        document.addEventListener('DOMContentLoaded', function() {
+            feather.replace();
+            loadDashboardData();
+            
+            // Auto-refresh every 30 seconds
+            setInterval(loadDashboardData, 30000);
+        });
+
+        async function loadDashboardData() {
+            try {
+                // Load market data
+                await loadMarketData();
+                
+                // Load technical indicators
+                await loadTechnicalIndicators();
+                
+                // Load risk metrics
+                await loadRiskMetrics();
+                
+                // Load recent trades
+                await loadRecentTrades();
+                
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+            }
+        }
+
+        async function loadMarketData() {
+            try {
+                const symbols = ['SPY', 'QQQ', 'BTC'];
+                
+                for (const symbol of symbols) {
+                    const response = await fetch(`/api/market-data/${symbol}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        const price = data.data.price;
+                        const change = data.data.change_percent || 0;
+                        const changeClass = change >= 0 ? 'text-green-400' : 'text-red-400';
+                        const changeText = `${change >= 0 ? '+' : ''}${change.toFixed(2)}%`;
+                        
+                        document.getElementById(`${symbol.toLowerCase()}-price`).textContent = `$${price.toFixed(2)}`;
+                        document.getElementById(`${symbol.toLowerCase()}-change`).textContent = changeText;
+                        document.getElementById(`${symbol.toLowerCase()}-change`).className = `text-sm ${changeClass}`;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading market data:', error);
+            }
+        }
+
+        async function loadTechnicalIndicators() {
+            try {
+                const symbols = ['SPY', 'QQQ'];
+                
+                for (const symbol of symbols) {
+                    const response = await fetch(`/api/technical-indicators/${symbol}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        const indicators = data.data;
+                        const prefix = symbol.toLowerCase();
+                        
+                        document.getElementById(`${prefix}-rsi`).textContent = indicators.rsi.toFixed(1);
+                        document.getElementById(`${prefix}-macd`).textContent = indicators.macd.toFixed(3);
+                        document.getElementById(`${prefix}-sma20`).textContent = `$${indicators.sma_20.toFixed(2)}`;
+                        
+                        // Load sentiment
+                        const sentimentResponse = await fetch(`/api/market-sentiment/${symbol}`);
+                        const sentimentData = await sentimentResponse.json();
+                        
+                        if (sentimentData.success) {
+                            document.getElementById(`${prefix}-sentiment`).textContent = 
+                                `${sentimentData.data.sentiment_score.toFixed(1)}%`;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading technical indicators:', error);
+            }
+        }
+
+        async function loadRiskMetrics() {
+            try {
+                const response = await fetch('/api/risk-report');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const report = data.data;
+                    const portfolio = report.portfolio_risk;
+                    
+                    // Update risk score
+                    const riskScore = portfolio.risk_score;
+                    document.getElementById('risk-score-text').textContent = `${riskScore}/100`;
+                    document.getElementById('risk-score-bar').style.width = `${riskScore}%`;
+                    
+                    // Color code risk score
+                    const riskBar = document.getElementById('risk-score-bar');
+                    if (riskScore < 30) {
+                        riskBar.className = 'h-full bg-green-500 rounded-full';
+                    } else if (riskScore < 70) {
+                        riskBar.className = 'h-full bg-yellow-500 rounded-full';
+                    } else {
+                        riskBar.className = 'h-full bg-red-500 rounded-full';
+                    }
+                    
+                    // Update other metrics
+                    document.getElementById('concentration-risk').textContent = 
+                        `${portfolio.concentration_risk.toFixed(1)}%`;
+                    document.getElementById('win-rate').textContent = 
+                        `${report.win_rate.toFixed(1)}%`;
+                }
+            } catch (error) {
+                console.error('Error loading risk metrics:', error);
+            }
+        }
+
+        async function loadRecentTrades() {
+            try {
+                const response = await fetch('/api/trade-history?per_page=10');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const trades = data.data.trades;
+                    const tbody = document.getElementById('recent-trades');
+                    
+                    tbody.innerHTML = trades.map(trade => `
+                        <tr class="border-b border-gray-700">
+                            <td class="py-2">${trade.symbol}</td>
+                            <td class="py-2">
+                                <span class="px-2 py-1 rounded text-xs ${trade.side === 'buy' ? 'bg-green-600' : 'bg-red-600'}">
+                                    ${trade.side.toUpperCase()}
+                                </span>
+                            </td>
+                            <td class="py-2">${trade.quantity || '-'}</td>
+                            <td class="py-2">${trade.price ? '$' + trade.price.toFixed(2) : '-'}</td>
+                            <td class="py-2">
+                                <span class="px-2 py-1 rounded text-xs ${
+                                    trade.status === 'executed' ? 'bg-green-600' : 
+                                    trade.status === 'pending' ? 'bg-yellow-600' : 'bg-red-600'
+                                }">
+                                    ${trade.status.toUpperCase()}
+                                </span>
+                            </td>
+                            <td class="py-2">${trade.strategy || 'manual'}</td>
+                            <td class="py-2">${new Date(trade.created_at).toLocaleString()}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading recent trades:', error);
+            }
+        }
+
+        function refreshData() {
+            loadDashboardData();
+        }
+    </script>
+</body>
+</html>

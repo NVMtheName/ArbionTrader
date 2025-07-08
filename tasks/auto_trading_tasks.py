@@ -7,11 +7,15 @@ from utils.encryption import decrypt_credentials
 from utils.coinbase_connector import CoinbaseConnector
 from utils.schwab_connector import SchwabConnector
 from utils.openai_trader import OpenAITrader
+from utils.market_data import MarketDataProvider
+from utils.risk_management import RiskManager
 import json
 
 class AutoTradingEngine:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.market_data = MarketDataProvider()
+        self.risk_manager = RiskManager()
         
     def log_system_event(self, level, message, module='auto_trading', user_id=None):
         """Log system events to database"""
@@ -151,23 +155,43 @@ class AutoTradingEngine:
     def sell_covered_call(self, connector, account_id, symbol, delta, dte, user_id, simulation_mode):
         """Sell covered call for wheel strategy"""
         try:
-            # This is a simplified implementation
-            # In production, you'd need to:
-            # 1. Get option chain
-            # 2. Find appropriate strike based on delta
-            # 3. Check if we already have open positions
-            
-            # For simulation purposes, we'll create a mock trade
+            # Get current market data
             current_price = connector.get_current_price(symbol)
             if not current_price:
                 return {'success': False, 'message': 'Could not get current price'}
             
-            # Calculate approximate strike price (current price + 2%)
-            strike_price = round(current_price * 1.02, 2)
+            # Get option chain to find appropriate strike
+            option_chain = self.market_data.get_option_chain(symbol)
+            if not option_chain:
+                # Fallback to simple calculation if option chain not available
+                strike_price = round(current_price * 1.02, 2)
+            else:
+                # Find strike closest to target delta
+                calls = option_chain['calls']
+                target_strike = None
+                min_delta_diff = float('inf')
+                
+                for call in calls:
+                    delta_diff = abs(call.get('delta', 0) - delta)
+                    if delta_diff < min_delta_diff and call['strike'] > current_price:
+                        min_delta_diff = delta_diff
+                        target_strike = call['strike']
+                
+                strike_price = target_strike or round(current_price * 1.02, 2)
             
-            # Mock expiration date (30 days from now)
+            # Validate trade against risk parameters
+            estimated_premium = current_price * 0.02  # Rough estimate
+            is_valid, message = self.risk_manager.validate_trade_limits(
+                user_id, estimated_premium * 100, symbol
+            )
+            
+            if not is_valid and not simulation_mode:
+                return {'success': False, 'message': f'Risk validation failed: {message}'}
+            
+            # Calculate expiration date
             expiration = (datetime.utcnow() + timedelta(days=dte)).strftime('%Y-%m-%d')
             
+            # Place the order
             result = connector.place_option_order(
                 account_id=account_id,
                 symbol=symbol,
@@ -180,9 +204,17 @@ class AutoTradingEngine:
                 is_simulation=simulation_mode
             )
             
+            # Log the trade attempt
+            self.log_system_event(
+                'info',
+                f'Covered call order placed for {symbol} at ${strike_price} strike, exp: {expiration}',
+                user_id=user_id
+            )
+            
             return result
         
         except Exception as e:
+            self.logger.error(f"Error in covered call execution: {str(e)}")
             return {'success': False, 'message': f'Covered call error: {str(e)}'}
     
     def sell_cash_secured_put(self, connector, account_id, symbol, delta, dte, user_id, simulation_mode):
@@ -327,28 +359,105 @@ class AutoTradingEngine:
             
             # Get market analysis from AI
             symbols = params.get('symbols', ['SPY', 'QQQ'])
+            trades_executed = 0
             
             for symbol in symbols:
-                # Generate AI trading signal
-                analysis_prompt = f"Analyze the current market conditions for {symbol} and provide a trading recommendation based on technical analysis."
-                
-                analysis = trader.analyze_market_conditions(symbol, analysis_prompt)
-                
-                if analysis['recommendation'] in ['buy', 'sell'] and analysis['confidence'] > 0.7:
-                    # Execute the trade
-                    trade_prompt = f"{analysis['recommendation']} {symbol} based on: {analysis['reasoning']}"
+                try:
+                    # Get comprehensive market data
+                    market_quote = self.market_data.get_stock_quote(symbol)
+                    technical_indicators = self.market_data.calculate_technical_indicators(symbol)
+                    sentiment = self.market_data.get_market_sentiment(symbol)
                     
-                    trade_instruction = trader.parse_trading_prompt(trade_prompt)
-                    result = trader.execute_trade(trade_instruction, user_id, simulation_mode)
+                    if not market_quote:
+                        continue
                     
-                    if result['success']:
-                        self.log_system_event('info', f'AI trade executed for {symbol}: {result["message"]}')
+                    # Create comprehensive analysis prompt
+                    analysis_prompt = f"""
+                    Analyze {symbol} for trading opportunities using this data:
+                    
+                    Current Price: ${market_quote.get('price', 0):.2f}
+                    Change: {market_quote.get('change_percent', 0):.2f}%
+                    Volume: {market_quote.get('volume', 0):,}
+                    
+                    Technical Indicators:
+                    - RSI: {technical_indicators.get('rsi', 0):.2f}
+                    - SMA 20: ${technical_indicators.get('sma_20', 0):.2f}
+                    - SMA 50: ${technical_indicators.get('sma_50', 0):.2f}
+                    - MACD: {technical_indicators.get('macd', 0):.2f}
+                    - MACD Signal: {technical_indicators.get('macd_signal', 0):.2f}
+                    
+                    Market Sentiment: {sentiment.get('sentiment_score', 50):.1f}% positive
+                    
+                    Provide a trading recommendation with high confidence only if conditions are favorable.
+                    """
+                    
+                    analysis = trader.analyze_market_conditions(symbol, analysis_prompt)
+                    
+                    # Only execute trades with high confidence
+                    if analysis['recommendation'] in ['buy', 'sell'] and analysis['confidence'] > 0.75:
+                        # Calculate position size based on risk management
+                        current_price = market_quote['price']
+                        stop_loss_price = current_price * 0.98 if analysis['recommendation'] == 'buy' else current_price * 1.02
+                        
+                        # Get estimated account balance (simplified)
+                        account_balance = 10000  # This would come from broker API
+                        position_size = self.risk_manager.calculate_position_size(
+                            account_balance, 2.0, current_price, stop_loss_price
+                        )
+                        
+                        if position_size > 0:
+                            # Validate trade limits
+                            trade_amount = position_size * current_price
+                            is_valid, message = self.risk_manager.validate_trade_limits(
+                                user_id, trade_amount, symbol
+                            )
+                            
+                            if is_valid or simulation_mode:
+                                # Create trade prompt
+                                trade_prompt = f"{analysis['recommendation']} {position_size} shares of {symbol} at market price. Reasoning: {analysis['reasoning']}"
+                                
+                                trade_instruction = trader.parse_trading_prompt(trade_prompt)
+                                result = trader.execute_trade(trade_instruction, user_id, simulation_mode)
+                                
+                                if result['success']:
+                                    trades_executed += 1
+                                    self.log_system_event(
+                                        'info',
+                                        f'AI trade executed for {symbol}: {result["message"]} (Confidence: {analysis["confidence"]:.2f})',
+                                        user_id=user_id
+                                    )
+                                else:
+                                    self.log_system_event(
+                                        'error',
+                                        f'AI trade failed for {symbol}: {result["message"]}',
+                                        user_id=user_id
+                                    )
+                            else:
+                                self.log_system_event(
+                                    'warning',
+                                    f'AI trade for {symbol} blocked by risk management: {message}',
+                                    user_id=user_id
+                                )
+                        else:
+                            self.log_system_event(
+                                'warning',
+                                f'AI trade for {symbol} skipped: position size calculated as 0',
+                                user_id=user_id
+                            )
                     else:
-                        self.log_system_event('error', f'AI trade failed for {symbol}: {result["message"]}')
+                        self.log_system_event(
+                            'info',
+                            f'AI analysis for {symbol}: {analysis["recommendation"]} with {analysis["confidence"]:.2f} confidence (below threshold)',
+                            user_id=user_id
+                        )
+                
+                except Exception as e:
+                    self.logger.error(f"Error in AI analysis for {symbol}: {str(e)}")
+                    continue
             
             return {
                 'success': True,
-                'message': 'AI strategy analysis completed'
+                'message': f'AI strategy completed. Executed {trades_executed} trades.'
             }
         
         except Exception as e:

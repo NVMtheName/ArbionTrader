@@ -7,6 +7,8 @@ from utils.encryption import encrypt_credentials, decrypt_credentials
 from utils.coinbase_connector import CoinbaseConnector
 from utils.schwab_connector import SchwabConnector
 from utils.openai_trader import OpenAITrader
+from utils.market_data import MarketDataProvider
+from utils.risk_management import RiskManager
 from functools import wraps
 import logging
 import json
@@ -53,6 +55,12 @@ def dashboard():
                          recent_trades=recent_trades,
                          api_status=api_status,
                          auto_trading_settings=auto_trading_settings)
+
+@main_bp.route('/enhanced-dashboard')
+@login_required
+def enhanced_dashboard():
+    """Enhanced dashboard with advanced features"""
+    return render_template('enhanced_dashboard.html')
 
 @main_bp.route('/natural-trade', methods=['GET', 'POST'])
 @login_required
@@ -373,3 +381,269 @@ def toggle_user_status():
 @login_required
 def account():
     return render_template('account.html')
+
+# Advanced API endpoints for enhanced features
+@main_bp.route('/api/market-data/<symbol>')
+@login_required
+def get_market_data(symbol):
+    """Get real-time market data for a symbol"""
+    try:
+        market_data = MarketDataProvider()
+        
+        # Determine if it's crypto or stock
+        if symbol.endswith('-USD') or symbol.upper() in ['BTC', 'ETH', 'LTC', 'BCH']:
+            data = market_data.get_crypto_price(symbol.replace('-USD', ''))
+        else:
+            data = market_data.get_stock_quote(symbol)
+        
+        if data:
+            return jsonify({'success': True, 'data': data})
+        else:
+            return jsonify({'success': False, 'message': 'Symbol not found'})
+    
+    except Exception as e:
+        logging.error(f"Error fetching market data: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@main_bp.route('/api/technical-indicators/<symbol>')
+@login_required
+def get_technical_indicators(symbol):
+    """Get technical indicators for a symbol"""
+    try:
+        market_data = MarketDataProvider()
+        indicators = market_data.calculate_technical_indicators(symbol)
+        
+        if indicators:
+            return jsonify({'success': True, 'data': indicators})
+        else:
+            return jsonify({'success': False, 'message': 'Could not calculate indicators'})
+    
+    except Exception as e:
+        logging.error(f"Error calculating technical indicators: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@main_bp.route('/api/option-chain/<symbol>')
+@login_required
+def get_option_chain(symbol):
+    """Get option chain for a symbol"""
+    try:
+        market_data = MarketDataProvider()
+        expiration = request.args.get('expiration')
+        
+        option_chain = market_data.get_option_chain(symbol, expiration)
+        
+        if option_chain:
+            return jsonify({'success': True, 'data': option_chain})
+        else:
+            return jsonify({'success': False, 'message': 'Option chain not available'})
+    
+    except Exception as e:
+        logging.error(f"Error fetching option chain: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@main_bp.route('/api/portfolio-risk')
+@login_required
+def get_portfolio_risk():
+    """Get portfolio risk analysis"""
+    try:
+        risk_manager = RiskManager()
+        risk_data = risk_manager.calculate_portfolio_risk(current_user.id)
+        
+        return jsonify({'success': True, 'data': risk_data})
+    
+    except Exception as e:
+        logging.error(f"Error calculating portfolio risk: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@main_bp.route('/api/risk-report')
+@login_required
+def get_risk_report():
+    """Get comprehensive risk report"""
+    try:
+        risk_manager = RiskManager()
+        report = risk_manager.generate_risk_report(current_user.id)
+        
+        return jsonify({'success': True, 'data': report})
+    
+    except Exception as e:
+        logging.error(f"Error generating risk report: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@main_bp.route('/api/validate-trade', methods=['POST'])
+@login_required
+def validate_trade():
+    """Validate a trade against risk parameters"""
+    try:
+        data = request.get_json()
+        symbol = data.get('symbol')
+        amount = float(data.get('amount', 0))
+        
+        risk_manager = RiskManager()
+        is_valid, message = risk_manager.validate_trade_limits(current_user.id, amount, symbol)
+        
+        return jsonify({'success': is_valid, 'message': message})
+    
+    except Exception as e:
+        logging.error(f"Error validating trade: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@main_bp.route('/api/position-size', methods=['POST'])
+@login_required
+def calculate_position_size():
+    """Calculate optimal position size"""
+    try:
+        data = request.get_json()
+        account_balance = float(data.get('account_balance', 10000))
+        risk_percentage = float(data.get('risk_percentage', 2))
+        entry_price = float(data.get('entry_price'))
+        stop_loss = float(data.get('stop_loss'))
+        
+        risk_manager = RiskManager()
+        position_size = risk_manager.calculate_position_size(
+            account_balance, risk_percentage, entry_price, stop_loss
+        )
+        
+        return jsonify({
+            'success': True,
+            'position_size': position_size,
+            'risk_amount': account_balance * (risk_percentage / 100),
+            'risk_per_share': abs(entry_price - stop_loss)
+        })
+    
+    except Exception as e:
+        logging.error(f"Error calculating position size: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@main_bp.route('/api/market-sentiment/<symbol>')
+@login_required
+def get_market_sentiment(symbol):
+    """Get market sentiment analysis"""
+    try:
+        market_data = MarketDataProvider()
+        sentiment = market_data.get_market_sentiment(symbol)
+        
+        if sentiment:
+            return jsonify({'success': True, 'data': sentiment})
+        else:
+            return jsonify({'success': False, 'message': 'Sentiment data not available'})
+    
+    except Exception as e:
+        logging.error(f"Error fetching market sentiment: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@main_bp.route('/api/historical-data/<symbol>')
+@login_required
+def get_historical_data(symbol):
+    """Get historical price data"""
+    try:
+        market_data = MarketDataProvider()
+        period = request.args.get('period', '1mo')
+        
+        historical_data = market_data.get_historical_data(symbol, period)
+        
+        if historical_data:
+            return jsonify({'success': True, 'data': historical_data})
+        else:
+            return jsonify({'success': False, 'message': 'Historical data not available'})
+    
+    except Exception as e:
+        logging.error(f"Error fetching historical data: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@main_bp.route('/api/system-logs')
+@login_required
+@admin_required
+def get_system_logs():
+    """Get system logs for administrators"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 50, type=int)
+        level = request.args.get('level', 'all')
+        
+        query = SystemLog.query
+        
+        if level != 'all':
+            query = query.filter_by(level=level)
+        
+        logs = query.order_by(SystemLog.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'logs': [
+                    {
+                        'id': log.id,
+                        'level': log.level,
+                        'message': log.message,
+                        'module': log.module,
+                        'user_id': log.user_id,
+                        'created_at': log.created_at.isoformat()
+                    }
+                    for log in logs.items
+                ],
+                'pagination': {
+                    'page': logs.page,
+                    'pages': logs.pages,
+                    'per_page': logs.per_page,
+                    'total': logs.total
+                }
+            }
+        })
+    
+    except Exception as e:
+        logging.error(f"Error fetching system logs: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+@main_bp.route('/api/trade-history')
+@login_required
+def get_trade_history():
+    """Get user's trade history with pagination"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        status = request.args.get('status', 'all')
+        
+        query = Trade.query.filter_by(user_id=current_user.id)
+        
+        if status != 'all':
+            query = query.filter_by(status=status)
+        
+        trades = query.order_by(Trade.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'trades': [
+                    {
+                        'id': trade.id,
+                        'symbol': trade.symbol,
+                        'side': trade.side,
+                        'quantity': trade.quantity,
+                        'price': trade.price,
+                        'amount': trade.amount,
+                        'status': trade.status,
+                        'trade_type': trade.trade_type,
+                        'strategy': trade.strategy,
+                        'provider': trade.provider,
+                        'is_simulation': trade.is_simulation,
+                        'created_at': trade.created_at.isoformat(),
+                        'executed_at': trade.executed_at.isoformat() if trade.executed_at else None
+                    }
+                    for trade in trades.items
+                ],
+                'pagination': {
+                    'page': trades.page,
+                    'pages': trades.pages,
+                    'per_page': trades.per_page,
+                    'total': trades.total
+                }
+            }
+        })
+    
+    except Exception as e:
+        logging.error(f"Error fetching trade history: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
