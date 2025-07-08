@@ -58,54 +58,68 @@ class TaskScheduler:
     def _run_auto_trading(self):
         """Execute auto-trading cycle"""
         try:
-            settings = AutoTradingSettings.get_settings()
-            
-            if not settings.is_enabled:
-                return
-            
-            # Check if enough time has passed since last run
-            if settings.last_run:
-                time_since_last = datetime.utcnow() - settings.last_run
-                if time_since_last < timedelta(minutes=10):
+            from app import app
+            with app.app_context():
+                settings = AutoTradingSettings.get_settings()
+                
+                if not settings.is_enabled:
                     return
-            
-            self.logger.info("Starting scheduled auto-trading cycle")
-            
-            # Run auto-trading in a separate thread to avoid blocking
-            trading_thread = threading.Thread(target=run_auto_trading)
-            trading_thread.daemon = True
-            trading_thread.start()
-            
-            # Log the execution
-            self._log_system_event('info', 'Auto-trading cycle initiated by scheduler')
+                
+                # Check if enough time has passed since last run
+                if settings.last_run:
+                    time_since_last = datetime.utcnow() - settings.last_run
+                    if time_since_last < timedelta(minutes=10):
+                        return
+                
+                self.logger.info("Starting scheduled auto-trading cycle")
+                
+                # Run auto-trading in a separate thread to avoid blocking
+                trading_thread = threading.Thread(target=run_auto_trading)
+                trading_thread.daemon = True
+                trading_thread.start()
+                
+                # Log the execution
+                self._log_system_event('info', 'Auto-trading cycle initiated by scheduler')
             
         except Exception as e:
             self.logger.error(f"Error in scheduled auto-trading: {str(e)}")
-            self._log_system_event('error', f'Scheduled auto-trading failed: {str(e)}')
+            try:
+                from app import app
+                with app.app_context():
+                    self._log_system_event('error', f'Scheduled auto-trading failed: {str(e)}')
+            except:
+                pass
     
     def _cleanup_old_logs(self):
         """Clean up old system logs"""
         try:
-            # Delete logs older than 30 days
-            cutoff_date = datetime.utcnow() - timedelta(days=30)
-            
-            old_logs = SystemLog.query.filter(
-                SystemLog.created_at < cutoff_date
-            ).count()
-            
-            if old_logs > 0:
-                SystemLog.query.filter(
+            from app import app
+            with app.app_context():
+                # Delete logs older than 30 days
+                cutoff_date = datetime.utcnow() - timedelta(days=30)
+                
+                old_logs = SystemLog.query.filter(
                     SystemLog.created_at < cutoff_date
-                ).delete()
+                ).count()
                 
-                db.session.commit()
-                
-                self.logger.info(f"Cleaned up {old_logs} old log entries")
-                self._log_system_event('info', f'Cleaned up {old_logs} old log entries')
+                if old_logs > 0:
+                    SystemLog.query.filter(
+                        SystemLog.created_at < cutoff_date
+                    ).delete()
+                    
+                    db.session.commit()
+                    
+                    self.logger.info(f"Cleaned up {old_logs} old log entries")
+                    self._log_system_event('info', f'Cleaned up {old_logs} old log entries')
         
         except Exception as e:
             self.logger.error(f"Error cleaning up logs: {str(e)}")
-            self._log_system_event('error', f'Log cleanup failed: {str(e)}')
+            try:
+                from app import app
+                with app.app_context():
+                    self._log_system_event('error', f'Log cleanup failed: {str(e)}')
+            except:
+                pass
     
     def _update_api_status(self):
         """Update API connection status for all users"""
