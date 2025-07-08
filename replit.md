@@ -82,7 +82,7 @@ Arbion is a secure, AI-powered trading platform that enables users to connect th
 
 ### Required APIs
 - **OpenAI API**: GPT-4 for natural language processing
-- **Coinbase Pro API**: Cryptocurrency trading execution
+- **Coinbase API**: Cryptocurrency trading execution (OAuth2 with state validation)
 - **Schwab API**: Stock and options trading execution
 
 ### Infrastructure Dependencies
@@ -129,6 +129,7 @@ Changelog:
   - Enhanced dashboard with live market data and technical indicators
   - Improved AI trading with comprehensive market analysis integration
   - Schwab OAuth2 integration with PKCE for secure authentication
+  - Coinbase OAuth2 integration with secure state validation
   - Enhanced API settings interface with OAuth2 and legacy key support
   - Comprehensive test suite showing 71.4% success rate on core features
 

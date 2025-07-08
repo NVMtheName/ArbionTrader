@@ -5,6 +5,7 @@ from models import User, APICredential, Trade, Strategy, SystemLog, AutoTradingS
 from app import db
 from utils.encryption import encrypt_credentials, decrypt_credentials
 from utils.coinbase_connector import CoinbaseConnector
+from utils.coinbase_oauth import CoinbaseOAuth
 from utils.schwab_connector import SchwabConnector
 from utils.schwab_oauth import SchwabOAuth
 from utils.openai_trader import OpenAITrader
@@ -125,19 +126,33 @@ def api_settings():
         provider = request.form.get('provider')
         
         if provider == 'coinbase':
-            api_key = request.form.get('coinbase_api_key')
-            secret = request.form.get('coinbase_secret')
-            passphrase = request.form.get('coinbase_passphrase')
+            # Check if this is OAuth2 flow initiation
+            oauth_flow = request.form.get('oauth_flow')
             
-            if not all([api_key, secret, passphrase]):
-                flash('All Coinbase API fields are required.', 'error')
-                return redirect(url_for('main.api_settings'))
-            
-            credentials = {
-                'api_key': api_key,
-                'secret': secret,
-                'passphrase': passphrase
-            }
+            if oauth_flow == 'true':
+                # Initiate OAuth2 flow
+                try:
+                    coinbase_oauth = CoinbaseOAuth()
+                    auth_url = coinbase_oauth.get_authorization_url()
+                    return redirect(auth_url)
+                except Exception as e:
+                    flash(f'OAuth2 initialization failed: {str(e)}', 'error')
+                    return redirect(url_for('main.api_settings'))
+            else:
+                # Legacy API key method (deprecated)
+                api_key = request.form.get('coinbase_api_key')
+                secret = request.form.get('coinbase_secret')
+                passphrase = request.form.get('coinbase_passphrase')
+                
+                if not all([api_key, secret, passphrase]):
+                    flash('All Coinbase API fields are required.', 'error')
+                    return redirect(url_for('main.api_settings'))
+                
+                credentials = {
+                    'api_key': api_key,
+                    'secret': secret,
+                    'passphrase': passphrase
+                }
         
         elif provider == 'schwab':
             # Check if this is OAuth2 flow initiation
@@ -235,12 +250,18 @@ def test_api_connection():
         credentials = decrypt_credentials(credential.encrypted_credentials)
         
         if provider == 'coinbase':
-            connector = CoinbaseConnector(
-                credentials['api_key'],
-                credentials['secret'],
-                credentials['passphrase']
-            )
-            result = connector.test_connection()
+            # Check if credentials contain OAuth2 token
+            if 'access_token' in credentials:
+                coinbase_oauth = CoinbaseOAuth()
+                result = coinbase_oauth.test_connection(credentials['access_token'])
+            else:
+                # Legacy API key method
+                connector = CoinbaseConnector(
+                    credentials['api_key'],
+                    credentials['secret'],
+                    credentials['passphrase']
+                )
+                result = connector.test_connection()
         
         elif provider == 'schwab':
             # Check if credentials contain OAuth2 token
@@ -344,6 +365,65 @@ def schwab_oauth_setup():
         return redirect(auth_url)
     except Exception as e:
         flash(f'OAuth2 setup failed: {str(e)}', 'error')
+        return redirect(url_for('main.api_settings'))
+
+@main_bp.route('/oauth_callback/coinbase')
+def oauth_callback_coinbase():
+    """Handle Coinbase OAuth2 callback"""
+    try:
+        # Get authorization code and state from callback
+        auth_code = request.args.get('code')
+        state = request.args.get('state')
+        error = request.args.get('error')
+        
+        if error:
+            flash(f'Coinbase authorization failed: {error}', 'error')
+            return redirect(url_for('main.api_settings'))
+        
+        if not auth_code:
+            flash('Authorization code missing from Coinbase callback', 'error')
+            return redirect(url_for('main.api_settings'))
+        
+        # Exchange code for token
+        coinbase_oauth = CoinbaseOAuth()
+        token_result = coinbase_oauth.exchange_code_for_token(auth_code, state)
+        
+        if not token_result['success']:
+            flash(f'Token exchange failed: {token_result["message"]}', 'error')
+            return redirect(url_for('main.api_settings'))
+        
+        # Encrypt and save credentials
+        encrypted_creds = encrypt_credentials(token_result['credentials'])
+        
+        # Check if credentials already exist
+        existing_cred = APICredential.query.filter_by(
+            user_id=current_user.id,
+            provider='coinbase'
+        ).first()
+        
+        if existing_cred:
+            existing_cred.encrypted_credentials = encrypted_creds
+            existing_cred.updated_at = datetime.utcnow()
+            existing_cred.test_status = 'success'
+        else:
+            new_cred = APICredential(
+                user_id=current_user.id,
+                provider='coinbase',
+                encrypted_credentials=encrypted_creds,
+                test_status='success'
+            )
+            db.session.add(new_cred)
+        
+        db.session.commit()
+        
+        flash('Coinbase OAuth2 authentication successful!', 'success')
+        logging.info(f"Coinbase OAuth2 credentials saved for user {current_user.id}")
+        
+        return redirect(url_for('main.api_settings'))
+    
+    except Exception as e:
+        logging.error(f"Error in Coinbase OAuth2 callback: {str(e)}")
+        flash(f'OAuth2 callback error: {str(e)}', 'error')
         return redirect(url_for('main.api_settings'))
 
 @main_bp.route('/strategies')

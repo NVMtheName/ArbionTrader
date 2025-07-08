@@ -1,0 +1,160 @@
+# Coinbase Integration Specification
+
+This document provides a full technical specification for integrating Coinbase API into the Arbion platform. It covers OAuth2 authentication, data access, and integration within the app’s backend architecture.
+
+---
+
+## 🔐 OAuth2 Authentication Flow
+
+### Base Authorization Flow
+Coinbase uses OAuth2 for user authorization. The steps for integrating OAuth are:
+
+1. **User clicks “Connect Coinbase”**
+2. **They are redirected to:**
+```
+https://www.coinbase.com/oauth/authorize?response_type=code
+  &client_id=YOUR_CLIENT_ID
+  &redirect_uri=https://www.arbion.ai/oauth_callback/coinbase
+  &state=secureRandomString
+  &scope=wallet:accounts:read,wallet:transactions:read
+```
+
+3. **Coinbase redirects back with:**
+```
+https://www.arbion.ai/oauth_callback/coinbase?code=abc123&state=secureRandomString
+```
+
+4. **Backend exchanges the `code` for tokens** using:
+```
+POST https://api.coinbase.com/oauth/token
+```
+
+With body:
+```json
+{
+  "grant_type": "authorization_code",
+  "code": "abc123",
+  "client_id": "YOUR_CLIENT_ID",
+  "client_secret": "YOUR_CLIENT_SECRET",
+  "redirect_uri": "https://www.arbion.ai/oauth_callback/coinbase"
+}
+```
+
+5. **Coinbase returns:**
+```json
+{
+  "access_token": "ACCESS_TOKEN",
+  "refresh_token": "REFRESH_TOKEN",
+  "expires_in": 7200,
+  "token_type": "bearer",
+  "scope": "wallet:accounts:read wallet:transactions:read"
+}
+```
+
+---
+
+## 🔄 Token Refresh
+
+When `access_token` expires, refresh it via:
+
+```
+POST https://api.coinbase.com/oauth/token
+```
+
+With:
+```json
+{
+  "grant_type": "refresh_token",
+  "refresh_token": "REFRESH_TOKEN",
+  "client_id": "YOUR_CLIENT_ID",
+  "client_secret": "YOUR_CLIENT_SECRET"
+}
+```
+
+---
+
+## 📊 Data Access
+
+Once authenticated, you can:
+
+### List accounts:
+```
+GET https://api.coinbase.com/v2/accounts
+Authorization: Bearer ACCESS_TOKEN
+```
+
+### Get account transactions:
+```
+GET https://api.coinbase.com/v2/accounts/{account_id}/transactions
+Authorization: Bearer ACCESS_TOKEN
+```
+
+### Webhooks (optional for auto-trading triggers):
+- Coinbase supports webhook events (optional).
+- Recommended to register at `https://arbion.ai/webhooks/coinbase`
+
+---
+
+## 🗂️ Integration in Arbion Codebase
+
+### Callback Route:
+Flask route at:
+```python
+@app.route('/oauth_callback/coinbase')
+def coinbase_callback():
+    code = request.args.get('code')
+    # Exchange code for token, store to DB
+```
+
+### Token Storage:
+- Save `access_token`, `refresh_token`, and `expires_at` securely in the DB (encrypted).
+- Use background refresh jobs or refresh on request when expired.
+
+### User Permissions:
+- Tied to logged-in user
+- Only Superadmins see token expiration status or can refresh manually
+
+---
+
+## 🧪 Test Connection Endpoint
+Include `/api/test_connection/coinbase` route to:
+- Validate current token
+- Pull account ID and basic balances
+- Return status (success/fail) for user UI
+
+---
+
+## ✅ UI Integration
+
+In `api_settings.html`:
+- Fields for `client_id`, `client_secret`, `redirect_uri` (hidden)
+- “Connect Coinbase” button triggers OAuth redirect
+- After callback, show “✅ Connected” or error toast
+- Show wallet account balances in dashboard sidebar (optional)
+
+---
+
+## 🔐 Security Notes
+
+- Never expose `client_secret` on frontend
+- Use HTTPS callback URL: `https://www.arbion.ai/oauth_callback/coinbase`
+- Rotate tokens periodically
+- Encrypt all sensitive fields in database (PostgreSQL column-level encryption)
+
+---
+
+## 🔧 Dependencies
+
+Ensure these are in `requirements.txt`:
+```
+requests
+flask
+```
+
+---
+
+## 📍 Notes
+
+- Live docs: https://docs.cdp.coinbase.com/
+- Use sandbox keys during development if available
+- Make sure to log all Coinbase API failures in `/logs`

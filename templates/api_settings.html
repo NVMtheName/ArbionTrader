@@ -44,58 +44,83 @@
                 </div>
             </div>
             
-            <form method="POST" class="space-y-4">
-                <input type="hidden" name="provider" value="coinbase">
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">API Key</label>
-                    <input 
-                        type="text" 
-                        name="coinbase_api_key" 
-                        class="input-field w-full" 
-                        placeholder="Enter your Coinbase API key"
-                        required
-                    >
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Secret</label>
-                    <input 
-                        type="password" 
-                        name="coinbase_secret" 
-                        class="input-field w-full" 
-                        placeholder="Enter your Coinbase secret"
-                        required
-                    >
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Passphrase</label>
-                    <input 
-                        type="password" 
-                        name="coinbase_passphrase" 
-                        class="input-field w-full" 
-                        placeholder="Enter your Coinbase passphrase"
-                        required
-                    >
-                </div>
-                
-                <div class="flex space-x-2">
-                    <button 
-                        type="submit" 
-                        class="btn-primary flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors"
-                    >
-                        Save Credentials
-                    </button>
-                    <button 
-                        type="button" 
-                        class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors"
-                        onclick="testConnection('coinbase')"
-                    >
-                        Test
+            <!-- OAuth2 Method (Recommended) -->
+            <div class="mb-4 p-4 bg-blue-900 bg-opacity-30 rounded-lg border border-blue-500">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="font-medium text-blue-300">OAuth2 Authentication (Recommended)</h4>
+                    <button type="button" onclick="showCoinbaseInfo()" class="text-blue-400 hover:text-blue-300">
+                        <i data-feather="info" class="w-4 h-4"></i>
                     </button>
                 </div>
-            </form>
+                <p class="text-sm text-gray-300 mb-3">
+                    Secure OAuth2 authentication for production-ready Coinbase integration.
+                </p>
+                <form method="POST">
+                    <input type="hidden" name="provider" value="coinbase">
+                    <input type="hidden" name="oauth_flow" value="true">
+                    <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
+                        <i data-feather="shield" class="w-4 h-4 inline mr-2"></i>
+                        Authenticate with Coinbase OAuth2
+                    </button>
+                </form>
+            </div>
+
+            <!-- Legacy API Key Method -->
+            <div class="mb-4 p-4 bg-yellow-900 bg-opacity-30 rounded-lg border border-yellow-500">
+                <h4 class="font-medium text-yellow-300 mb-2">Legacy API Key Method</h4>
+                <p class="text-sm text-gray-300 mb-3">
+                    Direct API key authentication (deprecated, use OAuth2 instead).
+                </p>
+                <form method="POST" class="space-y-4">
+                    <input type="hidden" name="provider" value="coinbase">
+                    <input type="hidden" name="oauth_flow" value="false">
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">API Key</label>
+                        <input 
+                            type="text" 
+                            name="coinbase_api_key" 
+                            class="input-field w-full" 
+                            placeholder="Enter your Coinbase API key"
+                        >
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Secret</label>
+                        <input 
+                            type="password" 
+                            name="coinbase_secret" 
+                            class="input-field w-full" 
+                            placeholder="Enter your Coinbase secret"
+                        >
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-1">Passphrase</label>
+                        <input 
+                            type="password" 
+                            name="coinbase_passphrase" 
+                            class="input-field w-full" 
+                            placeholder="Enter your Coinbase passphrase"
+                        >
+                    </div>
+                    
+                    <button type="submit" class="btn-secondary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
+                        Save Legacy Credentials
+                    </button>
+                </form>
+            </div>
+
+            <!-- Test Connection -->
+            <div class="flex justify-end">
+                <button 
+                    type="button" 
+                    class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                    onclick="testConnection('coinbase')"
+                >
+                    Test Connection
+                </button>
+            </div>
             
             {% if cred_status.get('coinbase', {}).get('last_tested') %}
                 <div class="mt-3 text-xs text-gray-500">
@@ -103,6 +128,9 @@
                 </div>
             {% endif %}
         </div>
+        
+        <!-- Include Coinbase OAuth2 Info Modal -->
+        {% include 'coinbase_oauth_info.html' %}
         
         <!-- Schwab API -->
         <div class="card">
