@@ -1,0 +1,149 @@
+
+# 🧾 Arbion AI Trading Dashboard – Developer Handoff Document
+
+## 🧠 Project Summary
+**Arbion** is a secure, AI-powered trading platform that allows users to connect their real brokerage APIs (Schwab, Coinbase), use natural language to trigger trades via OpenAI, and optionally automate pre-configured strategies (e.g., Wheel, Collar). It includes a role-based user management system and a dark-themed, Coinbase-style UI.
+
+## 🔧 Core Features Overview
+
+### 1. 🔐 Authentication System
+- **User roles**: `superadmin`, `admin`, `standard`
+- Built with Flask-Login
+- Superadmin can:
+  - Add/remove/promote users
+  - Access system logs
+  - Control automation & billing settings
+
+### 2. 🔑 API Credential Management
+- Users can store API credentials for:
+  - **Coinbase**
+  - **Schwab**
+  - **OpenAI**
+- Fields:
+  - Key / Secret / Passphrase where applicable
+- **Test Connection** buttons validate credentials
+- Stored in Postgres using encryption at rest
+
+### 3. 💬 Natural Language Trading
+- Prompt bar accepts freeform input:
+  - e.g., _“Buy $200 of ETH if MACD crosses above signal line”_
+- Uses OpenAI (chat + function calling) to parse into structured trade logic
+- Executes via:
+  - `coinbase_connector.py`
+  - `schwab_connector.py`
+- **Simulation Mode** toggle (superadmin only)
+
+### 4. ⚙️ Auto-Trading Engine
+- Superadmin can toggle automation for each strategy:
+  - Wheel
+  - Collar
+  - AI-driven
+- Executes in background via:
+  - Celery (preferred)  
+  - Heroku Scheduler (fallback)
+- Uses real-time market data from connected APIs
+
+### 5. 🖥️ Admin Dashboard (UX/UI)
+- Inspired by Coinbase Pro
+- Left nav sidebar with:
+  - Dashboard
+  - Natural Trade
+  - Strategies
+  - Auto-Trading
+  - API Settings
+  - User Management (superadmin only)
+  - Account/Profile
+- Status indicators in top bar:
+  - API status
+  - Auto-trading ON/OFF
+  - User role
+
+## 🏗️ Tech Stack
+
+| Layer          | Tech Used                      |
+|----------------|--------------------------------|
+| Backend        | Flask, Flask-Login, SQLAlchemy |
+| Frontend       | Jinja2, TailwindCSS (Dark)     |
+| Database       | PostgreSQL (Heroku)            |
+| Auth           | bcrypt password hashing        |
+| External APIs  | OpenAI, Coinbase, Schwab       |
+| Deployment     | Heroku + GitHub CI             |
+| Background Jobs| Celery w/ Redis (or Heroku Scheduler) |
+| Secure Storage | Encrypted credentials in DB    |
+
+## 🧱 File & Folder Structure
+
+```
+arbion/
+├── app.py
+├── config.py
+├── requirements.txt
+├── runtime.txt
+├── Procfile
+├── templates/
+│   ├── base.html
+│   ├── login.html
+│   ├── dashboard.html
+│   ├── api_settings.html
+│   ├── natural_trade.html
+│   ├── strategies.html
+│   ├── auto_trading.html
+│   ├── user_management.html
+│   ├── account.html
+├── static/
+│   ├── css/
+│   ├── js/
+│   └── img/
+├── arbion/
+│   ├── __init__.py
+│   ├── routes.py
+│   ├── models.py
+│   ├── auth.py
+│   ├── utils/
+│   │   ├── coinbase_connector.py
+│   │   ├── schwab_connector.py
+│   │   └── openai_trader.py
+│   └── tasks/
+│       └── auto_trading_tasks.py
+├── migrations/
+└── README.md
+```
+
+## 🧪 Development Instructions
+
+### 🛠 Local Setup
+```bash
+git clone <repo-url>
+cd arbion
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+createdb arbion_db
+flask db upgrade
+flask run
+```
+
+### 🔐 Heroku Deployment
+- Add `runtime.txt` → `python-3.11.x`
+- Ensure `Procfile` = `web: gunicorn app:app`
+- Set environment variables in Heroku config:
+  - `SECRET_KEY`
+  - `DATABASE_URL`
+  - `OPENAI_API_KEY`
+  - `COINBASE_API_KEY`, `COINBASE_SECRET`, etc.
+
+## 👥 Default Admin Login
+- **Username**: `nvm427@gmail.com`  
+- **Password**: `$@MP$0n9174201989`
+
+## 🔄 Background Job Options
+- **Celery** + Redis preferred (scalable, modular)
+- Heroku Scheduler fallback supported for minimal deployment
+- Can be extended to trigger auto-trades every 15 minutes
+
+## 🧩 Future Enhancements
+- Push/email alerts
+- Payment integration (Stripe)
+- Tiered billing logic
+- Trade analytics + charts
+- Historical performance dashboards
