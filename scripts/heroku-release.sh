@@ -8,21 +8,24 @@ export FLASK_APP=wsgi.py
 # Run database migrations if needed
 echo "Running database migrations..."
 python -c "
-from app import create_app, db
-from flask_migrate import upgrade
 import os
+from app import create_app, db
+
+# Fix DATABASE_URL for newer SQLAlchemy versions
+database_url = os.environ.get('DATABASE_URL', '')
+if database_url.startswith('postgres://'):
+    os.environ['DATABASE_URL'] = database_url.replace('postgres://', 'postgresql://', 1)
+    print('Fixed DATABASE_URL for SQLAlchemy compatibility')
 
 app = create_app()
 with app.app_context():
     try:
-        # Try to run migrations
-        upgrade()
-        print('Database migrations completed successfully')
-    except Exception as e:
-        print(f'Migration failed or no migrations needed: {e}')
         # Ensure tables are created
         db.create_all()
-        print('Database tables created')
+        print('Database tables created successfully')
+    except Exception as e:
+        print(f'Database setup failed: {e}')
+        exit(1)
 "
 
 # Create default superadmin user if needed
