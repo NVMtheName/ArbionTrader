@@ -24,14 +24,14 @@ After adding the domain, Heroku will provide a DNS target. You'll need to add th
 ```
 Type: ALIAS or ANAME
 Name: @
-Target: [DNS target from Heroku, e.g., sharp-rain-123.herokudns.com]
+Target: fathomless-honeydew-zv6ene3xmo3rbgkjenzxyql4.herokudns.com
 ```
 
 ### For WWW Subdomain (www.arbion.ai):
 ```
 Type: CNAME
 Name: www
-Target: [DNS target from Heroku, e.g., sharp-rain-123.herokudns.com]
+Target: hidden-seahorse-r47usw41xjogji02um4hhrq2.herokudns.com
 ```
 
 ## Step 3: SSL Certificate Configuration

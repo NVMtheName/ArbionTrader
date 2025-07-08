@@ -146,3 +146,11 @@ Changelog:
 ## User Preferences
 
 Preferred communication style: Simple, everyday language.
+
+## Deployment Information
+
+### Custom Domain Configuration
+- **Root Domain**: arbion.ai → fathomless-honeydew-zv6ene3xmo3rbgkjenzxyql4.herokudns.com
+- **WWW Subdomain**: www.arbion.ai → hidden-seahorse-r47usw41xjogji02um4hhrq2.herokudns.com
+- **SSL Certificate**: parasaurolophus-89788
+- **Status**: Ready for DNS configuration
