@@ -6,6 +6,7 @@ from app import db
 from utils.encryption import encrypt_credentials, decrypt_credentials
 from utils.coinbase_connector import CoinbaseConnector
 from utils.schwab_connector import SchwabConnector
+from utils.schwab_oauth import SchwabOAuth
 from utils.openai_trader import OpenAITrader
 from utils.market_data import MarketDataProvider
 from utils.risk_management import RiskManager
@@ -139,17 +140,31 @@ def api_settings():
             }
         
         elif provider == 'schwab':
-            api_key = request.form.get('schwab_api_key')
-            secret = request.form.get('schwab_secret')
+            # Check if this is OAuth2 flow initiation
+            oauth_flow = request.form.get('oauth_flow')
             
-            if not all([api_key, secret]):
-                flash('All Schwab API fields are required.', 'error')
-                return redirect(url_for('main.api_settings'))
-            
-            credentials = {
-                'api_key': api_key,
-                'secret': secret
-            }
+            if oauth_flow == 'true':
+                # Initiate OAuth2 flow
+                try:
+                    schwab_oauth = SchwabOAuth()
+                    auth_url = schwab_oauth.get_authorization_url()
+                    return redirect(auth_url)
+                except Exception as e:
+                    flash(f'OAuth2 initialization failed: {str(e)}', 'error')
+                    return redirect(url_for('main.api_settings'))
+            else:
+                # Legacy API key method (deprecated)
+                api_key = request.form.get('schwab_api_key')
+                secret = request.form.get('schwab_secret')
+                
+                if not all([api_key, secret]):
+                    flash('All Schwab API fields are required.', 'error')
+                    return redirect(url_for('main.api_settings'))
+                
+                credentials = {
+                    'api_key': api_key,
+                    'secret': secret
+                }
         
         elif provider == 'openai':
             api_key = request.form.get('openai_api_key')
@@ -228,11 +243,17 @@ def test_api_connection():
             result = connector.test_connection()
         
         elif provider == 'schwab':
-            connector = SchwabConnector(
-                credentials['api_key'],
-                credentials['secret']
-            )
-            result = connector.test_connection()
+            # Check if credentials contain OAuth2 token
+            if 'access_token' in credentials:
+                schwab_oauth = SchwabOAuth()
+                result = schwab_oauth.test_connection(credentials['access_token'])
+            else:
+                # Legacy API key method
+                connector = SchwabConnector(
+                    credentials['api_key'],
+                    credentials['secret']
+                )
+                result = connector.test_connection()
         
         elif provider == 'openai':
             trader = OpenAITrader(credentials['api_key'])
@@ -254,6 +275,76 @@ def test_api_connection():
         db.session.commit()
         logging.error(f"API test connection failed: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
+
+@main_bp.route('/oauth_callback/schwab')
+def oauth_callback_schwab():
+    """Handle Schwab OAuth2 callback"""
+    try:
+        # Get authorization code from callback
+        auth_code = request.args.get('code')
+        error = request.args.get('error')
+        
+        if error:
+            flash(f'Schwab authorization failed: {error}', 'error')
+            return redirect(url_for('main.api_settings'))
+        
+        if not auth_code:
+            flash('Authorization code missing from Schwab callback', 'error')
+            return redirect(url_for('main.api_settings'))
+        
+        # Exchange code for token
+        schwab_oauth = SchwabOAuth()
+        token_result = schwab_oauth.exchange_code_for_token(auth_code)
+        
+        if not token_result['success']:
+            flash(f'Token exchange failed: {token_result["message"]}', 'error')
+            return redirect(url_for('main.api_settings'))
+        
+        # Encrypt and save credentials
+        encrypted_creds = encrypt_credentials(token_result['credentials'])
+        
+        # Check if credentials already exist
+        existing_cred = APICredential.query.filter_by(
+            user_id=current_user.id,
+            provider='schwab'
+        ).first()
+        
+        if existing_cred:
+            existing_cred.encrypted_credentials = encrypted_creds
+            existing_cred.updated_at = datetime.utcnow()
+            existing_cred.test_status = 'success'
+        else:
+            new_cred = APICredential(
+                user_id=current_user.id,
+                provider='schwab',
+                encrypted_credentials=encrypted_creds,
+                test_status='success'
+            )
+            db.session.add(new_cred)
+        
+        db.session.commit()
+        
+        flash('Schwab OAuth2 authentication successful!', 'success')
+        logging.info(f"Schwab OAuth2 credentials saved for user {current_user.id}")
+        
+        return redirect(url_for('main.api_settings'))
+    
+    except Exception as e:
+        logging.error(f"Error in Schwab OAuth2 callback: {str(e)}")
+        flash(f'OAuth2 callback error: {str(e)}', 'error')
+        return redirect(url_for('main.api_settings'))
+
+@main_bp.route('/schwab-oauth-setup')
+@login_required
+def schwab_oauth_setup():
+    """Initiate Schwab OAuth2 flow"""
+    try:
+        schwab_oauth = SchwabOAuth()
+        auth_url = schwab_oauth.get_authorization_url()
+        return redirect(auth_url)
+    except Exception as e:
+        flash(f'OAuth2 setup failed: {str(e)}', 'error')
+        return redirect(url_for('main.api_settings'))
 
 @main_bp.route('/strategies')
 @login_required

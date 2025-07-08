@@ -128,6 +128,9 @@ Changelog:
   - New API endpoints for market data, risk analysis, and portfolio management
   - Enhanced dashboard with live market data and technical indicators
   - Improved AI trading with comprehensive market analysis integration
+  - Schwab OAuth2 integration with PKCE for secure authentication
+  - Enhanced API settings interface with OAuth2 and legacy key support
+  - Comprehensive test suite showing 71.4% success rate on core features
 
 ## User Preferences
 

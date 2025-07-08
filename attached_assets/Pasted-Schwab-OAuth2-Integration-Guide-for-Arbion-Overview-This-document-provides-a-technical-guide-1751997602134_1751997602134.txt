@@ -1,0 +1,167 @@
+Schwab OAuth2 Integration Guide for Arbion
+
+## 🔍 Overview
+
+This document provides a technical guide for integrating Schwab OAuth2 authentication (Authorization Code Flow with PKCE) into the Arbion Flask-based trading platform.
+
+---
+
+## ✅ OAuth2 Flow Used
+
+- **Type**: Authorization Code Flow with PKCE
+- **Purpose**: Authenticate Schwab users, fetch access/refresh tokens, and securely access Schwab trading/account APIs.
+
+---
+
+## 🔐 Callback URL
+
+**Registered Schwab Redirect URI:**  
+```
+https://www.arbion.ai/oauth_callback/schwab
+```
+
+> Ensure this matches exactly in both your Schwab developer portal settings and your `redirect_uri` parameter during auth flow.
+
+---
+
+## 🔗 Step 1: Authorization URL
+
+Redirect user to the following URL:
+
+```
+https://api.schwabapi.com/v1/oauth/authorize?
+  response_type=code&
+  client_id=YOUR_CLIENT_ID&
+  redirect_uri=https%3A%2F%2Fwww.arbion.ai%2Foauth_callback%2Fschwab&
+  code_challenge=CODE_CHALLENGE&
+  code_challenge_method=S256
+```
+
+- `code_challenge` is generated from a `code_verifier` (see utility function below).
+
+---
+
+## 🔁 Step 2: Token Exchange
+
+Once redirected back to your app:
+
+```http
+POST https://api.schwabapi.com/v1/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code
+&code=AUTH_CODE
+&client_id=YOUR_CLIENT_ID
+&redirect_uri=https://www.arbion.ai/oauth_callback/schwab
+&code_verifier=ORIGINAL_CODE_VERIFIER
+```
+
+**Response:**
+```json
+{
+  "access_token": "abc123...",
+  "refresh_token": "xyz456...",
+  "expires_in": 3600
+}
+```
+
+---
+
+## 🔁 Step 3: Refresh Token
+
+```http
+POST https://api.schwabapi.com/v1/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=refresh_token
+&refresh_token=REFRESH_TOKEN
+&client_id=YOUR_CLIENT_ID
+```
+
+---
+
+## 🗄️ Storage Schema (Suggested)
+
+| Field           | Type     | Notes                        |
+|----------------|----------|------------------------------|
+| client_id      | string   | Schwab app ID                |
+| access_token   | string   | Valid for 30–60 minutes      |
+| refresh_token  | string   | Valid for 90 days            |
+| token_expiry   | datetime | Store expiry to auto-refresh |
+| code_verifier  | string   | Store temporarily for PKCE   |
+
+Store all credentials encrypted in PostgreSQL.
+
+---
+
+## 🔐 PKCE Utility Functions
+
+```python
+# utils/pkce_utils.py
+import secrets, hashlib, base64
+
+def generate_pkce_pair():
+    code_verifier = secrets.token_urlsafe(64)
+    code_challenge = base64.urlsafe_b64encode(
+        hashlib.sha256(code_verifier.encode()).digest()
+    ).decode().rstrip("=")
+    return code_verifier, code_challenge
+```
+
+---
+
+## 🚏 Flask OAuth Callback Route
+
+```python
+# arbion/routes/oauth_routes.py
+
+@app.route('/oauth_callback/schwab')
+def oauth_callback_schwab():
+    code = request.args.get("code")
+    if not code:
+        return "Authorization code missing", 400
+
+    code_verifier = session.get("code_verifier")
+    data = {
+        "grant_type": "authorization_code",
+        "code": code,
+        "client_id": os.getenv("SCHWAB_CLIENT_ID"),
+        "redirect_uri": "https://www.arbion.ai/oauth_callback/schwab",
+        "code_verifier": code_verifier
+    }
+
+    headers = {'Content-Type': 'application/x-www-form-urlencoded'}
+    token_response = requests.post(
+        "https://api.schwabapi.com/v1/oauth/token",
+        headers=headers,
+        data=data
+    )
+
+    if token_response.ok:
+        token_data = token_response.json()
+        # store access_token, refresh_token, expiry time securely
+        return redirect(url_for('dashboard'))
+    else:
+        return f"Token exchange failed: {token_response.text}", 500
+```
+
+---
+
+## ✅ Security Checklist
+
+- Use HTTPS-only redirect URIs
+- Use PKCE with `code_challenge_method=S256`
+- Encrypt all tokens in storage
+- Never store client secret on frontend
+
+---
+
+## ✅ Testing & Validation
+
+- Use `Test Connection` button in the UI to hit a `/test_schwab_connection` endpoint
+- Log token expiration and refresh timestamps
+- Validate callback handling and graceful errors
+
+---
+
+For further help with Schwab integration or credential rotation, consult their [Developer Documentation](https://developer.schwab.com/).
