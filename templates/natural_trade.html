@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+
+{% block page_title %}Natural Language Trading{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="card">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-white">Natural Language Trading</h1>
+                <p class="text-gray-400 mt-1">Execute trades using natural language powered by AI</p>
+            </div>
+            <div class="flex items-center space-x-3">
+                <div class="flex items-center space-x-2">
+                    <i data-feather="cpu" class="w-5 h-5 text-purple-400"></i>
+                    <span class="text-sm text-gray-400">AI-Powered</span>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <i data-feather="shield" class="w-5 h-5 text-coinbase-green"></i>
+                    <span class="text-sm text-gray-400">Secure</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Trading Interface -->
+    <div class="card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="p-2 bg-coinbase-blue bg-opacity-20 rounded-lg">
+                <i data-feather="message-circle" class="w-6 h-6 text-coinbase-blue"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-white">Trading Prompt</h3>
+                <p class="text-sm text-gray-400">Describe your trading intention in natural language</p>
+            </div>
+        </div>
+        
+        <form method="POST" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Trading Instruction</label>
+                <textarea 
+                    name="prompt" 
+                    rows="4" 
+                    class="input-field w-full resize-none" 
+                    placeholder="Examples:
+• Buy $500 worth of Bitcoin
+• Sell 100 shares of AAPL at $150
+• Buy ETH if price drops below $2000
+• Sell 10 shares of TSLA at market price"
+                    required
+                ></textarea>
+            </div>
+            
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <div class="flex items-center space-x-2">
+                        <i data-feather="zap" class="w-4 h-4 text-yellow-400"></i>
+                        <span class="text-sm text-gray-400">Simulation Mode Active</span>
+                    </div>
+                </div>
+                
+                <button 
+                    type="submit" 
+                    class="btn-primary px-6 py-3 rounded-md text-sm font-medium transition-colors flex items-center space-x-2"
+                >
+                    <i data-feather="send" class="w-4 h-4"></i>
+                    <span>Execute Trade</span>
+                </button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Example Prompts -->
+    <div class="card">
+        <h3 class="text-lg font-semibold text-white mb-4">Example Trading Prompts</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="space-y-3">
+                <h4 class="text-sm font-medium text-coinbase-blue">Cryptocurrency Trading</h4>
+                <div class="space-y-2">
+                    <div class="p-3 bg-dark-card rounded-lg cursor-pointer hover:bg-opacity-80 transition-colors" onclick="fillPrompt('Buy $200 worth of Bitcoin')">
+                        <p class="text-sm text-gray-300">Buy $200 worth of Bitcoin</p>
+                    </div>
+                    <div class="p-3 bg-dark-card rounded-lg cursor-pointer hover:bg-opacity-80 transition-colors" onclick="fillPrompt('Sell 0.5 ETH at market price')">
+                        <p class="text-sm text-gray-300">Sell 0.5 ETH at market price</p>
+                    </div>
+                    <div class="p-3 bg-dark-card rounded-lg cursor-pointer hover:bg-opacity-80 transition-colors" onclick="fillPrompt('Buy $100 of ETH if price drops below $2000')">
+                        <p class="text-sm text-gray-300">Buy $100 of ETH if price drops below $2000</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="space-y-3">
+                <h4 class="text-sm font-medium text-coinbase-green">Stock Trading</h4>
+                <div class="space-y-2">
+                    <div class="p-3 bg-dark-card rounded-lg cursor-pointer hover:bg-opacity-80 transition-colors" onclick="fillPrompt('Buy 100 shares of AAPL at market price')">
+                        <p class="text-sm text-gray-300">Buy 100 shares of AAPL at market price</p>
+                    </div>
+                    <div class="p-3 bg-dark-card rounded-lg cursor-pointer hover:bg-opacity-80 transition-colors" onclick="fillPrompt('Sell 50 shares of TSLA at $250 limit')">
+                        <p class="text-sm text-gray-300">Sell 50 shares of TSLA at $250 limit</p>
+                    </div>
+                    <div class="p-3 bg-dark-card rounded-lg cursor-pointer hover:bg-opacity-80 transition-colors" onclick="fillPrompt('Buy SPY if RSI is below 30')">
+                        <p class="text-sm text-gray-300">Buy SPY if RSI is below 30</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- AI Processing Information -->
+    <div class="card">
+        <div class="flex items-center space-x-3 mb-4">
+            <div class="p-2 bg-purple-500 bg-opacity-20 rounded-lg">
+                <i data-feather="brain" class="w-6 h-6 text-purple-400"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-white">AI Processing Pipeline</h3>
+                <p class="text-sm text-gray-400">How your natural language instructions are processed</p>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-6">
+            <div class="text-center">
+                <div class="p-3 bg-coinbase-blue bg-opacity-20 rounded-lg mx-auto w-fit mb-3">
+                    <i data-feather="type" class="w-6 h-6 text-coinbase-blue"></i>
+                </div>
+                <h4 class="text-sm font-medium text-white mb-1">1. Input Analysis</h4>
+                <p class="text-xs text-gray-400">Natural language prompt is analyzed for trading intent</p>
+            </div>
+            
+            <div class="text-center">
+                <div class="p-3 bg-coinbase-green bg-opacity-20 rounded-lg mx-auto w-fit mb-3">
+                    <i data-feather="cpu" class="w-6 h-6 text-coinbase-green"></i>
+                </div>
+                <h4 class="text-sm font-medium text-white mb-1">2. AI Processing</h4>
+                <p class="text-xs text-gray-400">OpenAI extracts trading parameters and validates logic</p>
+            </div>
+            
+            <div class="text-center">
+                <div class="p-3 bg-purple-500 bg-opacity-20 rounded-lg mx-auto w-fit mb-3">
+                    <i data-feather="check-circle" class="w-6 h-6 text-purple-400"></i>
+                </div>
+                <h4 class="text-sm font-medium text-white mb-1">3. Validation</h4>
+                <p class="text-xs text-gray-400">Trade parameters are validated and risk-checked</p>
+            </div>
+            
+            <div class="text-center">
+                <div class="p-3 bg-yellow-500 bg-opacity-20 rounded-lg mx-auto w-fit mb-3">
+                    <i data-feather="trending-up" class="w-6 h-6 text-yellow-400"></i>
+                </div>
+                <h4 class="text-sm font-medium text-white mb-1">4. Execution</h4>
+                <p class="text-xs text-gray-400">Trade is executed through the appropriate broker API</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Safety Features -->
+    <div class="card">
+        <h3 class="text-lg font-semibold text-white mb-4">Safety Features</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="flex items-center space-x-3">
+                <i data-feather="shield-check" class="w-5 h-5 text-coinbase-green"></i>
+                <div>
+                    <p class="text-sm font-medium text-white">Simulation Mode</p>
+                    <p class="text-xs text-gray-400">All trades are simulated by default for testing</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <i data-feather="alert-triangle" class="w-5 h-5 text-yellow-400"></i>
+                <div>
+                    <p class="text-sm font-medium text-white">Risk Validation</p>
+                    <p class="text-xs text-gray-400">AI validates trades for potential risks and errors</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <i data-feather="eye" class="w-5 h-5 text-coinbase-blue"></i>
+                <div>
+                    <p class="text-sm font-medium text-white">Trade Logging</p>
+                    <p class="text-xs text-gray-400">All trades are logged with full audit trail</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <i data-feather="user-check" class="w-5 h-5 text-purple-400"></i>
+                <div>
+                    <p class="text-sm font-medium text-white">User Authorization</p>
+                    <p class="text-xs text-gray-400">Only authenticated users can execute trades</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Supported Formats -->
+    <div class="card">
+        <h3 class="text-lg font-semibold text-white mb-4">Supported Trading Formats</h3>
+        
+        <div class="space-y-4">
+            <div>
+                <h4 class="text-sm font-medium text-coinbase-blue mb-2">Market Orders</h4>
+                <ul class="text-sm text-gray-400 space-y-1">
+                    <li>• "Buy $500 worth of Bitcoin"</li>
+                    <li>• "Sell 100 shares of AAPL at market price"</li>
+                    <li>• "Buy 0.5 ETH immediately"</li>
+                </ul>
+            </div>
+            
+            <div>
+                <h4 class="text-sm font-medium text-coinbase-green mb-2">Limit Orders</h4>
+                <ul class="text-sm text-gray-400 space-y-1">
+                    <li>• "Buy TSLA at $200 per share"</li>
+                    <li>• "Sell Bitcoin at $50,000 limit"</li>
+                    <li>• "Buy 100 shares of SPY at $400 or better"</li>
+                </ul>
+            </div>
+            
+            <div>
+                <h4 class="text-sm font-medium text-purple-400 mb-2">Conditional Orders</h4>
+                <ul class="text-sm text-gray-400 space-y-1">
+                    <li>• "Buy ETH if price drops below $2000"</li>
+                    <li>• "Sell AAPL if RSI is above 70"</li>
+                    <li>• "Buy QQQ if MACD crosses above signal line"</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize Feather icons
+    feather.replace();
+    
+    function fillPrompt(text) {
+        const textarea = document.querySelector('textarea[name="prompt"]');
+        textarea.value = text;
+        textarea.focus();
+    }
+</script>
+{% endblock %}

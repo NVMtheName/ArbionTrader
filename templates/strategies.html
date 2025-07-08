@@ -1,0 +1,324 @@
+{% extends "base.html" %}
+
+{% block page_title %}Trading Strategies{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="card">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-white">Trading Strategies</h1>
+                <p class="text-gray-400 mt-1">Create and manage your automated trading strategies</p>
+            </div>
+            <button class="btn-primary px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2">
+                <i data-feather="plus" class="w-4 h-4"></i>
+                <span>New Strategy</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- Strategy Types Overview -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="card">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="p-2 bg-coinbase-blue bg-opacity-20 rounded-lg">
+                    <i data-feather="rotate-cw" class="w-6 h-6 text-coinbase-blue"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-white">Wheel Strategy</h3>
+                    <p class="text-sm text-gray-400">Cash-secured puts + covered calls</p>
+                </div>
+            </div>
+            
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-300">Risk Level</span>
+                    <span class="text-sm text-yellow-400">Medium</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-300">Market Type</span>
+                    <span class="text-sm text-gray-300">Stocks/ETFs</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-300">Expected Return</span>
+                    <span class="text-sm text-coinbase-green">15-25% annually</span>
+                </div>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t border-dark-border">
+                <p class="text-xs text-gray-400">
+                    Generate income by selling puts and calls on quality stocks while building long positions.
+                </p>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="p-2 bg-coinbase-green bg-opacity-20 rounded-lg">
+                    <i data-feather="shield" class="w-6 h-6 text-coinbase-green"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-white">Collar Strategy</h3>
+                    <p class="text-sm text-gray-400">Protective puts + covered calls</p>
+                </div>
+            </div>
+            
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-300">Risk Level</span>
+                    <span class="text-sm text-coinbase-green">Low</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-300">Market Type</span>
+                    <span class="text-sm text-gray-300">Stocks/ETFs</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-300">Expected Return</span>
+                    <span class="text-sm text-coinbase-green">5-15% annually</span>
+                </div>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t border-dark-border">
+                <p class="text-xs text-gray-400">
+                    Protect existing positions while generating income through covered calls.
+                </p>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="p-2 bg-purple-500 bg-opacity-20 rounded-lg">
+                    <i data-feather="cpu" class="w-6 h-6 text-purple-400"></i>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-white">AI Strategy</h3>
+                    <p class="text-sm text-gray-400">Machine learning driven</p>
+                </div>
+            </div>
+            
+            <div class="space-y-3">
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-300">Risk Level</span>
+                    <span class="text-sm text-coinbase-red">High</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-300">Market Type</span>
+                    <span class="text-sm text-gray-300">Stocks/Crypto</span>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span class="text-sm text-gray-300">Expected Return</span>
+                    <span class="text-sm text-coinbase-green">Variable</span>
+                </div>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t border-dark-border">
+                <p class="text-xs text-gray-400">
+                    AI-powered trading decisions based on market analysis and technical indicators.
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- User Strategies -->
+    <div class="card">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-semibold text-white">Your Strategies</h2>
+            <div class="flex items-center space-x-2">
+                <span class="text-sm text-gray-400">{{ strategies|length }} strategies</span>
+            </div>
+        </div>
+        
+        {% if strategies %}
+            <div class="space-y-4">
+                {% for strategy in strategies %}
+                <div class="p-4 bg-dark-card rounded-lg border border-dark-border">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center space-x-3">
+                            <div class="p-2 bg-{% if strategy.strategy_type == 'wheel' %}coinbase-blue{% elif strategy.strategy_type == 'collar' %}coinbase-green{% else %}purple-500{% endif %} bg-opacity-20 rounded-lg">
+                                <i data-feather="{% if strategy.strategy_type == 'wheel' %}rotate-cw{% elif strategy.strategy_type == 'collar' %}shield{% else %}cpu{% endif %}" class="w-5 h-5 text-{% if strategy.strategy_type == 'wheel' %}coinbase-blue{% elif strategy.strategy_type == 'collar' %}coinbase-green{% else %}purple-400{% endif %}"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-semibold text-white">{{ strategy.name }}</h3>
+                                <p class="text-sm text-gray-400">{{ strategy.strategy_type.title() }} Strategy</p>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if strategy.is_active %}bg-coinbase-green bg-opacity-20 text-coinbase-green{% else %}bg-gray-500 bg-opacity-20 text-gray-400{% endif %}">
+                                {% if strategy.is_active %}Active{% else %}Inactive{% endif %}
+                            </span>
+                            <button class="btn-secondary px-3 py-1 rounded-md text-xs font-medium transition-colors">
+                                Edit
+                            </button>
+                        </div>
+                    </div>
+                    
+                    {% if strategy.description %}
+                    <p class="text-sm text-gray-300 mb-3">{{ strategy.description }}</p>
+                    {% endif %}
+                    
+                    <div class="flex items-center justify-between text-sm">
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center space-x-1">
+                                <i data-feather="calendar" class="w-4 h-4 text-gray-400"></i>
+                                <span class="text-gray-400">Created {{ strategy.created_at.strftime('%m/%d/%Y') }}</span>
+                            </div>
+                            <div class="flex items-center space-x-1">
+                                <i data-feather="clock" class="w-4 h-4 text-gray-400"></i>
+                                <span class="text-gray-400">Updated {{ strategy.updated_at.strftime('%m/%d/%Y') }}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center space-x-2">
+                            <button class="text-coinbase-blue hover:text-blue-400 transition-colors">
+                                <i data-feather="bar-chart-2" class="w-4 h-4"></i>
+                            </button>
+                            <button class="text-gray-400 hover:text-white transition-colors">
+                                <i data-feather="settings" class="w-4 h-4"></i>
+                            </button>
+                            <button class="text-gray-400 hover:text-coinbase-red transition-colors">
+                                <i data-feather="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-8">
+                <i data-feather="trending-up" class="w-12 h-12 text-gray-500 mx-auto mb-4"></i>
+                <p class="text-gray-400">No strategies created yet</p>
+                <p class="text-sm text-gray-500 mt-1">Create your first trading strategy to get started</p>
+                <button class="btn-primary px-4 py-2 rounded-md text-sm font-medium transition-colors mt-4">
+                    Create Strategy
+                </button>
+            </div>
+        {% endif %}
+    </div>
+    
+    <!-- Strategy Performance -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card">
+            <h3 class="text-lg font-semibold text-white mb-4">Strategy Performance</h3>
+            
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-300">Total Return</span>
+                    <span class="text-sm text-coinbase-green">+12.5%</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-300">Win Rate</span>
+                    <span class="text-sm text-white">68%</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-300">Max Drawdown</span>
+                    <span class="text-sm text-coinbase-red">-3.2%</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-300">Sharpe Ratio</span>
+                    <span class="text-sm text-white">1.8</span>
+                </div>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t border-dark-border">
+                <div class="flex items-center justify-between text-xs text-gray-400">
+                    <span>Last 30 days</span>
+                    <button class="text-coinbase-blue hover:text-blue-400 transition-colors">
+                        View Details
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3 class="text-lg font-semibold text-white mb-4">Recent Activity</h3>
+            
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-coinbase-green rounded-full"></div>
+                        <span class="text-sm text-gray-300">Wheel Strategy executed</span>
+                    </div>
+                    <span class="text-xs text-gray-400">2h ago</span>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-coinbase-blue rounded-full"></div>
+                        <span class="text-sm text-gray-300">AI analysis completed</span>
+                    </div>
+                    <span class="text-xs text-gray-400">4h ago</span>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                        <span class="text-sm text-gray-300">Collar adjustment made</span>
+                    </div>
+                    <span class="text-xs text-gray-400">1d ago</span>
+                </div>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t border-dark-border">
+                <button class="text-coinbase-blue hover:text-blue-400 transition-colors text-xs">
+                    View All Activity
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Strategy Documentation -->
+    <div class="card">
+        <h3 class="text-lg font-semibold text-white mb-4">Strategy Documentation</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center space-x-2 mb-2">
+                    <i data-feather="book-open" class="w-5 h-5 text-coinbase-blue"></i>
+                    <h4 class="text-sm font-medium text-white">Strategy Guide</h4>
+                </div>
+                <p class="text-xs text-gray-400 mb-3">
+                    Learn how to create and optimize your trading strategies
+                </p>
+                <button class="text-coinbase-blue hover:text-blue-400 transition-colors text-xs">
+                    Read Guide
+                </button>
+            </div>
+            
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center space-x-2 mb-2">
+                    <i data-feather="video" class="w-5 h-5 text-coinbase-green"></i>
+                    <h4 class="text-sm font-medium text-white">Video Tutorials</h4>
+                </div>
+                <p class="text-xs text-gray-400 mb-3">
+                    Watch step-by-step tutorials on strategy implementation
+                </p>
+                <button class="text-coinbase-green hover:text-green-400 transition-colors text-xs">
+                    Watch Videos
+                </button>
+            </div>
+            
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center space-x-2 mb-2">
+                    <i data-feather="help-circle" class="w-5 h-5 text-purple-400"></i>
+                    <h4 class="text-sm font-medium text-white">FAQ</h4>
+                </div>
+                <p class="text-xs text-gray-400 mb-3">
+                    Common questions about automated trading strategies
+                </p>
+                <button class="text-purple-400 hover:text-purple-300 transition-colors text-xs">
+                    View FAQ
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize Feather icons
+    feather.replace();
+</script>
+{% endblock %}

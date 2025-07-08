@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Arbion AI Trading Platform</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'dark-bg': '#0d1421',
+                        'dark-surface': '#1a2332',
+                        'dark-card': '#253241',
+                        'dark-border': '#374151',
+                        'coinbase-blue': '#1652f0',
+                        'coinbase-green': '#05d9a1',
+                        'coinbase-red': '#f04438'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0d1421;
+            color: #e5e7eb;
+        }
+        
+        .input-field {
+            background-color: #253241;
+            border: 1px solid #374151;
+            color: #e5e7eb;
+            border-radius: 6px;
+            padding: 0.75rem;
+        }
+        
+        .input-field:focus {
+            outline: none;
+            border-color: #1652f0;
+            box-shadow: 0 0 0 3px rgba(22, 82, 240, 0.1);
+        }
+        
+        .btn-primary {
+            background-color: #1652f0;
+            color: white;
+            border: 1px solid #1652f0;
+        }
+        
+        .btn-primary:hover {
+            background-color: #0f3cc9;
+        }
+        
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+        
+        .alert-error {
+            background-color: rgba(240, 68, 56, 0.1);
+            border: 1px solid rgba(240, 68, 56, 0.3);
+            color: #f04438;
+        }
+        
+        .card {
+            background-color: #1a2332;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 2rem;
+        }
+    </style>
+</head>
+<body class="bg-dark-bg text-gray-300">
+    <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+        <div class="max-w-md w-full space-y-8">
+            <div class="text-center">
+                <div class="mx-auto h-12 w-12 bg-coinbase-blue rounded-full flex items-center justify-center">
+                    <i data-feather="trending-up" class="w-6 h-6 text-white"></i>
+                </div>
+                <h2 class="mt-6 text-3xl font-bold text-white">
+                    Sign in to Arbion
+                </h2>
+                <p class="mt-2 text-sm text-gray-400">
+                    AI-Powered Trading Platform
+                </p>
+            </div>
+            
+            <div class="card">
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'error' if category == 'error' else category }}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <form class="space-y-6" method="POST">
+                    <div>
+                        <label for="email" class="block text-sm font-medium text-gray-300">
+                            Email address
+                        </label>
+                        <div class="mt-1">
+                            <input 
+                                id="email" 
+                                name="email" 
+                                type="email" 
+                                required 
+                                class="input-field w-full" 
+                                placeholder="Enter your email"
+                            >
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <label for="password" class="block text-sm font-medium text-gray-300">
+                            Password
+                        </label>
+                        <div class="mt-1">
+                            <input 
+                                id="password" 
+                                name="password" 
+                                type="password" 
+                                required 
+                                class="input-field w-full" 
+                                placeholder="Enter your password"
+                            >
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <button 
+                            type="submit" 
+                            class="btn-primary w-full py-3 px-4 rounded-md text-sm font-medium transition-colors"
+                        >
+                            Sign in
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="mt-6 text-center">
+                    <p class="text-sm text-gray-400">
+                        Secure access with role-based permissions
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Demo Credentials Info -->
+            <div class="card">
+                <h3 class="text-lg font-medium text-white mb-3">Demo Credentials</h3>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Default Admin:</span>
+                        <span class="text-white">nvm427@gmail.com</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Password:</span>
+                        <span class="text-white font-mono">$@MP$0n9174201989</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Role:</span>
+                        <span class="text-coinbase-green">Superadmin</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="text-center">
+                <div class="flex items-center justify-center space-x-4 text-xs text-gray-500">
+                    <div class="flex items-center">
+                        <i data-feather="shield" class="w-4 h-4 mr-1"></i>
+                        <span>Secure</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i data-feather="lock" class="w-4 h-4 mr-1"></i>
+                        <span>Encrypted</span>
+                    </div>
+                    <div class="flex items-center">
+                        <i data-feather="zap" class="w-4 h-4 mr-1"></i>
+                        <span>AI-Powered</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize Feather icons
+        feather.replace();
+        
+        // Auto-hide flash messages after 5 seconds
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                alert.style.transition = 'opacity 0.5s';
+                alert.style.opacity = '0';
+                setTimeout(function() {
+                    alert.remove();
+                }, 500);
+            });
+        }, 5000);
+    </script>
+</body>
+</html>

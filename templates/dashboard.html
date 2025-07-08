@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Welcome Section -->
+    <div class="card">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-white">Welcome back, {{ current_user.username }}!</h1>
+                <p class="text-gray-400 mt-1">Monitor your trading activity and manage your strategies</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                {% if current_user.is_superadmin() and auto_trading_settings %}
+                    <div class="flex items-center space-x-2">
+                        <span class="status-indicator {% if auto_trading_settings.is_enabled %}status-success{% else %}status-error{% endif %}"></span>
+                        <span class="text-sm text-gray-400">Auto-Trading</span>
+                    </div>
+                    {% if auto_trading_settings.simulation_mode %}
+                        <div class="bg-yellow-500 bg-opacity-20 text-yellow-400 px-3 py-1 rounded-full text-sm">
+                            Simulation Mode
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Total Trades</p>
+                    <p class="text-2xl font-bold text-white">{{ recent_trades|length }}</p>
+                </div>
+                <div class="p-3 bg-coinbase-blue bg-opacity-20 rounded-lg">
+                    <i data-feather="activity" class="w-6 h-6 text-coinbase-blue"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">API Connections</p>
+                    <p class="text-2xl font-bold text-white">{{ api_status.values() | select('equalto', 'success') | list | length }}</p>
+                </div>
+                <div class="p-3 bg-coinbase-green bg-opacity-20 rounded-lg">
+                    <i data-feather="link" class="w-6 h-6 text-coinbase-green"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Account Status</p>
+                    <p class="text-2xl font-bold text-coinbase-green">{{ current_user.role.title() }}</p>
+                </div>
+                <div class="p-3 bg-purple-500 bg-opacity-20 rounded-lg">
+                    <i data-feather="user" class="w-6 h-6 text-purple-400"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Last Trade</p>
+                    <p class="text-2xl font-bold text-white">
+                        {% if recent_trades %}
+                            {{ recent_trades[0].created_at.strftime('%H:%M') }}
+                        {% else %}
+                            --:--
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="p-3 bg-yellow-500 bg-opacity-20 rounded-lg">
+                    <i data-feather="clock" class="w-6 h-6 text-yellow-400"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="card">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="p-2 bg-coinbase-blue bg-opacity-20 rounded-lg">
+                    <i data-feather="message-circle" class="w-5 h-5 text-coinbase-blue"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-white">Natural Language Trading</h3>
+            </div>
+            <p class="text-gray-400 text-sm mb-4">Execute trades using natural language commands powered by AI</p>
+            <a href="{{ url_for('main.natural_trade') }}" class="btn-primary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                Start Trading
+            </a>
+        </div>
+        
+        <div class="card">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="p-2 bg-coinbase-green bg-opacity-20 rounded-lg">
+                    <i data-feather="settings" class="w-5 h-5 text-coinbase-green"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-white">API Configuration</h3>
+            </div>
+            <p class="text-gray-400 text-sm mb-4">Configure your Coinbase, Schwab, and OpenAI API credentials</p>
+            <a href="{{ url_for('main.api_settings') }}" class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                Manage APIs
+            </a>
+        </div>
+        
+        <div class="card">
+            <div class="flex items-center space-x-3 mb-4">
+                <div class="p-2 bg-purple-500 bg-opacity-20 rounded-lg">
+                    <i data-feather="trending-up" class="w-5 h-5 text-purple-400"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-white">Trading Strategies</h3>
+            </div>
+            <p class="text-gray-400 text-sm mb-4">Create and manage automated trading strategies</p>
+            <a href="{{ url_for('main.strategies') }}" class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                View Strategies
+            </a>
+        </div>
+    </div>
+    
+    <!-- Recent Trading Activity -->
+    <div class="card">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-semibold text-white">Recent Trading Activity</h2>
+            <button class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                View All
+            </button>
+        </div>
+        
+        {% if recent_trades %}
+            <div class="overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-dark-border">
+                            <th class="text-left py-3 px-4 text-sm font-medium text-gray-400">Time</th>
+                            <th class="text-left py-3 px-4 text-sm font-medium text-gray-400">Symbol</th>
+                            <th class="text-left py-3 px-4 text-sm font-medium text-gray-400">Side</th>
+                            <th class="text-left py-3 px-4 text-sm font-medium text-gray-400">Quantity</th>
+                            <th class="text-left py-3 px-4 text-sm font-medium text-gray-400">Price</th>
+                            <th class="text-left py-3 px-4 text-sm font-medium text-gray-400">Status</th>
+                            <th class="text-left py-3 px-4 text-sm font-medium text-gray-400">Provider</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for trade in recent_trades %}
+                        <tr class="border-b border-dark-border hover:bg-dark-card transition-colors">
+                            <td class="py-3 px-4 text-sm text-gray-300">{{ trade.created_at.strftime('%m/%d %H:%M') }}</td>
+                            <td class="py-3 px-4 text-sm font-medium text-white">{{ trade.symbol }}</td>
+                            <td class="py-3 px-4 text-sm">
+                                <span class="px-2 py-1 rounded-full text-xs font-medium {% if trade.side == 'buy' %}bg-coinbase-green bg-opacity-20 text-coinbase-green{% else %}bg-coinbase-red bg-opacity-20 text-coinbase-red{% endif %}">
+                                    {{ trade.side.upper() }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-sm text-gray-300">{{ trade.quantity if trade.quantity else '--' }}</td>
+                            <td class="py-3 px-4 text-sm text-gray-300">
+                                {% if trade.price %}
+                                    ${{ "%.2f"|format(trade.price) }}
+                                {% else %}
+                                    Market
+                                {% endif %}
+                            </td>
+                            <td class="py-3 px-4 text-sm">
+                                <span class="px-2 py-1 rounded-full text-xs font-medium {% if trade.status == 'executed' %}bg-coinbase-green bg-opacity-20 text-coinbase-green{% elif trade.status == 'failed' %}bg-coinbase-red bg-opacity-20 text-coinbase-red{% else %}bg-yellow-500 bg-opacity-20 text-yellow-400{% endif %}">
+                                    {{ trade.status.upper() }}
+                                </span>
+                            </td>
+                            <td class="py-3 px-4 text-sm text-gray-300">
+                                <div class="flex items-center">
+                                    {% if trade.is_simulation %}
+                                        <i data-feather="play" class="w-4 h-4 mr-1 text-yellow-400"></i>
+                                    {% endif %}
+                                    {{ trade.provider.title() }}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-8">
+                <i data-feather="activity" class="w-12 h-12 text-gray-500 mx-auto mb-4"></i>
+                <p class="text-gray-400">No trading activity yet</p>
+                <p class="text-sm text-gray-500 mt-1">Start trading to see your activity here</p>
+            </div>
+        {% endif %}
+    </div>
+    
+    <!-- API Status Overview -->
+    <div class="card">
+        <h2 class="text-xl font-semibold text-white mb-6">API Connections</h2>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 bg-blue-500 bg-opacity-20 rounded-lg">
+                            <i data-feather="dollar-sign" class="w-5 h-5 text-blue-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-white">Coinbase</p>
+                            <p class="text-xs text-gray-400">Crypto Trading</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="status-indicator {% if api_status.get('coinbase') == 'success' %}status-success{% else %}status-error{% endif %}"></span>
+                        <span class="text-sm text-gray-400">
+                            {% if api_status.get('coinbase') == 'success' %}
+                                Connected
+                            {% else %}
+                                Not Connected
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 bg-green-500 bg-opacity-20 rounded-lg">
+                            <i data-feather="trending-up" class="w-5 h-5 text-green-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-white">Schwab</p>
+                            <p class="text-xs text-gray-400">Stock Trading</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="status-indicator {% if api_status.get('schwab') == 'success' %}status-success{% else %}status-error{% endif %}"></span>
+                        <span class="text-sm text-gray-400">
+                            {% if api_status.get('schwab') == 'success' %}
+                                Connected
+                            {% else %}
+                                Not Connected
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 bg-purple-500 bg-opacity-20 rounded-lg">
+                            <i data-feather="cpu" class="w-5 h-5 text-purple-400"></i>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-white">OpenAI</p>
+                            <p class="text-xs text-gray-400">AI Processing</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center">
+                        <span class="status-indicator {% if api_status.get('openai') == 'success' %}status-success{% else %}status-error{% endif %}"></span>
+                        <span class="text-sm text-gray-400">
+                            {% if api_status.get('openai') == 'success' %}
+                                Connected
+                            {% else %}
+                                Not Connected
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize Feather icons
+    feather.replace();
+</script>
+{% endblock %}

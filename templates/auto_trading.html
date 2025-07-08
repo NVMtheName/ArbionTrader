@@ -1,0 +1,390 @@
+{% extends "base.html" %}
+
+{% block page_title %}Auto-Trading{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="card">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-white">Auto-Trading Control</h1>
+                <p class="text-gray-400 mt-1">Manage automated trading strategies and system settings</p>
+            </div>
+            <div class="flex items-center space-x-4">
+                <div class="flex items-center space-x-2">
+                    <span class="status-indicator {% if settings.is_enabled %}status-success{% else %}status-error{% endif %}"></span>
+                    <span class="text-sm text-gray-400">
+                        Auto-Trading {% if settings.is_enabled %}Enabled{% else %}Disabled{% endif %}
+                    </span>
+                </div>
+                {% if settings.simulation_mode %}
+                    <div class="bg-yellow-500 bg-opacity-20 text-yellow-400 px-3 py-1 rounded-full text-sm">
+                        Simulation Mode
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Master Controls -->
+    <div class="card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="p-2 bg-coinbase-blue bg-opacity-20 rounded-lg">
+                <i data-feather="power" class="w-6 h-6 text-coinbase-blue"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-white">Master Controls</h3>
+                <p class="text-sm text-gray-400">Global auto-trading system settings</p>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="text-sm font-medium text-white">Auto-Trading System</h4>
+                        <p class="text-xs text-gray-400">Enable or disable all automated trading</p>
+                    </div>
+                    <form method="POST" class="inline">
+                        <input type="hidden" name="action" value="toggle_main">
+                        <button type="submit" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-coinbase-blue focus:ring-offset-2 {% if settings.is_enabled %}bg-coinbase-blue{% else %}bg-gray-600{% endif %}">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {% if settings.is_enabled %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="text-sm font-medium text-white">Simulation Mode</h4>
+                        <p class="text-xs text-gray-400">Test strategies without real money</p>
+                    </div>
+                    <form method="POST" class="inline">
+                        <input type="hidden" name="action" value="toggle_simulation">
+                        <button type="submit" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 {% if settings.simulation_mode %}bg-yellow-400{% else %}bg-gray-600{% endif %}">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {% if settings.simulation_mode %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            
+            <div class="space-y-4">
+                <div class="p-4 bg-dark-card rounded-lg">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <i data-feather="clock" class="w-4 h-4 text-gray-400"></i>
+                        <span class="text-sm font-medium text-white">Last Run</span>
+                    </div>
+                    <p class="text-sm text-gray-300">
+                        {% if settings.last_run %}
+                            {{ settings.last_run.strftime('%m/%d/%Y %H:%M:%S') }}
+                        {% else %}
+                            Never
+                        {% endif %}
+                    </p>
+                </div>
+                
+                <div class="p-4 bg-dark-card rounded-lg">
+                    <div class="flex items-center space-x-2 mb-2">
+                        <i data-feather="activity" class="w-4 h-4 text-gray-400"></i>
+                        <span class="text-sm font-medium text-white">System Status</span>
+                    </div>
+                    <p class="text-sm text-coinbase-green">
+                        {% if settings.is_enabled %}
+                            Running
+                        {% else %}
+                            Stopped
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Strategy Controls -->
+    <div class="card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="p-2 bg-coinbase-green bg-opacity-20 rounded-lg">
+                <i data-feather="trending-up" class="w-6 h-6 text-coinbase-green"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-white">Strategy Controls</h3>
+                <p class="text-sm text-gray-400">Enable or disable individual trading strategies</p>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Wheel Strategy -->
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 bg-coinbase-blue bg-opacity-20 rounded-lg">
+                            <i data-feather="rotate-cw" class="w-5 h-5 text-coinbase-blue"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-medium text-white">Wheel Strategy</h4>
+                            <p class="text-xs text-gray-400">Cash-secured puts + covered calls</p>
+                        </div>
+                    </div>
+                    <form method="POST" class="inline">
+                        <input type="hidden" name="action" value="toggle_wheel">
+                        <button type="submit" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-coinbase-blue focus:ring-offset-2 {% if settings.wheel_enabled %}bg-coinbase-blue{% else %}bg-gray-600{% endif %}">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {% if settings.wheel_enabled %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="space-y-2 text-xs">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Status:</span>
+                        <span class="{% if settings.wheel_enabled %}text-coinbase-green{% else %}text-gray-400{% endif %}">
+                            {% if settings.wheel_enabled %}Active{% else %}Inactive{% endif %}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Risk Level:</span>
+                        <span class="text-yellow-400">Medium</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Market:</span>
+                        <span class="text-gray-300">Stocks/ETFs</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Collar Strategy -->
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 bg-coinbase-green bg-opacity-20 rounded-lg">
+                            <i data-feather="shield" class="w-5 h-5 text-coinbase-green"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-medium text-white">Collar Strategy</h4>
+                            <p class="text-xs text-gray-400">Protective puts + covered calls</p>
+                        </div>
+                    </div>
+                    <form method="POST" class="inline">
+                        <input type="hidden" name="action" value="toggle_collar">
+                        <button type="submit" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-coinbase-green focus:ring-offset-2 {% if settings.collar_enabled %}bg-coinbase-green{% else %}bg-gray-600{% endif %}">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {% if settings.collar_enabled %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="space-y-2 text-xs">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Status:</span>
+                        <span class="{% if settings.collar_enabled %}text-coinbase-green{% else %}text-gray-400{% endif %}">
+                            {% if settings.collar_enabled %}Active{% else %}Inactive{% endif %}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Risk Level:</span>
+                        <span class="text-coinbase-green">Low</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Market:</span>
+                        <span class="text-gray-300">Stocks/ETFs</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- AI Strategy -->
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="p-2 bg-purple-500 bg-opacity-20 rounded-lg">
+                            <i data-feather="cpu" class="w-5 h-5 text-purple-400"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-medium text-white">AI Strategy</h4>
+                            <p class="text-xs text-gray-400">Machine learning driven</p>
+                        </div>
+                    </div>
+                    <form method="POST" class="inline">
+                        <input type="hidden" name="action" value="toggle_ai">
+                        <button type="submit" class="relative inline-flex h-6 w-11 items-centers rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 {% if settings.ai_enabled %}bg-purple-400{% else %}bg-gray-600{% endif %}">
+                            <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {% if settings.ai_enabled %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="space-y-2 text-xs">
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Status:</span>
+                        <span class="{% if settings.ai_enabled %}text-coinbase-green{% else %}text-gray-400{% endif %}">
+                            {% if settings.ai_enabled %}Active{% else %}Inactive{% endif %}
+                        </span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Risk Level:</span>
+                        <span class="text-coinbase-red">High</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-gray-400">Market:</span>
+                        <span class="text-gray-300">Stocks/Crypto</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- System Performance -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="card">
+            <h3 class="text-lg font-semibold text-white mb-4">System Performance</h3>
+            
+            <div class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-300">Uptime</span>
+                    <span class="text-sm text-coinbase-green">99.8%</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-300">Execution Speed</span>
+                    <span class="text-sm text-white">< 500ms</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-300">Success Rate</span>
+                    <span class="text-sm text-coinbase-green">98.5%</span>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-gray-300">Error Rate</span>
+                    <span class="text-sm text-gray-300">1.5%</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3 class="text-lg font-semibold text-white mb-4">Recent Activity</h3>
+            
+            <div class="space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-coinbase-green rounded-full"></div>
+                        <span class="text-sm text-gray-300">System cycle completed</span>
+                    </div>
+                    <span class="text-xs text-gray-400">5m ago</span>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-coinbase-blue rounded-full"></div>
+                        <span class="text-sm text-gray-300">Wheel strategy executed</span>
+                    </div>
+                    <span class="text-xs text-gray-400">12m ago</span>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-purple-400 rounded-full"></div>
+                        <span class="text-sm text-gray-300">AI analysis completed</span>
+                    </div>
+                    <span class="text-xs text-gray-400">18m ago</span>
+                </div>
+                
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-2">
+                        <div class="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                        <span class="text-sm text-gray-300">Market data updated</span>
+                    </div>
+                    <span class="text-xs text-gray-400">25m ago</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Safety Features -->
+    <div class="card">
+        <div class="flex items-center space-x-3 mb-6">
+            <div class="p-2 bg-coinbase-red bg-opacity-20 rounded-lg">
+                <i data-feather="shield-off" class="w-6 h-6 text-coinbase-red"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-white">Safety Features</h3>
+                <p class="text-sm text-gray-400">Risk management and safety controls</p>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center space-x-2 mb-2">
+                    <i data-feather="pause-circle" class="w-5 h-5 text-yellow-400"></i>
+                    <span class="text-sm font-medium text-white">Emergency Stop</span>
+                </div>
+                <p class="text-xs text-gray-400 mb-3">
+                    Immediately halt all trading activity
+                </p>
+                <button class="btn-danger px-3 py-1 rounded-md text-xs font-medium transition-colors">
+                    Emergency Stop
+                </button>
+            </div>
+            
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center space-x-2 mb-2">
+                    <i data-feather="dollar-sign" class="w-5 h-5 text-coinbase-green"></i>
+                    <span class="text-sm font-medium text-white">Position Limits</span>
+                </div>
+                <p class="text-xs text-gray-400 mb-3">
+                    Maximum position size protection
+                </p>
+                <button class="btn-secondary px-3 py-1 rounded-md text-xs font-medium transition-colors">
+                    Configure
+                </button>
+            </div>
+            
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center space-x-2 mb-2">
+                    <i data-feather="trending-down" class="w-5 h-5 text-coinbase-red"></i>
+                    <span class="text-sm font-medium text-white">Loss Limits</span>
+                </div>
+                <p class="text-xs text-gray-400 mb-3">
+                    Daily/weekly loss protection
+                </p>
+                <button class="btn-secondary px-3 py-1 rounded-md text-xs font-medium transition-colors">
+                    Configure
+                </button>
+            </div>
+            
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center space-x-2 mb-2">
+                    <i data-feather="alert-triangle" class="w-5 h-5 text-yellow-400"></i>
+                    <span class="text-sm font-medium text-white">Alerts</span>
+                </div>
+                <p class="text-xs text-gray-400 mb-3">
+                    Real-time notifications
+                </p>
+                <button class="btn-secondary px-3 py-1 rounded-md text-xs font-medium transition-colors">
+                    Configure
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Warning Notice -->
+    <div class="card border-l-4 border-l-coinbase-red">
+        <div class="flex items-start space-x-3">
+            <div class="p-2 bg-coinbase-red bg-opacity-20 rounded-lg">
+                <i data-feather="alert-triangle" class="w-6 h-6 text-coinbase-red"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-white">Important Notice</h3>
+                <p class="text-sm text-gray-400 mt-1">
+                    Auto-trading involves significant risk and should only be used with proper risk management. 
+                    Always test strategies in simulation mode before using real funds. Past performance does not guarantee future results.
+                </p>
+                <div class="mt-3 text-xs text-gray-500">
+                    By using auto-trading features, you acknowledge that you understand the risks involved and 
+                    are responsible for any losses that may occur.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize Feather icons
+    feather.replace();
+</script>
+{% endblock %}

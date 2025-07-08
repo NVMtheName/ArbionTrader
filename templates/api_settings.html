@@ -1,0 +1,419 @@
+{% extends "base.html" %}
+
+{% block page_title %}API Settings{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="card">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-white">API Settings</h1>
+                <p class="text-gray-400 mt-1">Configure your trading platform API credentials</p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <i data-feather="shield" class="w-5 h-5 text-coinbase-green"></i>
+                <span class="text-sm text-coinbase-green">Encrypted Storage</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- API Provider Cards -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Coinbase API -->
+        <div class="card">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-blue-500 bg-opacity-20 rounded-lg">
+                        <i data-feather="dollar-sign" class="w-6 h-6 text-blue-400"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">Coinbase Pro</h3>
+                        <p class="text-sm text-gray-400">Cryptocurrency Trading</p>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <span class="status-indicator {% if cred_status.get('coinbase', {}).get('status') == 'success' %}status-success{% else %}status-error{% endif %}"></span>
+                    <span class="text-xs text-gray-400">
+                        {% if cred_status.get('coinbase', {}).get('status') == 'success' %}
+                            Connected
+                        {% else %}
+                            Not Connected
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            
+            <form method="POST" class="space-y-4">
+                <input type="hidden" name="provider" value="coinbase">
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">API Key</label>
+                    <input 
+                        type="text" 
+                        name="coinbase_api_key" 
+                        class="input-field w-full" 
+                        placeholder="Enter your Coinbase API key"
+                        required
+                    >
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Secret</label>
+                    <input 
+                        type="password" 
+                        name="coinbase_secret" 
+                        class="input-field w-full" 
+                        placeholder="Enter your Coinbase secret"
+                        required
+                    >
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Passphrase</label>
+                    <input 
+                        type="password" 
+                        name="coinbase_passphrase" 
+                        class="input-field w-full" 
+                        placeholder="Enter your Coinbase passphrase"
+                        required
+                    >
+                </div>
+                
+                <div class="flex space-x-2">
+                    <button 
+                        type="submit" 
+                        class="btn-primary flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors"
+                    >
+                        Save Credentials
+                    </button>
+                    <button 
+                        type="button" 
+                        class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                        onclick="testConnection('coinbase')"
+                    >
+                        Test
+                    </button>
+                </div>
+            </form>
+            
+            {% if cred_status.get('coinbase', {}).get('last_tested') %}
+                <div class="mt-3 text-xs text-gray-500">
+                    Last tested: {{ cred_status.coinbase.last_tested.strftime('%m/%d/%Y %H:%M') }}
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Schwab API -->
+        <div class="card">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-green-500 bg-opacity-20 rounded-lg">
+                        <i data-feather="trending-up" class="w-6 h-6 text-green-400"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">Charles Schwab</h3>
+                        <p class="text-sm text-gray-400">Stock & Options Trading</p>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <span class="status-indicator {% if cred_status.get('schwab', {}).get('status') == 'success' %}status-success{% else %}status-error{% endif %}"></span>
+                    <span class="text-xs text-gray-400">
+                        {% if cred_status.get('schwab', {}).get('status') == 'success' %}
+                            Connected
+                        {% else %}
+                            Not Connected
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            
+            <form method="POST" class="space-y-4">
+                <input type="hidden" name="provider" value="schwab">
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">API Key</label>
+                    <input 
+                        type="text" 
+                        name="schwab_api_key" 
+                        class="input-field w-full" 
+                        placeholder="Enter your Schwab API key"
+                        required
+                    >
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Secret</label>
+                    <input 
+                        type="password" 
+                        name="schwab_secret" 
+                        class="input-field w-full" 
+                        placeholder="Enter your Schwab secret"
+                        required
+                    >
+                </div>
+                
+                <div class="flex space-x-2">
+                    <button 
+                        type="submit" 
+                        class="btn-primary flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors"
+                    >
+                        Save Credentials
+                    </button>
+                    <button 
+                        type="button" 
+                        class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                        onclick="testConnection('schwab')"
+                    >
+                        Test
+                    </button>
+                </div>
+            </form>
+            
+            {% if cred_status.get('schwab', {}).get('last_tested') %}
+                <div class="mt-3 text-xs text-gray-500">
+                    Last tested: {{ cred_status.schwab.last_tested.strftime('%m/%d/%Y %H:%M') }}
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- OpenAI API -->
+        <div class="card">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-purple-500 bg-opacity-20 rounded-lg">
+                        <i data-feather="cpu" class="w-6 h-6 text-purple-400"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">OpenAI</h3>
+                        <p class="text-sm text-gray-400">AI Natural Language Processing</p>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <span class="status-indicator {% if cred_status.get('openai', {}).get('status') == 'success' %}status-success{% else %}status-error{% endif %}"></span>
+                    <span class="text-xs text-gray-400">
+                        {% if cred_status.get('openai', {}).get('status') == 'success' %}
+                            Connected
+                        {% else %}
+                            Not Connected
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            
+            <form method="POST" class="space-y-4">
+                <input type="hidden" name="provider" value="openai">
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">API Key</label>
+                    <input 
+                        type="password" 
+                        name="openai_api_key" 
+                        class="input-field w-full" 
+                        placeholder="Enter your OpenAI API key"
+                        required
+                    >
+                </div>
+                
+                <div class="flex space-x-2">
+                    <button 
+                        type="submit" 
+                        class="btn-primary flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors"
+                    >
+                        Save Credentials
+                    </button>
+                    <button 
+                        type="button" 
+                        class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                        onclick="testConnection('openai')"
+                    >
+                        Test
+                    </button>
+                </div>
+            </form>
+            
+            {% if cred_status.get('openai', {}).get('last_tested') %}
+                <div class="mt-3 text-xs text-gray-500">
+                    Last tested: {{ cred_status.openai.last_tested.strftime('%m/%d/%Y %H:%M') }}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Security Information -->
+    <div class="card">
+        <div class="flex items-center space-x-3 mb-4">
+            <div class="p-2 bg-coinbase-green bg-opacity-20 rounded-lg">
+                <i data-feather="shield" class="w-6 h-6 text-coinbase-green"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-white">Security & Encryption</h3>
+                <p class="text-sm text-gray-400">Your API credentials are encrypted and stored securely</p>
+            </div>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div class="flex items-center space-x-3">
+                <i data-feather="lock" class="w-5 h-5 text-coinbase-green"></i>
+                <div>
+                    <p class="text-sm font-medium text-white">AES-256 Encryption</p>
+                    <p class="text-xs text-gray-400">Industry-standard encryption for all stored credentials</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <i data-feather="key" class="w-5 h-5 text-coinbase-green"></i>
+                <div>
+                    <p class="text-sm font-medium text-white">Secure Key Management</p>
+                    <p class="text-xs text-gray-400">Keys are derived from your session secret</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <i data-feather="eye-off" class="w-5 h-5 text-coinbase-green"></i>
+                <div>
+                    <p class="text-sm font-medium text-white">Zero-Knowledge Storage</p>
+                    <p class="text-xs text-gray-400">Your credentials are never stored in plain text</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center space-x-3">
+                <i data-feather="refresh-cw" class="w-5 h-5 text-coinbase-green"></i>
+                <div>
+                    <p class="text-sm font-medium text-white">Regular Testing</p>
+                    <p class="text-xs text-gray-400">Connections are tested periodically for validation</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- API Usage Guidelines -->
+    <div class="card">
+        <h3 class="text-lg font-semibold text-white mb-4">API Setup Guidelines</h3>
+        
+        <div class="space-y-4">
+            <div>
+                <h4 class="text-sm font-medium text-white mb-2">Coinbase Pro API</h4>
+                <ol class="text-sm text-gray-400 space-y-1 list-decimal list-inside">
+                    <li>Log in to your Coinbase Pro account</li>
+                    <li>Navigate to Settings → API</li>
+                    <li>Create a new API key with trading permissions</li>
+                    <li>Copy the API key, secret, and passphrase</li>
+                    <li>Ensure your IP address is whitelisted</li>
+                </ol>
+            </div>
+            
+            <div>
+                <h4 class="text-sm font-medium text-white mb-2">Charles Schwab API</h4>
+                <ol class="text-sm text-gray-400 space-y-1 list-decimal list-inside">
+                    <li>Apply for Schwab API access through their developer portal</li>
+                    <li>Complete the application process and verification</li>
+                    <li>Receive your API key and secret</li>
+                    <li>Set up OAuth2 authentication as required</li>
+                    <li>Test with paper trading before live trading</li>
+                </ol>
+            </div>
+            
+            <div>
+                <h4 class="text-sm font-medium text-white mb-2">OpenAI API</h4>
+                <ol class="text-sm text-gray-400 space-y-1 list-decimal list-inside">
+                    <li>Create an account at platform.openai.com</li>
+                    <li>Navigate to API keys in your account settings</li>
+                    <li>Create a new API key</li>
+                    <li>Set up billing and usage limits</li>
+                    <li>Keep your API key secure and never share it</li>
+                </ol>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Connection Test Modal -->
+<div id="testModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-dark-surface p-6 rounded-lg max-w-md w-full mx-4">
+        <div class="flex items-center space-x-3 mb-4">
+            <div class="p-2 bg-coinbase-blue bg-opacity-20 rounded-lg">
+                <i data-feather="wifi" class="w-6 h-6 text-coinbase-blue"></i>
+            </div>
+            <div>
+                <h3 class="text-lg font-semibold text-white">Testing Connection</h3>
+                <p class="text-sm text-gray-400">Please wait while we verify your credentials</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center justify-center py-4">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-coinbase-blue"></div>
+        </div>
+        
+        <div id="testResult" class="mt-4 hidden">
+            <div class="p-3 rounded-lg">
+                <p id="testMessage" class="text-sm"></p>
+            </div>
+        </div>
+        
+        <div class="flex justify-end mt-4">
+            <button onclick="closeTestModal()" class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                Close
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize Feather icons
+    feather.replace();
+    
+    function testConnection(provider) {
+        const modal = document.getElementById('testModal');
+        const testResult = document.getElementById('testResult');
+        const testMessage = document.getElementById('testMessage');
+        
+        // Show modal
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        
+        // Hide previous results
+        testResult.classList.add('hidden');
+        
+        // Create form data
+        const formData = new FormData();
+        formData.append('provider', provider);
+        
+        // Send test request
+        fetch('{{ url_for("main.test_api_connection") }}', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            testResult.classList.remove('hidden');
+            testMessage.textContent = data.message;
+            
+            if (data.success) {
+                testResult.className = 'mt-4 p-3 rounded-lg bg-coinbase-green bg-opacity-20 border border-coinbase-green border-opacity-30';
+                testMessage.className = 'text-sm text-coinbase-green';
+                
+                // Update status indicator
+                location.reload();
+            } else {
+                testResult.className = 'mt-4 p-3 rounded-lg bg-coinbase-red bg-opacity-20 border border-coinbase-red border-opacity-30';
+                testMessage.className = 'text-sm text-coinbase-red';
+            }
+        })
+        .catch(error => {
+            testResult.classList.remove('hidden');
+            testResult.className = 'mt-4 p-3 rounded-lg bg-coinbase-red bg-opacity-20 border border-coinbase-red border-opacity-30';
+            testMessage.className = 'text-sm text-coinbase-red';
+            testMessage.textContent = 'Connection test failed: ' + error.message;
+        });
+    }
+    
+    function closeTestModal() {
+        const modal = document.getElementById('testModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+</script>
+{% endblock %}

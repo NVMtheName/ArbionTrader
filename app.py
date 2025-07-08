@@ -1,0 +1,88 @@
+import os
+import logging
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_login import LoginManager
+from flask_migrate import Migrate
+from sqlalchemy.orm import DeclarativeBase
+from werkzeug.middleware.proxy_fix import ProxyFix
+
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+
+class Base(DeclarativeBase):
+    pass
+
+db = SQLAlchemy(model_class=Base)
+login_manager = LoginManager()
+migrate = Migrate()
+
+def create_app():
+    app = Flask(__name__)
+    
+    # Configuration
+    app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
+    app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL", "postgresql://localhost/arbion_db")
+    app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
+        "pool_recycle": 300,
+        "pool_pre_ping": True,
+    }
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+    
+    # Proxy fix for Heroku
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+    
+    # Initialize extensions
+    db.init_app(app)
+    login_manager.init_app(app)
+    migrate.init_app(app, db)
+    
+    # Login manager configuration
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message = 'Please log in to access this page.'
+    login_manager.login_message_category = 'info'
+    
+    @login_manager.user_loader
+    def load_user(user_id):
+        from models import User
+        return User.query.get(int(user_id))
+    
+    # Import and register blueprints
+    from routes import main_bp
+    from auth import auth_bp
+    
+    app.register_blueprint(main_bp)
+    app.register_blueprint(auth_bp, url_prefix='/auth')
+    
+    # Create tables and default admin user
+    with app.app_context():
+        # Import models to ensure they're registered
+        import models
+        
+        db.create_all()
+        
+        # Create default superadmin user
+        from models import User
+        from werkzeug.security import generate_password_hash
+        
+        admin_email = "nvm427@gmail.com"
+        admin_password = "$@MP$0n9174201989"
+        
+        existing_admin = User.query.filter_by(email=admin_email).first()
+        if not existing_admin:
+            admin_user = User(
+                username="superadmin",
+                email=admin_email,
+                password_hash=generate_password_hash(admin_password),
+                role="superadmin"
+            )
+            db.session.add(admin_user)
+            db.session.commit()
+            logging.info(f"Created default superadmin user: {admin_email}")
+    
+    return app
+
+app = create_app()
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

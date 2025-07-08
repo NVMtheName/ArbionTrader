@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Arbion AI Trading Platform{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        'dark-bg': '#0d1421',
+                        'dark-surface': '#1a2332',
+                        'dark-card': '#253241',
+                        'dark-border': '#374151',
+                        'coinbase-blue': '#1652f0',
+                        'coinbase-green': '#05d9a1',
+                        'coinbase-red': '#f04438'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0d1421;
+            color: #e5e7eb;
+        }
+        
+        .sidebar-item:hover {
+            background-color: #253241;
+        }
+        
+        .sidebar-item.active {
+            background-color: #1652f0;
+            color: white;
+        }
+        
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+        
+        .status-success {
+            background-color: #05d9a1;
+        }
+        
+        .status-error {
+            background-color: #f04438;
+        }
+        
+        .status-pending {
+            background-color: #fbbf24;
+        }
+        
+        .btn-primary {
+            background-color: #1652f0;
+            color: white;
+            border: 1px solid #1652f0;
+        }
+        
+        .btn-primary:hover {
+            background-color: #0f3cc9;
+        }
+        
+        .btn-secondary {
+            background-color: transparent;
+            color: #9ca3af;
+            border: 1px solid #374151;
+        }
+        
+        .btn-secondary:hover {
+            background-color: #374151;
+            color: white;
+        }
+        
+        .btn-danger {
+            background-color: #f04438;
+            color: white;
+            border: 1px solid #f04438;
+        }
+        
+        .btn-danger:hover {
+            background-color: #dc2626;
+        }
+        
+        .btn-success {
+            background-color: #05d9a1;
+            color: white;
+            border: 1px solid #05d9a1;
+        }
+        
+        .btn-success:hover {
+            background-color: #059669;
+        }
+        
+        .card {
+            background-color: #1a2332;
+            border: 1px solid #374151;
+            border-radius: 8px;
+            padding: 1.5rem;
+        }
+        
+        .input-field {
+            background-color: #253241;
+            border: 1px solid #374151;
+            color: #e5e7eb;
+            border-radius: 6px;
+            padding: 0.75rem;
+        }
+        
+        .input-field:focus {
+            outline: none;
+            border-color: #1652f0;
+            box-shadow: 0 0 0 3px rgba(22, 82, 240, 0.1);
+        }
+        
+        .alert {
+            padding: 1rem;
+            border-radius: 6px;
+            margin-bottom: 1rem;
+        }
+        
+        .alert-success {
+            background-color: rgba(5, 217, 161, 0.1);
+            border: 1px solid rgba(5, 217, 161, 0.3);
+            color: #05d9a1;
+        }
+        
+        .alert-error {
+            background-color: rgba(240, 68, 56, 0.1);
+            border: 1px solid rgba(240, 68, 56, 0.3);
+            color: #f04438;
+        }
+        
+        .alert-warning {
+            background-color: rgba(251, 191, 36, 0.1);
+            border: 1px solid rgba(251, 191, 36, 0.3);
+            color: #fbbf24;
+        }
+        
+        .alert-info {
+            background-color: rgba(22, 82, 240, 0.1);
+            border: 1px solid rgba(22, 82, 240, 0.3);
+            color: #1652f0;
+        }
+    </style>
+</head>
+<body class="bg-dark-bg text-gray-300">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="w-64 bg-dark-surface border-r border-dark-border flex flex-col">
+            <div class="p-6 border-b border-dark-border">
+                <h1 class="text-2xl font-bold text-white">Arbion</h1>
+                <p class="text-sm text-gray-400">AI Trading Platform</p>
+            </div>
+            
+            <nav class="flex-1 p-4 space-y-2">
+                <a href="{{ url_for('main.dashboard') }}" class="sidebar-item flex items-center space-x-3 p-3 rounded-lg transition-colors {% if request.endpoint == 'main.dashboard' %}active{% endif %}">
+                    <i data-feather="home" class="w-5 h-5"></i>
+                    <span>Dashboard</span>
+                </a>
+                
+                <a href="{{ url_for('main.natural_trade') }}" class="sidebar-item flex items-center space-x-3 p-3 rounded-lg transition-colors {% if request.endpoint == 'main.natural_trade' %}active{% endif %}">
+                    <i data-feather="message-circle" class="w-5 h-5"></i>
+                    <span>Natural Trade</span>
+                </a>
+                
+                <a href="{{ url_for('main.strategies') }}" class="sidebar-item flex items-center space-x-3 p-3 rounded-lg transition-colors {% if request.endpoint == 'main.strategies' %}active{% endif %}">
+                    <i data-feather="trending-up" class="w-5 h-5"></i>
+                    <span>Strategies</span>
+                </a>
+                
+                {% if current_user.is_superadmin() %}
+                <a href="{{ url_for('main.auto_trading') }}" class="sidebar-item flex items-center space-x-3 p-3 rounded-lg transition-colors {% if request.endpoint == 'main.auto_trading' %}active{% endif %}">
+                    <i data-feather="zap" class="w-5 h-5"></i>
+                    <span>Auto-Trading</span>
+                </a>
+                {% endif %}
+                
+                <a href="{{ url_for('main.api_settings') }}" class="sidebar-item flex items-center space-x-3 p-3 rounded-lg transition-colors {% if request.endpoint == 'main.api_settings' %}active{% endif %}">
+                    <i data-feather="settings" class="w-5 h-5"></i>
+                    <span>API Settings</span>
+                </a>
+                
+                {% if current_user.is_superadmin() %}
+                <a href="{{ url_for('main.user_management') }}" class="sidebar-item flex items-center space-x-3 p-3 rounded-lg transition-colors {% if request.endpoint == 'main.user_management' %}active{% endif %}">
+                    <i data-feather="users" class="w-5 h-5"></i>
+                    <span>User Management</span>
+                </a>
+                {% endif %}
+                
+                <a href="{{ url_for('main.account') }}" class="sidebar-item flex items-center space-x-3 p-3 rounded-lg transition-colors {% if request.endpoint == 'main.account' %}active{% endif %}">
+                    <i data-feather="user" class="w-5 h-5"></i>
+                    <span>Account</span>
+                </a>
+            </nav>
+            
+            <div class="p-4 border-t border-dark-border">
+                <a href="{{ url_for('auth.logout') }}" class="flex items-center space-x-3 p-3 rounded-lg transition-colors hover:bg-dark-card text-gray-400 hover:text-white">
+                    <i data-feather="log-out" class="w-5 h-5"></i>
+                    <span>Logout</span>
+                </a>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col">
+            <!-- Top Bar -->
+            <div class="bg-dark-surface border-b border-dark-border p-4 flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <h2 class="text-xl font-semibold text-white">{% block page_title %}Dashboard{% endblock %}</h2>
+                </div>
+                
+                <div class="flex items-center space-x-4">
+                    <!-- API Status Indicators -->
+                    <div class="flex items-center space-x-3">
+                        {% if api_status %}
+                            {% if api_status.get('coinbase') %}
+                                <div class="flex items-center">
+                                    <span class="status-indicator {% if api_status.coinbase == 'success' %}status-success{% else %}status-error{% endif %}"></span>
+                                    <span class="text-sm text-gray-400">Coinbase</span>
+                                </div>
+                            {% endif %}
+                            
+                            {% if api_status.get('schwab') %}
+                                <div class="flex items-center">
+                                    <span class="status-indicator {% if api_status.schwab == 'success' %}status-success{% else %}status-error{% endif %}"></span>
+                                    <span class="text-sm text-gray-400">Schwab</span>
+                                </div>
+                            {% endif %}
+                            
+                            {% if api_status.get('openai') %}
+                                <div class="flex items-center">
+                                    <span class="status-indicator {% if api_status.openai == 'success' %}status-success{% else %}status-error{% endif %}"></span>
+                                    <span class="text-sm text-gray-400">OpenAI</span>
+                                </div>
+                            {% endif %}
+                        {% endif %}
+                    </div>
+                    
+                    <!-- User Info -->
+                    <div class="flex items-center space-x-2">
+                        <div class="text-right">
+                            <p class="text-sm text-white">{{ current_user.username }}</p>
+                            <p class="text-xs text-gray-400">{{ current_user.role.title() }}</p>
+                        </div>
+                        <div class="w-8 h-8 bg-coinbase-blue rounded-full flex items-center justify-center">
+                            <span class="text-white text-sm font-semibold">{{ current_user.username[0].upper() }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Content Area -->
+            <div class="flex-1 p-6 overflow-y-auto">
+                <!-- Flash Messages -->
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'error' if category == 'error' else category }}">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <!-- Page Content -->
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize Feather icons
+        feather.replace();
+        
+        // Auto-hide flash messages after 5 seconds
+        setTimeout(function() {
+            const alerts = document.querySelectorAll('.alert');
+            alerts.forEach(function(alert) {
+                alert.style.transition = 'opacity 0.5s';
+                alert.style.opacity = '0';
+                setTimeout(function() {
+                    alert.remove();
+                }, 500);
+            });
+        }, 5000);
+    </script>
+    
+    {% block scripts %}{% endblock %}
+</body>
+</html>

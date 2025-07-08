@@ -1,0 +1,333 @@
+{% extends "base.html" %}
+
+{% block page_title %}User Management{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Page Header -->
+    <div class="card">
+        <div class="flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold text-white">User Management</h1>
+                <p class="text-gray-400 mt-1">Manage user accounts and permissions</p>
+            </div>
+            <button onclick="showCreateUserModal()" class="btn-primary px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2">
+                <i data-feather="user-plus" class="w-4 h-4"></i>
+                <span>Add User</span>
+            </button>
+        </div>
+    </div>
+    
+    <!-- User Statistics -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Total Users</p>
+                    <p class="text-2xl font-bold text-white">{{ users|length }}</p>
+                </div>
+                <div class="p-3 bg-coinbase-blue bg-opacity-20 rounded-lg">
+                    <i data-feather="users" class="w-6 h-6 text-coinbase-blue"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Active Users</p>
+                    <p class="text-2xl font-bold text-white">{{ users|selectattr('is_active')|list|length }}</p>
+                </div>
+                <div class="p-3 bg-coinbase-green bg-opacity-20 rounded-lg">
+                    <i data-feather="user-check" class="w-6 h-6 text-coinbase-green"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Superadmins</p>
+                    <p class="text-2xl font-bold text-white">{{ users|selectattr('role', 'equalto', 'superadmin')|list|length }}</p>
+                </div>
+                <div class="p-3 bg-purple-500 bg-opacity-20 rounded-lg">
+                    <i data-feather="crown" class="w-6 h-6 text-purple-400"></i>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="flex items-center justify-between">
+                <div>
+                    <p class="text-sm text-gray-400">Standard Users</p>
+                    <p class="text-2xl font-bold text-white">{{ users|selectattr('role', 'equalto', 'standard')|list|length }}</p>
+                </div>
+                <div class="p-3 bg-gray-500 bg-opacity-20 rounded-lg">
+                    <i data-feather="user" class="w-6 h-6 text-gray-400"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- User List -->
+    <div class="card">
+        <div class="flex items-center justify-between mb-6">
+            <h2 class="text-xl font-semibold text-white">User Accounts</h2>
+            <div class="flex items-center space-x-2">
+                <button class="btn-secondary px-3 py-1 rounded-md text-sm font-medium transition-colors">
+                    <i data-feather="filter" class="w-4 h-4 mr-1"></i>
+                    Filter
+                </button>
+                <button class="btn-secondary px-3 py-1 rounded-md text-sm font-medium transition-colors">
+                    <i data-feather="download" class="w-4 h-4 mr-1"></i>
+                    Export
+                </button>
+            </div>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-dark-border">
+                        <th class="text-left py-3 px-4 text-sm font-medium text-gray-400">User</th>
+                        <th class="text-left py-3 px-4 text-sm font-medium text-gray-400">Role</th>
+                        <th class="text-left py-3 px-4 text-sm font-medium text-gray-400">Status</th>
+                        <th class="text-left py-3 px-4 text-sm font-medium text-gray-400">Created</th>
+                        <th class="text-left py-3 px-4 text-sm font-medium text-gray-400">Last Login</th>
+                        <th class="text-right py-3 px-4 text-sm font-medium text-gray-400">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr class="border-b border-dark-border hover:bg-dark-card transition-colors">
+                        <td class="py-3 px-4">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-8 h-8 bg-{% if user.role == 'superadmin' %}purple-500{% elif user.role == 'admin' %}coinbase-blue{% else %}gray-500{% endif %} rounded-full flex items-center justify-center">
+                                    <span class="text-white text-sm font-semibold">{{ user.username[0].upper() }}</span>
+                                </div>
+                                <div>
+                                    <p class="text-sm font-medium text-white">{{ user.username }}</p>
+                                    <p class="text-xs text-gray-400">{{ user.email }}</p>
+                                </div>
+                            </div>
+                        </td>
+                        <td class="py-3 px-4">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if user.role == 'superadmin' %}bg-purple-500 bg-opacity-20 text-purple-400{% elif user.role == 'admin' %}bg-coinbase-blue bg-opacity-20 text-coinbase-blue{% else %}bg-gray-500 bg-opacity-20 text-gray-400{% endif %}">
+                                {{ user.role.title() }}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4">
+                            <span class="px-2 py-1 rounded-full text-xs font-medium {% if user.is_active %}bg-coinbase-green bg-opacity-20 text-coinbase-green{% else %}bg-coinbase-red bg-opacity-20 text-coinbase-red{% endif %}">
+                                {% if user.is_active %}Active{% else %}Inactive{% endif %}
+                            </span>
+                        </td>
+                        <td class="py-3 px-4 text-sm text-gray-300">{{ user.created_at.strftime('%m/%d/%Y') }}</td>
+                        <td class="py-3 px-4 text-sm text-gray-300">
+                            <!-- This would need to be tracked in a separate model -->
+                            Recently
+                        </td>
+                        <td class="py-3 px-4 text-right">
+                            <div class="flex items-center justify-end space-x-2">
+                                <button class="text-coinbase-blue hover:text-blue-400 transition-colors">
+                                    <i data-feather="edit-2" class="w-4 h-4"></i>
+                                </button>
+                                
+                                {% if user.id != current_user.id %}
+                                <form method="POST" action="{{ url_for('main.toggle_user_status') }}" class="inline">
+                                    <input type="hidden" name="user_id" value="{{ user.id }}">
+                                    <button type="submit" class="text-gray-400 hover:text-white transition-colors">
+                                        {% if user.is_active %}
+                                            <i data-feather="user-x" class="w-4 h-4"></i>
+                                        {% else %}
+                                            <i data-feather="user-check" class="w-4 h-4"></i>
+                                        {% endif %}
+                                    </button>
+                                </form>
+                                {% endif %}
+                                
+                                <button class="text-gray-400 hover:text-coinbase-red transition-colors">
+                                    <i data-feather="trash-2" class="w-4 h-4"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <!-- Role Information -->
+    <div class="card">
+        <h3 class="text-lg font-semibold text-white mb-4">Role Permissions</h3>
+        
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center space-x-2 mb-3">
+                    <i data-feather="crown" class="w-5 h-5 text-purple-400"></i>
+                    <h4 class="text-sm font-medium text-white">Superadmin</h4>
+                </div>
+                <ul class="text-xs text-gray-400 space-y-1">
+                    <li>• Full system access</li>
+                    <li>• User management</li>
+                    <li>• Auto-trading controls</li>
+                    <li>• System logs access</li>
+                    <li>• Billing management</li>
+                </ul>
+            </div>
+            
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center space-x-2 mb-3">
+                    <i data-feather="shield" class="w-5 h-5 text-coinbase-blue"></i>
+                    <h4 class="text-sm font-medium text-white">Admin</h4>
+                </div>
+                <ul class="text-xs text-gray-400 space-y-1">
+                    <li>• Trading platform access</li>
+                    <li>• Strategy management</li>
+                    <li>• API configuration</li>
+                    <li>• Limited user actions</li>
+                    <li>• Trade monitoring</li>
+                </ul>
+            </div>
+            
+            <div class="p-4 bg-dark-card rounded-lg">
+                <div class="flex items-center space-x-2 mb-3">
+                    <i data-feather="user" class="w-5 h-5 text-gray-400"></i>
+                    <h4 class="text-sm font-medium text-white">Standard</h4>
+                </div>
+                <ul class="text-xs text-gray-400 space-y-1">
+                    <li>• Basic trading access</li>
+                    <li>• Personal strategies</li>
+                    <li>• API management</li>
+                    <li>• Account settings</li>
+                    <li>• Trade history</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Activity Log -->
+    <div class="card">
+        <h3 class="text-lg font-semibold text-white mb-4">Recent Activity</h3>
+        
+        <div class="space-y-3">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="w-2 h-2 bg-coinbase-green rounded-full"></div>
+                    <span class="text-sm text-gray-300">User john.doe created</span>
+                </div>
+                <span class="text-xs text-gray-400">5m ago</span>
+            </div>
+            
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="w-2 h-2 bg-coinbase-blue rounded-full"></div>
+                    <span class="text-sm text-gray-300">User jane.smith role updated to admin</span>
+                </div>
+                <span class="text-xs text-gray-400">12m ago</span>
+            </div>
+            
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                    <span class="text-sm text-gray-300">User bob.jones deactivated</span>
+                </div>
+                <span class="text-xs text-gray-400">1h ago</span>
+            </div>
+            
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="w-2 h-2 bg-purple-400 rounded-full"></div>
+                    <span class="text-sm text-gray-300">Bulk user import completed</span>
+                </div>
+                <span class="text-xs text-gray-400">2h ago</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create User Modal -->
+<div id="createUserModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-dark-surface p-6 rounded-lg max-w-md w-full mx-4">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-white">Create New User</h3>
+            <button onclick="hideCreateUserModal()" class="text-gray-400 hover:text-white">
+                <i data-feather="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+        
+        <form method="POST" action="{{ url_for('main.create_user') }}" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Username</label>
+                <input 
+                    type="text" 
+                    name="username" 
+                    class="input-field w-full" 
+                    placeholder="Enter username"
+                    required
+                >
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Email</label>
+                <input 
+                    type="email" 
+                    name="email" 
+                    class="input-field w-full" 
+                    placeholder="Enter email address"
+                    required
+                >
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Password</label>
+                <input 
+                    type="password" 
+                    name="password" 
+                    class="input-field w-full" 
+                    placeholder="Enter password"
+                    required
+                >
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Role</label>
+                <select name="role" class="input-field w-full" required>
+                    <option value="">Select a role</option>
+                    <option value="standard">Standard User</option>
+                    <option value="admin">Admin</option>
+                    <option value="superadmin">Superadmin</option>
+                </select>
+            </div>
+            
+            <div class="flex justify-end space-x-2 pt-4">
+                <button type="button" onclick="hideCreateUserModal()" class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" class="btn-primary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    Create User
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize Feather icons
+    feather.replace();
+    
+    function showCreateUserModal() {
+        const modal = document.getElementById('createUserModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+    
+    function hideCreateUserModal() {
+        const modal = document.getElementById('createUserModal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+</script>
+{% endblock %}

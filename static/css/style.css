@@ -1,0 +1,504 @@
+/* Additional custom styles for Arbion AI Trading Platform */
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #1a2332;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #374151;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #4b5563;
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Animation classes */
+.fade-in {
+    animation: fadeIn 0.5s ease-out;
+}
+
+.slide-in {
+    animation: slideIn 0.3s ease-out;
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+/* Loading spinner */
+.loading-spinner {
+    border: 2px solid #374151;
+    border-top: 2px solid #1652f0;
+    border-radius: 50%;
+    width: 20px;
+    height: 20px;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Trading status indicators */
+.status-indicator-large {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+}
+
+.status-success-large {
+    background-color: #05d9a1;
+    box-shadow: 0 0 0 2px rgba(5, 217, 161, 0.2);
+}
+
+.status-error-large {
+    background-color: #f04438;
+    box-shadow: 0 0 0 2px rgba(240, 68, 56, 0.2);
+}
+
+.status-pending-large {
+    background-color: #fbbf24;
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.2);
+}
+
+/* Interactive elements */
+.interactive-hover {
+    transition: all 0.2s ease;
+}
+
+.interactive-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Chart container */
+.chart-container {
+    position: relative;
+    height: 300px;
+    background: #1a2332;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+/* Trading table enhancements */
+.trading-table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+.trading-table thead th {
+    position: sticky;
+    top: 0;
+    background: #1a2332;
+    z-index: 10;
+}
+
+.trading-table tbody tr:hover {
+    background: #253241;
+}
+
+/* Modal enhancements */
+.modal-backdrop {
+    backdrop-filter: blur(4px);
+}
+
+.modal-content {
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* Form enhancements */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #e5e7eb;
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.75rem;
+    background: #253241;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    color: #e5e7eb;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #1652f0;
+    box-shadow: 0 0 0 3px rgba(22, 82, 240, 0.1);
+}
+
+.form-input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Badge enhancements */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.75rem;
+    border-radius: 9999px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    line-height: 1.25;
+}
+
+.badge-primary {
+    background: rgba(22, 82, 240, 0.2);
+    color: #1652f0;
+}
+
+.badge-success {
+    background: rgba(5, 217, 161, 0.2);
+    color: #05d9a1;
+}
+
+.badge-error {
+    background: rgba(240, 68, 56, 0.2);
+    color: #f04438;
+}
+
+.badge-warning {
+    background: rgba(251, 191, 36, 0.2);
+    color: #fbbf24;
+}
+
+/* Toggle switch */
+.toggle-switch {
+    position: relative;
+    display: inline-block;
+    width: 44px;
+    height: 24px;
+}
+
+.toggle-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #6b7280;
+    transition: 0.3s;
+    border-radius: 34px;
+}
+
+.toggle-slider:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: 0.3s;
+    border-radius: 50%;
+}
+
+input:checked + .toggle-slider {
+    background-color: #1652f0;
+}
+
+input:checked + .toggle-slider:before {
+    transform: translateX(20px);
+}
+
+/* Responsive utilities */
+@media (max-width: 768px) {
+    .mobile-hidden {
+        display: none !important;
+    }
+    
+    .mobile-full {
+        width: 100% !important;
+    }
+    
+    .mobile-stack {
+        flex-direction: column !important;
+    }
+    
+    .mobile-stack > * {
+        width: 100% !important;
+        margin-bottom: 1rem !important;
+    }
+    
+    .mobile-stack > *:last-child {
+        margin-bottom: 0 !important;
+    }
+}
+
+/* Print styles */
+@media print {
+    .no-print {
+        display: none !important;
+    }
+    
+    .print-full {
+        width: 100% !important;
+    }
+    
+    body {
+        background: white !important;
+        color: black !important;
+    }
+    
+    .card {
+        border: 1px solid #ccc !important;
+        background: white !important;
+    }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+    .input-field {
+        border-width: 2px;
+    }
+    
+    .btn-primary {
+        border-width: 2px;
+    }
+    
+    .status-indicator {
+        border: 2px solid currentColor;
+    }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* Focus management */
+.focus-visible {
+    outline: 2px solid #1652f0;
+    outline-offset: 2px;
+}
+
+/* Custom utility classes */
+.text-gradient {
+    background: linear-gradient(135deg, #1652f0 0%, #05d9a1 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.glass-effect {
+    backdrop-filter: blur(10px);
+    background: rgba(26, 35, 50, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.gradient-border {
+    position: relative;
+    background: #1a2332;
+    border-radius: 8px;
+}
+
+.gradient-border::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    padding: 1px;
+    background: linear-gradient(135deg, #1652f0, #05d9a1);
+    border-radius: inherit;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+}
+
+/* Coinbase-inspired hover effects */
+.coinbase-hover {
+    transition: all 0.2s ease;
+    border-radius: 8px;
+}
+
+.coinbase-hover:hover {
+    background: rgba(22, 82, 240, 0.1);
+    transform: translateY(-1px);
+}
+
+.coinbase-card {
+    background: #1a2332;
+    border: 1px solid #374151;
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.2s ease;
+}
+
+.coinbase-card:hover {
+    border-color: #1652f0;
+    box-shadow: 0 4px 12px rgba(22, 82, 240, 0.15);
+}
+
+/* Trading specific styles */
+.price-up {
+    color: #05d9a1;
+}
+
+.price-down {
+    color: #f04438;
+}
+
+.price-neutral {
+    color: #9ca3af;
+}
+
+.trade-row {
+    transition: all 0.2s ease;
+}
+
+.trade-row:hover {
+    background: #253241;
+    transform: translateX(2px);
+}
+
+/* Strategy indicator */
+.strategy-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+}
+
+.strategy-wheel {
+    background: #1652f0;
+}
+
+.strategy-collar {
+    background: #05d9a1;
+}
+
+.strategy-ai {
+    background: #a855f7;
+}
+
+/* Performance indicators */
+.performance-positive {
+    color: #05d9a1;
+}
+
+.performance-negative {
+    color: #f04438;
+}
+
+.performance-neutral {
+    color: #9ca3af;
+}
+
+/* Loading states */
+.skeleton {
+    background: linear-gradient(90deg, #1a2332 25%, #253241 50%, #1a2332 75%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 2s infinite;
+}
+
+@keyframes skeleton-loading {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Error states */
+.error-state {
+    color: #f04438;
+    background: rgba(240, 68, 56, 0.1);
+    border: 1px solid rgba(240, 68, 56, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.success-state {
+    color: #05d9a1;
+    background: rgba(5, 217, 161, 0.1);
+    border: 1px solid rgba(5, 217, 161, 0.3);
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+/* Accessibility improvements */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.skip-link {
+    position: absolute;
+    top: -40px;
+    left: 6px;
+    background: #1652f0;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 4px;
+    z-index: 1000;
+    text-decoration: none;
+}
+
+.skip-link:focus {
+    top: 6px;
+}
