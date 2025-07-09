@@ -148,6 +148,14 @@ Changelog:
   - Fixed Schwab OAuth2 configuration by loading .env file in main.py and wsgi.py
   - Schwab OAuth2 now properly configured with client credentials
   - Environment variables properly loaded at application startup
+- July 09, 2025. Redesigned OAuth2 architecture for multi-user deployment:
+  - **BREAKING CHANGE**: Removed dependency on environment variables for OAuth2 client credentials
+  - Created OAuthClientCredential model to store client credentials per-user in database
+  - Updated SchwabOAuth class to load credentials from database instead of environment variables
+  - Added OAuth2 client credentials setup form in API settings interface
+  - Each user can now configure their own OAuth2 client credentials independently
+  - System now supports multiple users without requiring server environment variable access
+  - Enhanced API settings interface with step-by-step OAuth2 setup instructions
 
 ## User Preferences
 

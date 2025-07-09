@@ -162,17 +162,43 @@ def api_settings():
             if oauth_flow == 'true':
                 # Initiate OAuth2 flow
                 try:
-                    # Load environment variables explicitly
-                    from dotenv import load_dotenv
-                    load_dotenv()
-                    
-                    schwab_oauth = SchwabOAuth()
-                    logging.info(f"Schwab OAuth initialization - Client ID: {schwab_oauth.client_id[:10] if schwab_oauth.client_id else 'None'}...")
+                    schwab_oauth = SchwabOAuth(user_id=current_user.id)
                     auth_url = schwab_oauth.get_authorization_url()
                     return redirect(auth_url)
                 except Exception as e:
                     logging.error(f"OAuth2 initialization error: {str(e)}")
                     flash(f'OAuth2 initialization failed: {str(e)}', 'error')
+                    return redirect(url_for('main.api_settings'))
+            
+            # Check if this is OAuth2 client credentials setup
+            elif request.form.get('oauth_setup') == 'true':
+                try:
+                    client_id = request.form.get('client_id')
+                    client_secret = request.form.get('client_secret')
+                    redirect_uri = request.form.get('redirect_uri', 'https://www.arbion.ai/oauth_callback/schwab')
+                    
+                    if not client_id or not client_secret:
+                        flash('Client ID and Client Secret are required for OAuth2 setup', 'error')
+                        return redirect(url_for('main.api_settings'))
+                    
+                    schwab_oauth = SchwabOAuth()
+                    success = schwab_oauth.save_client_credentials(
+                        user_id=current_user.id,
+                        client_id=client_id,
+                        client_secret=client_secret,
+                        redirect_uri=redirect_uri
+                    )
+                    
+                    if success:
+                        flash('Schwab OAuth2 client credentials saved successfully!', 'success')
+                    else:
+                        flash('Failed to save OAuth2 client credentials', 'error')
+                    
+                    return redirect(url_for('main.api_settings'))
+                    
+                except Exception as e:
+                    logging.error(f"OAuth2 client setup error: {str(e)}")
+                    flash(f'OAuth2 client setup failed: {str(e)}', 'error')
                     return redirect(url_for('main.api_settings'))
             else:
                 # Legacy API key method (deprecated)
@@ -237,10 +263,15 @@ def api_settings():
             'last_tested': cred.last_tested
         }
     
-    # Check if Schwab OAuth2 is configured
-    from dotenv import load_dotenv
-    load_dotenv()
-    schwab_oauth_configured = bool(os.environ.get('SCHWAB_CLIENT_ID'))
+    # Check if Schwab OAuth2 client credentials are configured for this user
+    from models import OAuthClientCredential
+    schwab_oauth_configured = bool(
+        OAuthClientCredential.query.filter_by(
+            user_id=current_user.id,
+            provider='schwab',
+            is_active=True
+        ).first()
+    )
     
     return render_template('api_settings.html', 
                          cred_status=cred_status, 
@@ -280,7 +311,7 @@ def test_api_connection():
         elif provider == 'schwab':
             # Check if credentials contain OAuth2 token
             if 'access_token' in credentials:
-                schwab_oauth = SchwabOAuth()
+                schwab_oauth = SchwabOAuth(user_id=current_user.id)
                 result = schwab_oauth.test_connection(credentials['access_token'])
             else:
                 # Legacy API key method
@@ -333,7 +364,7 @@ def oauth_callback_schwab():
             return redirect(url_for('main.api_settings'))
         
         # Exchange code for token
-        schwab_oauth = SchwabOAuth()
+        schwab_oauth = SchwabOAuth(user_id=current_user.id)
         token_result = schwab_oauth.exchange_code_for_token(auth_code)
         
         if not token_result['success']:

@@ -172,17 +172,56 @@
                 <div class="bg-amber-900/20 border border-amber-500 rounded-lg p-3 mb-3">
                     <div class="flex items-center">
                         <i data-feather="alert-triangle" class="text-amber-500 mr-2 w-4 h-4"></i>
-                        <span class="text-amber-300 text-sm">Requires platform configuration</span>
+                        <span class="text-amber-300 text-sm">OAuth2 client credentials not configured</span>
+                    </div>
+                </div>
+                
+                <!-- OAuth2 Client Credentials Setup Form -->
+                <div class="mt-4 p-4 bg-gray-900 rounded-lg">
+                    <h4 class="text-md font-semibold mb-3 text-blue-300">Setup OAuth2 Client Credentials</h4>
+                    <form method="POST" action="{{ url_for('main.api_settings') }}">
+                        <input type="hidden" name="provider" value="schwab">
+                        <input type="hidden" name="oauth_setup" value="true">
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Client ID</label>
+                            <input type="text" name="client_id" class="input-field w-full" placeholder="Your Schwab OAuth2 Client ID" required>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Client Secret</label>
+                            <input type="password" name="client_secret" class="input-field w-full" placeholder="Your Schwab OAuth2 Client Secret" required>
+                        </div>
+                        
+                        <div class="mb-4">
+                            <label class="block text-sm font-medium mb-2">Redirect URI</label>
+                            <input type="url" name="redirect_uri" value="https://www.arbion.ai/oauth_callback/schwab" class="input-field w-full" readonly>
+                            <p class="text-xs text-gray-400 mt-1">Use this exact redirect URI when registering your Schwab OAuth2 app</p>
+                        </div>
+                        
+                        <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
+                            Save OAuth2 Client Credentials
+                        </button>
+                    </form>
+                    
+                    <div class="mt-4 p-3 bg-blue-900 bg-opacity-50 rounded-lg">
+                        <h5 class="text-sm font-semibold mb-2">Setup Instructions:</h5>
+                        <ol class="text-xs text-gray-300 space-y-1">
+                            <li>1. Go to Schwab Developer Portal</li>
+                            <li>2. Create a new OAuth2 application</li>
+                            <li>3. Set the redirect URI to: <code class="bg-gray-700 px-1 rounded">https://www.arbion.ai/oauth_callback/schwab</code></li>
+                            <li>4. Copy the Client ID and Client Secret here</li>
+                            <li>5. Save the credentials and then authenticate</li>
+                        </ol>
                     </div>
                 </div>
                 {% else %}
                 <div class="bg-green-900/20 border border-green-500 rounded-lg p-3 mb-3">
                     <div class="flex items-center">
                         <i data-feather="check-circle" class="text-green-500 mr-2 w-4 h-4"></i>
-                        <span class="text-green-300 text-sm">OAuth2 ready for authentication</span>
+                        <span class="text-green-300 text-sm">OAuth2 client credentials configured</span>
                     </div>
                 </div>
-                {% endif %}
                 
                 <form method="POST">
                     <input type="hidden" name="provider" value="schwab">
@@ -192,6 +231,41 @@
                         Authenticate with Schwab OAuth2
                     </button>
                 </form>
+                
+                <!-- Option to reconfigure OAuth2 client credentials -->
+                <div class="mt-4 pt-4 border-t border-gray-700">
+                    <button onclick="toggleSchwabOAuthSetup()" class="text-blue-400 hover:text-blue-300 text-sm">
+                        Reconfigure OAuth2 Client Credentials
+                    </button>
+                    
+                    <div id="schwab-oauth-setup" class="hidden mt-4 p-4 bg-gray-900 rounded-lg">
+                        <h4 class="text-md font-semibold mb-3 text-blue-300">Update OAuth2 Client Credentials</h4>
+                        <form method="POST" action="{{ url_for('main.api_settings') }}">
+                            <input type="hidden" name="provider" value="schwab">
+                            <input type="hidden" name="oauth_setup" value="true">
+                            
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2">Client ID</label>
+                                <input type="text" name="client_id" class="input-field w-full" placeholder="Your Schwab OAuth2 Client ID" required>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2">Client Secret</label>
+                                <input type="password" name="client_secret" class="input-field w-full" placeholder="Your Schwab OAuth2 Client Secret" required>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="block text-sm font-medium mb-2">Redirect URI</label>
+                                <input type="url" name="redirect_uri" value="https://www.arbion.ai/oauth_callback/schwab" class="input-field w-full" readonly>
+                            </div>
+                            
+                            <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
+                                Update OAuth2 Client Credentials
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
             </div>
 
             <!-- Legacy API Key Method -->

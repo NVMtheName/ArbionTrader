@@ -15,6 +15,7 @@ class User(UserMixin, db.Model):
     
     # Relationships
     api_credentials = db.relationship('APICredential', backref='user', lazy=True, cascade='all, delete-orphan')
+    oauth_client_credentials = db.relationship('OAuthClientCredential', backref='user', lazy=True, cascade='all, delete-orphan')
     trades = db.relationship('Trade', backref='user', lazy=True, cascade='all, delete-orphan')
     
     def is_superadmin(self):
@@ -91,6 +92,21 @@ class SystemLog(db.Model):
     
     def __repr__(self):
         return f'<SystemLog {self.level}: {self.message[:50]}>'
+
+class OAuthClientCredential(db.Model):
+    """Store OAuth2 client credentials per-user for multi-user deployment"""
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    provider = db.Column(db.String(50), nullable=False)  # schwab, coinbase
+    client_id = db.Column(db.String(256), nullable=False)
+    client_secret = db.Column(db.String(256), nullable=False)
+    redirect_uri = db.Column(db.String(512), nullable=False)
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    def __repr__(self):
+        return f'<OAuthClientCredential {self.provider} for user {self.user_id}>'
 
 class AutoTradingSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True)

@@ -1,278 +1,280 @@
 import os
-import requests
 import logging
+import base64
+import hashlib
+import secrets
+import requests
 from datetime import datetime, timedelta
-from urllib.parse import urlencode, quote
-from flask import session, request, redirect, url_for, flash
-from utils.pkce_utils import generate_pkce_pair
-from utils.encryption import encrypt_credentials, decrypt_credentials
+from flask import session, url_for
+from urllib.parse import urlencode
 
 logger = logging.getLogger(__name__)
 
 class SchwabOAuth:
-    """Schwab OAuth2 integration with PKCE"""
+    """Schwab OAuth2 integration for secure authentication - Multi-user compatible"""
     
-    def __init__(self):
-        # Load environment variables explicitly
-        from dotenv import load_dotenv
-        load_dotenv()
-        
-        self.client_id = os.environ.get('SCHWAB_CLIENT_ID')
-        # Use development redirect URI for testing
-        self.redirect_uri = os.environ.get('SCHWAB_REDIRECT_URI', 'https://www.arbion.ai/oauth_callback/schwab')
+    def __init__(self, user_id=None):
+        self.user_id = user_id
+        self.client_id = None
+        self.client_secret = None
+        self.redirect_uri = None
         self.auth_url = 'https://api.schwabapi.com/v1/oauth/authorize'
         self.token_url = 'https://api.schwabapi.com/v1/oauth/token'
         
-        if not self.client_id:
-            logger.warning(f"SCHWAB_CLIENT_ID environment variable not set. Available env vars: {list(os.environ.keys())[:10]}")
-            logger.info(f"Current working directory: {os.getcwd()}")
-            logger.info(f"Looking for .env file: {os.path.exists('.env')}")
-            # Try to load from .env file one more time
-            try:
-                with open('.env', 'r') as f:
-                    for line in f:
-                        if line.startswith('SCHWAB_CLIENT_ID='):
-                            self.client_id = line.split('=', 1)[1].strip()
-                            logger.info(f"Loaded SCHWAB_CLIENT_ID from .env file: {self.client_id[:10]}...")
-                            break
-            except Exception as e:
-                logger.error(f"Failed to read .env file: {e}")
+        # Load client credentials from database if user_id provided
+        if user_id:
+            self._load_client_credentials(user_id)
+    
+    def _load_client_credentials(self, user_id):
+        """Load OAuth2 client credentials from database for the user"""
+        try:
+            from models import OAuthClientCredential
+            
+            client_cred = OAuthClientCredential.query.filter_by(
+                user_id=user_id,
+                provider='schwab',
+                is_active=True
+            ).first()
+            
+            if client_cred:
+                self.client_id = client_cred.client_id
+                self.client_secret = client_cred.client_secret
+                self.redirect_uri = client_cred.redirect_uri
+                logger.info(f"Loaded Schwab OAuth credentials for user {user_id}")
+            else:
+                logger.warning(f"No active Schwab OAuth client credentials found for user {user_id}")
+                
+        except Exception as e:
+            logger.error(f"Failed to load Schwab OAuth credentials for user {user_id}: {e}")
+    
+    def set_client_credentials(self, client_id, client_secret, redirect_uri):
+        """Set client credentials programmatically"""
+        self.client_id = client_id
+        self.client_secret = client_secret
+        self.redirect_uri = redirect_uri
+    
+    def save_client_credentials(self, user_id, client_id, client_secret, redirect_uri):
+        """Save OAuth2 client credentials to database"""
+        try:
+            from models import OAuthClientCredential
+            from app import db
+            
+            # Check if credentials already exist
+            existing_cred = OAuthClientCredential.query.filter_by(
+                user_id=user_id,
+                provider='schwab'
+            ).first()
+            
+            if existing_cred:
+                existing_cred.client_id = client_id
+                existing_cred.client_secret = client_secret
+                existing_cred.redirect_uri = redirect_uri
+                existing_cred.updated_at = datetime.utcnow()
+                existing_cred.is_active = True
+            else:
+                new_cred = OAuthClientCredential(
+                    user_id=user_id,
+                    provider='schwab',
+                    client_id=client_id,
+                    client_secret=client_secret,
+                    redirect_uri=redirect_uri
+                )
+                db.session.add(new_cred)
+            
+            db.session.commit()
+            logger.info(f"Saved Schwab OAuth client credentials for user {user_id}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to save Schwab OAuth client credentials: {e}")
+            return False
     
     def get_authorization_url(self):
         """Generate authorization URL with PKCE"""
         try:
-            # Double-check client_id loading
             if not self.client_id:
-                # Try to load from .env file again
-                from dotenv import load_dotenv
-                load_dotenv()
-                self.client_id = os.environ.get('SCHWAB_CLIENT_ID')
-                if not self.client_id:
-                    # Final fallback - read directly from .env
-                    try:
-                        with open('.env', 'r') as f:
-                            for line in f:
-                                if line.startswith('SCHWAB_CLIENT_ID='):
-                                    self.client_id = line.split('=', 1)[1].strip()
-                                    break
-                    except:
-                        pass
+                raise ValueError("Schwab OAuth client credentials not configured for this user. Please configure your OAuth2 client credentials first.")
             
-            if not self.client_id:
-                raise ValueError("Schwab client ID not configured. Please set SCHWAB_CLIENT_ID environment variable or contact support.")
-            
-            # Generate PKCE pair
+            # Generate PKCE parameters
+            from utils.pkce_utils import generate_pkce_pair
             code_verifier, code_challenge = generate_pkce_pair()
             
             # Store code verifier in session for later use
             session['schwab_code_verifier'] = code_verifier
             
+            # Generate state for CSRF protection
+            state = secrets.token_urlsafe(32)
+            session['schwab_oauth_state'] = state
+            
             # Build authorization URL
-            auth_params = {
-                'response_type': 'code',
+            params = {
                 'client_id': self.client_id,
                 'redirect_uri': self.redirect_uri,
+                'response_type': 'code',
+                'scope': 'AccountAccess',
+                'state': state,
                 'code_challenge': code_challenge,
                 'code_challenge_method': 'S256'
             }
             
-            auth_url = f"{self.auth_url}?{urlencode(auth_params)}"
-            
-            logger.info("Generated Schwab authorization URL")
+            auth_url = f"{self.auth_url}?{urlencode(params)}"
+            logger.info(f"Generated Schwab OAuth authorization URL for user {self.user_id}")
             return auth_url
-        
+            
         except Exception as e:
-            logger.error(f"Error generating authorization URL: {str(e)}")
+            logger.error(f"Error generating Schwab OAuth authorization URL: {e}")
             raise
     
     def exchange_code_for_token(self, auth_code):
         """Exchange authorization code for access token"""
         try:
-            if not self.client_id:
-                raise ValueError("Schwab client ID not configured")
+            if not self.client_id or not self.client_secret:
+                raise ValueError("Schwab OAuth client credentials not configured")
             
+            # Get code verifier from session
             code_verifier = session.get('schwab_code_verifier')
             if not code_verifier:
                 raise ValueError("Code verifier not found in session")
             
             # Prepare token request
-            token_data = {
+            auth_header = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
+            
+            headers = {
+                'Authorization': f'Basic {auth_header}',
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+            
+            data = {
                 'grant_type': 'authorization_code',
                 'code': auth_code,
-                'client_id': self.client_id,
                 'redirect_uri': self.redirect_uri,
                 'code_verifier': code_verifier
             }
             
-            headers = {
-                'Content-Type': 'application/x-www-form-urlencoded'
+            response = requests.post(self.token_url, headers=headers, data=data)
+            response.raise_for_status()
+            
+            token_data = response.json()
+            
+            # Clean up session
+            session.pop('schwab_code_verifier', None)
+            session.pop('schwab_oauth_state', None)
+            
+            # Calculate expiration time
+            expires_in = token_data.get('expires_in', 3600)
+            expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+            
+            credentials = {
+                'access_token': token_data['access_token'],
+                'refresh_token': token_data.get('refresh_token'),
+                'expires_at': expires_at.isoformat(),
+                'scope': token_data.get('scope', 'AccountAccess')
             }
             
-            # Make token request
-            response = requests.post(
-                self.token_url,
-                headers=headers,
-                data=token_data,
-                timeout=30
-            )
+            logger.info(f"Successfully exchanged Schwab OAuth code for tokens")
+            return {
+                'success': True,
+                'credentials': credentials
+            }
             
-            if response.status_code == 200:
-                token_info = response.json()
-                
-                # Calculate expiry time
-                expires_in = token_info.get('expires_in', 3600)
-                expiry_time = datetime.utcnow() + timedelta(seconds=expires_in)
-                
-                # Prepare credentials for storage
-                credentials = {
-                    'access_token': token_info['access_token'],
-                    'refresh_token': token_info.get('refresh_token'),
-                    'token_expiry': expiry_time.isoformat(),
-                    'client_id': self.client_id
-                }
-                
-                # Clean up session
-                session.pop('schwab_code_verifier', None)
-                
-                logger.info("Successfully exchanged code for Schwab token")
-                return {
-                    'success': True,
-                    'credentials': credentials,
-                    'message': 'Token exchange successful'
-                }
-            else:
-                logger.error(f"Token exchange failed: {response.status_code} - {response.text}")
-                return {
-                    'success': False,
-                    'message': f'Token exchange failed: {response.text}',
-                    'status_code': response.status_code
-                }
-        
-        except Exception as e:
-            logger.error(f"Error during token exchange: {str(e)}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"HTTP error during Schwab token exchange: {e}")
             return {
                 'success': False,
-                'message': f'Token exchange error: {str(e)}'
+                'message': f'Token exchange failed: {str(e)}'
+            }
+        except Exception as e:
+            logger.error(f"Error during Schwab token exchange: {e}")
+            return {
+                'success': False,
+                'message': f'Token exchange failed: {str(e)}'
             }
     
     def refresh_token(self, refresh_token):
         """Refresh access token using refresh token"""
         try:
-            if not self.client_id:
-                raise ValueError("Schwab client ID not configured")
+            if not self.client_id or not self.client_secret:
+                raise ValueError("Schwab OAuth client credentials not configured")
             
-            refresh_data = {
-                'grant_type': 'refresh_token',
-                'refresh_token': refresh_token,
-                'client_id': self.client_id
-            }
+            auth_header = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
             
             headers = {
+                'Authorization': f'Basic {auth_header}',
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
             
-            response = requests.post(
-                self.token_url,
-                headers=headers,
-                data=refresh_data,
-                timeout=30
-            )
+            data = {
+                'grant_type': 'refresh_token',
+                'refresh_token': refresh_token
+            }
             
-            if response.status_code == 200:
-                token_info = response.json()
-                
-                # Calculate expiry time
-                expires_in = token_info.get('expires_in', 3600)
-                expiry_time = datetime.utcnow() + timedelta(seconds=expires_in)
-                
-                # Prepare updated credentials
-                credentials = {
-                    'access_token': token_info['access_token'],
-                    'refresh_token': token_info.get('refresh_token', refresh_token),
-                    'token_expiry': expiry_time.isoformat(),
-                    'client_id': self.client_id
-                }
-                
-                logger.info("Successfully refreshed Schwab token")
-                return {
-                    'success': True,
-                    'credentials': credentials,
-                    'message': 'Token refresh successful'
-                }
-            else:
-                logger.error(f"Token refresh failed: {response.status_code} - {response.text}")
-                return {
-                    'success': False,
-                    'message': f'Token refresh failed: {response.text}',
-                    'status_code': response.status_code
-                }
-        
+            response = requests.post(self.token_url, headers=headers, data=data)
+            response.raise_for_status()
+            
+            token_data = response.json()
+            
+            # Calculate expiration time
+            expires_in = token_data.get('expires_in', 3600)
+            expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+            
+            credentials = {
+                'access_token': token_data['access_token'],
+                'refresh_token': token_data.get('refresh_token', refresh_token),
+                'expires_at': expires_at.isoformat(),
+                'scope': token_data.get('scope', 'AccountAccess')
+            }
+            
+            logger.info("Successfully refreshed Schwab OAuth token")
+            return {
+                'success': True,
+                'credentials': credentials
+            }
+            
         except Exception as e:
-            logger.error(f"Error during token refresh: {str(e)}")
+            logger.error(f"Error refreshing Schwab OAuth token: {e}")
             return {
                 'success': False,
-                'message': f'Token refresh error: {str(e)}'
+                'message': f'Token refresh failed: {str(e)}'
             }
     
     def is_token_expired(self, credentials):
         """Check if access token is expired"""
         try:
-            if 'token_expiry' not in credentials:
+            expires_at_str = credentials.get('expires_at')
+            if not expires_at_str:
                 return True
             
-            expiry_time = datetime.fromisoformat(credentials['token_expiry'])
-            # Consider token expired if it expires within 5 minutes
-            buffer_time = datetime.utcnow() + timedelta(minutes=5)
+            expires_at = datetime.fromisoformat(expires_at_str)
+            return datetime.utcnow() >= expires_at
             
-            return expiry_time <= buffer_time
-        
         except Exception as e:
-            logger.error(f"Error checking token expiry: {str(e)}")
+            logger.error(f"Error checking token expiration: {e}")
             return True
     
     def get_valid_token(self, encrypted_credentials):
         """Get a valid access token, refreshing if necessary"""
         try:
-            # Decrypt credentials
+            from utils.encryption import decrypt_credentials
+            
             credentials = decrypt_credentials(encrypted_credentials)
             
             # Check if token is expired
             if not self.is_token_expired(credentials):
-                return {
-                    'success': True,
-                    'access_token': credentials['access_token'],
-                    'credentials': credentials
-                }
+                return credentials['access_token']
             
-            # Token is expired, try to refresh
+            # Try to refresh token
             refresh_token = credentials.get('refresh_token')
-            if not refresh_token:
-                return {
-                    'success': False,
-                    'message': 'No refresh token available, re-authorization required'
-                }
+            if refresh_token:
+                refresh_result = self.refresh_token(refresh_token)
+                if refresh_result['success']:
+                    return refresh_result['credentials']['access_token']
             
-            # Refresh the token
-            refresh_result = self.refresh_token(refresh_token)
+            # Token expired and refresh failed
+            return None
             
-            if refresh_result['success']:
-                return {
-                    'success': True,
-                    'access_token': refresh_result['credentials']['access_token'],
-                    'credentials': refresh_result['credentials']
-                }
-            else:
-                return {
-                    'success': False,
-                    'message': f'Token refresh failed: {refresh_result["message"]}'
-                }
-        
         except Exception as e:
-            logger.error(f"Error getting valid token: {str(e)}")
-            return {
-                'success': False,
-                'message': f'Token validation error: {str(e)}'
-            }
+            logger.error(f"Error getting valid Schwab token: {e}")
+            return None
     
     def test_connection(self, access_token):
         """Test the connection with Schwab API"""
@@ -284,9 +286,8 @@ class SchwabOAuth:
             
             # Test with accounts endpoint
             response = requests.get(
-                'https://api.schwabapi.com/v1/accounts',
-                headers=headers,
-                timeout=30
+                'https://api.schwabapi.com/trader/v1/accounts',
+                headers=headers
             )
             
             if response.status_code == 200:
@@ -297,12 +298,12 @@ class SchwabOAuth:
             else:
                 return {
                     'success': False,
-                    'message': f'API test failed: {response.status_code} - {response.text}'
+                    'message': f'Schwab API connection failed: {response.status_code}'
                 }
-        
+                
         except Exception as e:
-            logger.error(f"Error testing Schwab connection: {str(e)}")
+            logger.error(f"Error testing Schwab connection: {e}")
             return {
                 'success': False,
-                'message': f'Connection test error: {str(e)}'
+                'message': f'Connection test failed: {str(e)}'
             }
