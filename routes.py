@@ -508,7 +508,7 @@ def test_api_connection():
         logging.error(f"API test connection failed: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
 
-@main_bp.route('/oauth_callback/schwab')
+@main_bp.route('/oauth_callback/broker')
 def oauth_callback_schwab():
     """Handle Schwab OAuth2 callback"""
     from models import APICredential
@@ -590,7 +590,7 @@ def schwab_oauth_setup():
         flash(f'OAuth2 setup failed: {str(e)}', 'error')
         return redirect(url_for('main.api_settings'))
 
-@main_bp.route('/oauth_callback/coinbase')
+@main_bp.route('/oauth_callback/crypto')
 def oauth_callback_coinbase():
     """Handle Coinbase OAuth2 callback"""
     from models import APICredential

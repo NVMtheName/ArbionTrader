@@ -168,6 +168,14 @@ Changelog:
   - Enhanced error handling for missing API credentials across all integrations
   - Comprehensive multi-user system eliminates all environment variable dependencies for API keys
   - Each user can independently configure their own credentials for all supported platforms
+- July 09, 2025. Fixed OAuth2 redirect URL restrictions for Coinbase compliance:
+  - **BREAKING CHANGE**: Updated OAuth callback routes to avoid "coinbase" in URL path
+  - Changed Coinbase OAuth callback from `/oauth_callback/coinbase` to `/oauth_callback/crypto`
+  - Changed Schwab OAuth callback from `/oauth_callback/schwab` to `/oauth_callback/broker`
+  - Updated Flask app configuration with SERVER_NAME and PREFERRED_URL_SCHEME for proper external URL generation
+  - OAuth redirects now generate correctly as https://arbion.ai/oauth_callback/crypto and https://arbion.ai/oauth_callback/broker
+  - Enhanced OAuth callback debugging and logging for troubleshooting redirect issues
+  - Coinbase OAuth apps can now use the compliant redirect URI without naming restrictions
 
 ## User Preferences
 

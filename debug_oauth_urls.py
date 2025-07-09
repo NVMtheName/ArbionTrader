@@ -41,7 +41,7 @@ def debug_oauth_urls():
         print("\nSteps:")
         print("1. Go to Coinbase Developer Console")
         print("2. Edit your OAuth application")
-        print("3. Set the redirect URI to exactly: https://arbion.ai/oauth_callback/coinbase")
+        print("3. Set the redirect URI to exactly: https://arbion.ai/oauth_callback/crypto")
         print("4. Save the changes")
         print("5. Test the OAuth flow again")
 
