@@ -37,6 +37,42 @@ def superadmin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def get_dashboard_market_data():
+    """Get real-time market data for dashboard display"""
+    try:
+        market_provider = MarketDataProvider()
+        
+        # Key market symbols to display
+        symbols = ['SPY', 'QQQ', 'BTC-USD', 'ETH-USD', 'AAPL', 'MSFT', 'GOOGL', 'TSLA']
+        market_data = {}
+        
+        for symbol in symbols:
+            try:
+                if symbol in ['BTC-USD', 'ETH-USD']:
+                    # Crypto data
+                    data = market_provider.get_crypto_price(symbol.replace('-USD', ''))
+                else:
+                    # Stock data
+                    data = market_provider.get_stock_quote(symbol)
+                
+                if data:
+                    market_data[symbol] = {
+                        'price': data.get('price', 0),
+                        'change': data.get('change', 0),
+                        'change_percent': data.get('change_percent', 0),
+                        'volume': data.get('volume', 0),
+                        'high': data.get('high', 0),
+                        'low': data.get('low', 0)
+                    }
+            except Exception as e:
+                logging.error(f"Error fetching data for {symbol}: {str(e)}")
+                continue
+        
+        return market_data
+    except Exception as e:
+        logging.error(f"Error in get_dashboard_market_data: {str(e)}")
+        return {}
+
 @main_bp.route('/')
 @login_required
 def dashboard():
@@ -54,10 +90,14 @@ def dashboard():
     if current_user.is_superadmin():
         auto_trading_settings = AutoTradingSettings.get_settings()
     
+    # Get real-time market data
+    market_data = get_dashboard_market_data()
+    
     return render_template('dashboard.html', 
                          recent_trades=recent_trades,
                          api_status=api_status,
-                         auto_trading_settings=auto_trading_settings)
+                         auto_trading_settings=auto_trading_settings,
+                         market_data=market_data)
 
 @main_bp.route('/enhanced-dashboard')
 @login_required
@@ -916,3 +956,19 @@ def get_trade_history():
     except Exception as e:
         logging.error(f"Error fetching trade history: {str(e)}")
         return jsonify({'success': False, 'message': str(e)})
+
+
+@main_bp.route("/api/market-data")
+@login_required
+def api_market_data():
+    """API endpoint to get real-time market data"""
+    try:
+        market_data = get_dashboard_market_data()
+        return jsonify({
+            "success": True,
+            "data": market_data,
+            "timestamp": datetime.utcnow().isoformat()
+        })
+    except Exception as e:
+        logging.error(f"Error fetching market data: {str(e)}")
+        return jsonify({"success": False, "error": str(e)})

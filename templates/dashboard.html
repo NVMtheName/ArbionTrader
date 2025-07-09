@@ -84,6 +84,63 @@
         </div>
     </div>
     
+    <!-- Real-Time Market Data -->
+    <div class="card">
+        <div class="flex items-center justify-between mb-6">
+            <div class="flex items-center space-x-3">
+                <div class="p-2 bg-coinbase-green bg-opacity-20 rounded-lg">
+                    <i data-feather="trending-up" class="w-5 h-5 text-coinbase-green"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-white">Real-Time Market Data</h3>
+            </div>
+            <button onclick="refreshMarketData()" class="text-coinbase-green hover:text-green-400 text-sm">
+                <i data-feather="refresh-cw" class="w-4 h-4 inline mr-1"></i>
+                Refresh
+            </button>
+        </div>
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="market-data-container">
+            {% if market_data %}
+                {% for symbol, data in market_data.items() %}
+                    <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="font-semibold text-white">{{ symbol }}</span>
+                            <span class="text-xs text-gray-400">LIVE</span>
+                        </div>
+                        <div class="space-y-1">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xl font-bold text-white">
+                                    ${{ "%.2f"|format(data.price) }}
+                                </span>
+                                <span class="text-sm {% if data.change >= 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                                    {% if data.change >= 0 %}+{% endif %}{{ "%.2f"|format(data.change) }}
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-400">Change %</span>
+                                <span class="text-sm {% if data.change_percent >= 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                                    {% if data.change_percent >= 0 %}+{% endif %}{{ "%.2f"|format(data.change_percent) }}%
+                                </span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-gray-400">Volume</span>
+                                <span class="text-xs text-gray-300">{{ "{:,.0f}".format(data.volume) }}</span>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="col-span-full text-center py-8">
+                    <div class="text-gray-400 mb-2">
+                        <i data-feather="wifi-off" class="w-8 h-8 mx-auto mb-2"></i>
+                        Market data unavailable
+                    </div>
+                    <p class="text-sm text-gray-500">Unable to fetch real-time market data</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    
     <!-- Quick Actions -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="card">
@@ -278,5 +335,101 @@
 <script>
     // Initialize Feather icons
     feather.replace();
+    
+    // Refresh market data
+    function refreshMarketData() {
+        const refreshButton = document.querySelector('[onclick="refreshMarketData()"]');
+        const refreshIcon = refreshButton.querySelector('i');
+        
+        // Add loading state
+        refreshIcon.classList.add('animate-spin');
+        refreshButton.disabled = true;
+        
+        fetch('/api/market-data')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateMarketDataDisplay(data.data);
+                } else {
+                    console.error('Failed to fetch market data:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching market data:', error);
+            })
+            .finally(() => {
+                // Remove loading state
+                refreshIcon.classList.remove('animate-spin');
+                refreshButton.disabled = false;
+            });
+    }
+    
+    // Update market data display
+    function updateMarketDataDisplay(marketData) {
+        const container = document.getElementById('market-data-container');
+        
+        if (Object.keys(marketData).length === 0) {
+            container.innerHTML = `
+                <div class="col-span-full text-center py-8">
+                    <div class="text-gray-400 mb-2">
+                        <i data-feather="wifi-off" class="w-8 h-8 mx-auto mb-2"></i>
+                        Market data unavailable
+                    </div>
+                    <p class="text-sm text-gray-500">Unable to fetch real-time market data</p>
+                </div>
+            `;
+            feather.replace();
+            return;
+        }
+        
+        let html = '';
+        for (const [symbol, data] of Object.entries(marketData)) {
+            const changeColor = data.change >= 0 ? 'text-green-400' : 'text-red-400';
+            const changeSign = data.change >= 0 ? '+' : '';
+            const changePercentColor = data.change_percent >= 0 ? 'text-green-400' : 'text-red-400';
+            const changePercentSign = data.change_percent >= 0 ? '+' : '';
+            
+            html += `
+                <div class="bg-gray-800 rounded-lg p-4 border border-gray-700">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-semibold text-white">${symbol}</span>
+                        <span class="text-xs text-gray-400">LIVE</span>
+                    </div>
+                    <div class="space-y-1">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xl font-bold text-white">
+                                $${data.price.toFixed(2)}
+                            </span>
+                            <span class="text-sm ${changeColor}">
+                                ${changeSign}${data.change.toFixed(2)}
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-gray-400">Change %</span>
+                            <span class="text-sm ${changePercentColor}">
+                                ${changePercentSign}${data.change_percent.toFixed(2)}%
+                            </span>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-gray-400">Volume</span>
+                            <span class="text-xs text-gray-300">${data.volume.toLocaleString()}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
+        feather.replace();
+    }
+    
+    // Auto-refresh market data every 30 seconds
+    setInterval(refreshMarketData, 30000);
+    
+    // Initial load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Refresh market data on page load
+        setTimeout(refreshMarketData, 2000);
+    });
 </script>
 {% endblock %}
