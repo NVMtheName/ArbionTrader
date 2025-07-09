@@ -576,14 +576,14 @@ def oauth_callback_schwab():
         flash(f'OAuth2 callback error: {str(e)}', 'error')
         return redirect(url_for('main.api_settings'))
 
-@main_bp.route('/schwab-oauth-setup')
+@main_bp.route('/schwab-oauth-setup', methods=['GET', 'POST'])
 @login_required
 def schwab_oauth_setup():
     """Initiate Schwab OAuth2 flow"""
     from utils.schwab_oauth import SchwabOAuth
     
     try:
-        schwab_oauth = SchwabOAuth()
+        schwab_oauth = SchwabOAuth(user_id=current_user.id)
         auth_url = schwab_oauth.get_authorization_url()
         return redirect(auth_url)
     except Exception as e:
