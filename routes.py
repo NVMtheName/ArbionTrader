@@ -133,11 +133,43 @@ def api_settings():
             if oauth_flow == 'true':
                 # Initiate OAuth2 flow
                 try:
-                    coinbase_oauth = CoinbaseOAuth()
+                    coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
                     auth_url = coinbase_oauth.get_authorization_url()
                     return redirect(auth_url)
                 except Exception as e:
+                    logging.error(f"Coinbase OAuth2 initialization error: {str(e)}")
                     flash(f'OAuth2 initialization failed: {str(e)}', 'error')
+                    return redirect(url_for('main.api_settings'))
+            
+            # Check if this is OAuth2 client credentials setup
+            elif request.form.get('oauth_setup') == 'true':
+                try:
+                    client_id = request.form.get('client_id')
+                    client_secret = request.form.get('client_secret')
+                    redirect_uri = request.form.get('redirect_uri', 'https://www.arbion.ai/oauth_callback/coinbase')
+                    
+                    if not client_id or not client_secret:
+                        flash('Client ID and Client Secret are required for OAuth2 setup', 'error')
+                        return redirect(url_for('main.api_settings'))
+                    
+                    coinbase_oauth = CoinbaseOAuth()
+                    success = coinbase_oauth.save_client_credentials(
+                        user_id=current_user.id,
+                        client_id=client_id,
+                        client_secret=client_secret,
+                        redirect_uri=redirect_uri
+                    )
+                    
+                    if success:
+                        flash('Coinbase OAuth2 client credentials saved successfully!', 'success')
+                    else:
+                        flash('Failed to save OAuth2 client credentials', 'error')
+                    
+                    return redirect(url_for('main.api_settings'))
+                    
+                except Exception as e:
+                    logging.error(f"Coinbase OAuth2 client setup error: {str(e)}")
+                    flash(f'OAuth2 client setup failed: {str(e)}', 'error')
                     return redirect(url_for('main.api_settings'))
             else:
                 # Legacy API key method (deprecated)
@@ -263,7 +295,7 @@ def api_settings():
             'last_tested': cred.last_tested
         }
     
-    # Check if Schwab OAuth2 client credentials are configured for this user
+    # Check OAuth2 client credentials configuration for this user
     from models import OAuthClientCredential
     schwab_oauth_configured = bool(
         OAuthClientCredential.query.filter_by(
@@ -273,9 +305,18 @@ def api_settings():
         ).first()
     )
     
+    coinbase_oauth_configured = bool(
+        OAuthClientCredential.query.filter_by(
+            user_id=current_user.id,
+            provider='coinbase',
+            is_active=True
+        ).first()
+    )
+    
     return render_template('api_settings.html', 
                          cred_status=cred_status, 
-                         schwab_oauth_configured=schwab_oauth_configured)
+                         schwab_oauth_configured=schwab_oauth_configured,
+                         coinbase_oauth_configured=coinbase_oauth_configured)
 
 @main_bp.route('/test-api-connection', methods=['POST'])
 @login_required
@@ -297,7 +338,7 @@ def test_api_connection():
         if provider == 'coinbase':
             # Check if credentials contain OAuth2 token
             if 'access_token' in credentials:
-                coinbase_oauth = CoinbaseOAuth()
+                coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
                 result = coinbase_oauth.test_connection(credentials['access_token'])
             else:
                 # Legacy API key method
@@ -435,7 +476,7 @@ def oauth_callback_coinbase():
             return redirect(url_for('main.api_settings'))
         
         # Exchange code for token
-        coinbase_oauth = CoinbaseOAuth()
+        coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
         token_result = coinbase_oauth.exchange_code_for_token(auth_code, state)
         
         if not token_result['success']:

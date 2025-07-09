@@ -1,80 +1,134 @@
-<!-- Coinbase OAuth2 Information Modal -->
-<div id="coinbase-oauth-info" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-    <div class="bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        <div class="p-6">
-            <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold text-white">Coinbase OAuth2 Integration</h3>
-                <button onclick="closeCoinbaseInfo()" class="text-gray-400 hover:text-white">
-                    <i data-feather="x" class="w-5 h-5"></i>
-                </button>
+<!-- Coinbase OAuth2 Info Modal -->
+<div id="coinbase-oauth-info" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-gray-800 rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between mb-4">
+            <h2 class="text-2xl font-bold text-white">Coinbase OAuth2 Setup Guide</h2>
+            <button onclick="closeCoinbaseInfo()" class="text-gray-400 hover:text-white">
+                <i data-feather="x" class="w-6 h-6"></i>
+            </button>
+        </div>
+        
+        <div class="space-y-6">
+            <div class="bg-yellow-900/20 border border-yellow-500 rounded-lg p-4">
+                <div class="flex items-center mb-2">
+                    <i data-feather="alert-triangle" class="text-yellow-500 mr-2"></i>
+                    <h3 class="text-yellow-400 font-semibold">Important Note</h3>
+                </div>
+                <p class="text-gray-300 text-sm">
+                    This setup requires creating a developer application in the Coinbase Developer Portal. 
+                    You'll need to configure OAuth2 client credentials for your personal use.
+                </p>
             </div>
             
-            <div class="space-y-4 text-gray-300">
-                <div class="bg-blue-900 bg-opacity-50 rounded-lg p-4 border border-blue-500">
-                    <h4 class="font-medium text-blue-300 mb-2">Why OAuth2?</h4>
-                    <p class="text-sm">
-                        OAuth2 is the secure, recommended method for Coinbase API integration. 
-                        It provides better security than API keys and is the standard for production applications.
-                    </p>
+            <div class="bg-blue-900/20 border border-blue-500 rounded-lg p-4">
+                <div class="flex items-center mb-2">
+                    <i data-feather="info" class="text-blue-500 mr-2"></i>
+                    <h3 class="text-blue-400 font-semibold">What is OAuth2?</h3>
                 </div>
-                
-                <div class="bg-green-900 bg-opacity-50 rounded-lg p-4 border border-green-500">
-                    <h4 class="font-medium text-green-300 mb-2">How It Works</h4>
-                    <ol class="text-sm space-y-1 list-decimal list-inside">
-                        <li>Click "Authenticate with Coinbase OAuth2"</li>
-                        <li>You'll be redirected to Coinbase's secure login page</li>
-                        <li>Log in with your Coinbase credentials</li>
-                        <li>Authorize Arbion to access your account data</li>
-                        <li>You'll be redirected back to Arbion with secure tokens</li>
-                    </ol>
-                </div>
-                
-                <div class="bg-purple-900 bg-opacity-50 rounded-lg p-4 border border-purple-500">
-                    <h4 class="font-medium text-purple-300 mb-2">Permissions Granted</h4>
-                    <ul class="text-sm space-y-1 list-disc list-inside">
-                        <li>Read your account information and balances</li>
-                        <li>View transaction history</li>
-                        <li>Access wallet data for portfolio analysis</li>
-                        <li>No trading permissions (read-only access)</li>
-                    </ul>
-                </div>
-                
-                <div class="bg-yellow-900 bg-opacity-50 rounded-lg p-4 border border-yellow-500">
-                    <h4 class="font-medium text-yellow-300 mb-2">Security Features</h4>
-                    <ul class="text-sm space-y-1 list-disc list-inside">
-                        <li>Secure state parameter validation</li>
-                        <li>Tokens are encrypted and stored securely</li>
-                        <li>Automatic token refresh when expired</li>
-                        <li>No sensitive credentials stored in browser</li>
-                    </ul>
-                </div>
-                
-                <div class="bg-red-900 bg-opacity-50 rounded-lg p-4 border border-red-500">
-                    <h4 class="font-medium text-red-300 mb-2">Important Notes</h4>
-                    <ul class="text-sm space-y-1 list-disc list-inside">
-                        <li>This requires a valid Coinbase account</li>
-                        <li>Tokens expire after 2 hours and will be refreshed automatically</li>
-                        <li>You can revoke access anytime from your Coinbase settings</li>
-                        <li>Legacy API key method is deprecated</li>
-                    </ul>
-                </div>
+                <p class="text-gray-300 text-sm">
+                    OAuth2 allows you to securely connect your Coinbase account without sharing your login credentials. 
+                    It's the recommended authentication method for production applications.
+                </p>
             </div>
             
-            <div class="mt-6 flex justify-end">
-                <button onclick="closeCoinbaseInfo()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg">
-                    Got it
-                </button>
+            <div>
+                <h3 class="text-lg font-semibold text-white mb-3">Step-by-Step Setup</h3>
+                <ol class="text-sm text-gray-300 space-y-3 list-decimal list-inside">
+                    <li>
+                        <strong>Visit Coinbase Developer Portal</strong><br>
+                        Go to <a href="https://developers.coinbase.com" target="_blank" class="text-blue-400 hover:text-blue-300">https://developers.coinbase.com</a>
+                    </li>
+                    
+                    <li>
+                        <strong>Create a New Application</strong><br>
+                        Click "Create New Application" and fill in the application details:
+                        <ul class="ml-4 mt-2 text-sm text-gray-400">
+                            <li>• Application Name: "Arbion Trading Bot" (or your preferred name)</li>
+                            <li>• Application Type: "Web Application"</li>
+                            <li>• Website URL: "https://www.arbion.ai"</li>
+                        </ul>
+                    </li>
+                    
+                    <li>
+                        <strong>Configure OAuth2 Settings</strong><br>
+                        In your application settings, set:
+                        <ul class="ml-4 mt-2 text-sm text-gray-400">
+                            <li>• Redirect URI: <code class="bg-gray-700 px-2 py-1 rounded">https://www.arbion.ai/oauth_callback/coinbase</code></li>
+                            <li>• Permissions: Select "wallet:accounts:read" and "wallet:transactions:read"</li>
+                        </ul>
+                    </li>
+                    
+                    <li>
+                        <strong>Get Your OAuth2 Credentials</strong><br>
+                        After creating the application, you'll receive:
+                        <ul class="ml-4 mt-2 text-sm text-gray-400">
+                            <li>• Client ID (public identifier)</li>
+                            <li>• Client Secret (private key - keep secure)</li>
+                        </ul>
+                    </li>
+                    
+                    <li>
+                        <strong>Configure in Arbion</strong><br>
+                        Return to this page and:
+                        <ul class="ml-4 mt-2 text-sm text-gray-400">
+                            <li>• Click "Configure OAuth2 Credentials"</li>
+                            <li>• Enter your Client ID and Client Secret</li>
+                            <li>• Verify the Redirect URI matches</li>
+                            <li>• Save the credentials</li>
+                        </ul>
+                    </li>
+                    
+                    <li>
+                        <strong>Authenticate</strong><br>
+                        Once configured, click "Authenticate with Coinbase OAuth2" to complete the setup.
+                    </li>
+                </ol>
             </div>
+            
+            <div class="bg-green-900/20 border border-green-500 rounded-lg p-4">
+                <div class="flex items-center mb-2">
+                    <i data-feather="shield" class="text-green-500 mr-2"></i>
+                    <h3 class="text-green-400 font-semibold">Security Benefits</h3>
+                </div>
+                <ul class="text-sm text-gray-300 space-y-1">
+                    <li>• No need to share your Coinbase login credentials</li>
+                    <li>• Secure token-based authentication</li>
+                    <li>• Automatic token refresh handling</li>
+                    <li>• Granular permission control</li>
+                    <li>• Easy revocation from Coinbase settings</li>
+                </ul>
+            </div>
+            
+            <div class="bg-red-900/20 border border-red-500 rounded-lg p-4">
+                <div class="flex items-center mb-2">
+                    <i data-feather="alert-circle" class="text-red-500 mr-2"></i>
+                    <h3 class="text-red-400 font-semibold">Troubleshooting</h3>
+                </div>
+                <ul class="text-sm text-gray-300 space-y-2">
+                    <li>
+                        <strong>Error: "Invalid redirect URI"</strong><br>
+                        <span class="text-gray-400">Ensure the redirect URI in your Coinbase app matches exactly: <code class="bg-gray-700 px-1 rounded">https://www.arbion.ai/oauth_callback/coinbase</code></span>
+                    </li>
+                    <li>
+                        <strong>Error: "Invalid client credentials"</strong><br>
+                        <span class="text-gray-400">Double-check your Client ID and Client Secret are copied correctly from Coinbase Developer Portal</span>
+                    </li>
+                    <li>
+                        <strong>Error: "Insufficient permissions"</strong><br>
+                        <span class="text-gray-400">Ensure your Coinbase app has the required permissions: wallet:accounts:read and wallet:transactions:read</span>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="flex justify-end mt-6 space-x-3">
+            <button onclick="closeCoinbaseInfo()" class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                Close
+            </button>
+            <a href="https://developers.coinbase.com" target="_blank" class="btn-primary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <i data-feather="external-link" class="w-4 h-4 inline mr-2"></i>
+                Open Developer Portal
+            </a>
         </div>
     </div>
 </div>
-
-<script>
-function showCoinbaseInfo() {
-    document.getElementById('coinbase-oauth-info').classList.remove('hidden');
-}
-
-function closeCoinbaseInfo() {
-    document.getElementById('coinbase-oauth-info').classList.add('hidden');
-}
-</script>

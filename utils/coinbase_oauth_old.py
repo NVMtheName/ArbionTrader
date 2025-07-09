@@ -10,90 +10,24 @@ from utils.encryption import encrypt_credentials, decrypt_credentials
 logger = logging.getLogger(__name__)
 
 class CoinbaseOAuth:
-    """Coinbase OAuth2 integration for secure authentication - Multi-user compatible"""
+    """Coinbase OAuth2 integration for secure authentication"""
     
-    def __init__(self, user_id=None):
-        self.user_id = user_id
-        self.client_id = None
-        self.client_secret = None
-        self.redirect_uri = None
+    def __init__(self):
+        self.client_id = os.environ.get('COINBASE_CLIENT_ID')
+        self.client_secret = os.environ.get('COINBASE_CLIENT_SECRET')
+        self.redirect_uri = os.environ.get('COINBASE_REDIRECT_URI', 'https://www.arbion.ai/oauth_callback/coinbase')
         self.auth_url = 'https://www.coinbase.com/oauth/authorize'
         self.token_url = 'https://api.coinbase.com/oauth/token'
         self.api_base_url = 'https://api.coinbase.com/v2'
         
-        # Load client credentials from database if user_id provided
-        if user_id:
-            self._load_client_credentials(user_id)
-    
-    def _load_client_credentials(self, user_id):
-        """Load OAuth2 client credentials from database for the user"""
-        try:
-            from models import OAuthClientCredential
-            
-            client_cred = OAuthClientCredential.query.filter_by(
-                user_id=user_id,
-                provider='coinbase',
-                is_active=True
-            ).first()
-            
-            if client_cred:
-                self.client_id = client_cred.client_id
-                self.client_secret = client_cred.client_secret
-                self.redirect_uri = client_cred.redirect_uri
-                logger.info(f"Loaded Coinbase OAuth credentials for user {user_id}")
-            else:
-                logger.warning(f"No active Coinbase OAuth client credentials found for user {user_id}")
-                
-        except Exception as e:
-            logger.error(f"Failed to load Coinbase OAuth credentials for user {user_id}: {e}")
-    
-    def set_client_credentials(self, client_id, client_secret, redirect_uri):
-        """Set client credentials programmatically"""
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.redirect_uri = redirect_uri
-    
-    def save_client_credentials(self, user_id, client_id, client_secret, redirect_uri):
-        """Save OAuth2 client credentials to database"""
-        try:
-            from models import OAuthClientCredential
-            from app import db
-            
-            # Check if credentials already exist
-            existing_cred = OAuthClientCredential.query.filter_by(
-                user_id=user_id,
-                provider='coinbase'
-            ).first()
-            
-            if existing_cred:
-                existing_cred.client_id = client_id
-                existing_cred.client_secret = client_secret
-                existing_cred.redirect_uri = redirect_uri
-                existing_cred.updated_at = datetime.utcnow()
-                existing_cred.is_active = True
-            else:
-                new_cred = OAuthClientCredential(
-                    user_id=user_id,
-                    provider='coinbase',
-                    client_id=client_id,
-                    client_secret=client_secret,
-                    redirect_uri=redirect_uri
-                )
-                db.session.add(new_cred)
-            
-            db.session.commit()
-            logger.info(f"Saved Coinbase OAuth client credentials for user {user_id}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Failed to save Coinbase OAuth client credentials: {e}")
-            return False
+        if not self.client_id or not self.client_secret:
+            logger.warning("Coinbase OAuth2 credentials not configured")
     
     def get_authorization_url(self):
         """Generate authorization URL with state parameter"""
         try:
             if not self.client_id:
-                raise ValueError("Coinbase OAuth client credentials not configured for this user. Please configure your OAuth2 client credentials first.")
+                raise ValueError("Coinbase client ID not configured")
             
             # Generate secure state parameter
             state = secrets.token_urlsafe(32)
@@ -110,11 +44,11 @@ class CoinbaseOAuth:
             
             auth_url = f"{self.auth_url}?{urlencode(auth_params)}"
             
-            logger.info(f"Generated Coinbase authorization URL for user {self.user_id}")
+            logger.info("Generated Coinbase authorization URL")
             return auth_url
         
         except Exception as e:
-            logger.error(f"Error generating Coinbase authorization URL: {str(e)}")
+            logger.error(f"Error generating authorization URL: {str(e)}")
             raise
     
     def exchange_code_for_token(self, auth_code, state):
@@ -161,30 +95,33 @@ class CoinbaseOAuth:
                     'access_token': token_info['access_token'],
                     'refresh_token': token_info.get('refresh_token'),
                     'token_expiry': expiry_time.isoformat(),
+                    'client_id': self.client_id,
+                    'client_secret': self.client_secret,
                     'scope': token_info.get('scope', 'wallet:accounts:read,wallet:transactions:read')
                 }
                 
                 # Clean up session
                 session.pop('coinbase_oauth_state', None)
                 
-                logger.info("Successfully exchanged Coinbase OAuth code for tokens")
+                logger.info("Successfully exchanged code for Coinbase token")
                 return {
                     'success': True,
-                    'credentials': credentials
+                    'credentials': credentials,
+                    'message': 'Token exchange successful'
                 }
             else:
-                error_msg = f"Token exchange failed with status {response.status_code}"
-                logger.error(error_msg)
+                logger.error(f"Token exchange failed: {response.status_code} - {response.text}")
                 return {
                     'success': False,
-                    'message': error_msg
+                    'message': f'Token exchange failed: {response.text}',
+                    'status_code': response.status_code
                 }
         
         except Exception as e:
-            logger.error(f"Error during Coinbase token exchange: {str(e)}")
+            logger.error(f"Error during token exchange: {str(e)}")
             return {
                 'success': False,
-                'message': f'Token exchange failed: {str(e)}'
+                'message': f'Token exchange error: {str(e)}'
             }
     
     def refresh_token(self, refresh_token):
@@ -193,7 +130,7 @@ class CoinbaseOAuth:
             if not self.client_id or not self.client_secret:
                 raise ValueError("Coinbase OAuth2 credentials not configured")
             
-            token_data = {
+            refresh_data = {
                 'grant_type': 'refresh_token',
                 'refresh_token': refresh_token,
                 'client_id': self.client_id,
@@ -207,7 +144,7 @@ class CoinbaseOAuth:
             response = requests.post(
                 self.token_url,
                 headers=headers,
-                data=token_data,
+                data=refresh_data,
                 timeout=30
             )
             
@@ -218,69 +155,96 @@ class CoinbaseOAuth:
                 expires_in = token_info.get('expires_in', 7200)
                 expiry_time = datetime.utcnow() + timedelta(seconds=expires_in)
                 
+                # Prepare updated credentials
                 credentials = {
                     'access_token': token_info['access_token'],
                     'refresh_token': token_info.get('refresh_token', refresh_token),
                     'token_expiry': expiry_time.isoformat(),
+                    'client_id': self.client_id,
+                    'client_secret': self.client_secret,
                     'scope': token_info.get('scope', 'wallet:accounts:read,wallet:transactions:read')
                 }
                 
-                logger.info("Successfully refreshed Coinbase OAuth token")
+                logger.info("Successfully refreshed Coinbase token")
                 return {
                     'success': True,
-                    'credentials': credentials
+                    'credentials': credentials,
+                    'message': 'Token refresh successful'
                 }
             else:
-                error_msg = f"Token refresh failed with status {response.status_code}"
-                logger.error(error_msg)
+                logger.error(f"Token refresh failed: {response.status_code} - {response.text}")
                 return {
                     'success': False,
-                    'message': error_msg
+                    'message': f'Token refresh failed: {response.text}',
+                    'status_code': response.status_code
                 }
         
         except Exception as e:
-            logger.error(f"Error refreshing Coinbase OAuth token: {str(e)}")
+            logger.error(f"Error during token refresh: {str(e)}")
             return {
                 'success': False,
-                'message': f'Token refresh failed: {str(e)}'
+                'message': f'Token refresh error: {str(e)}'
             }
     
     def is_token_expired(self, credentials):
         """Check if access token is expired"""
         try:
-            expiry_str = credentials.get('token_expiry')
-            if not expiry_str:
+            if 'token_expiry' not in credentials:
                 return True
             
-            expiry_time = datetime.fromisoformat(expiry_str)
-            return datetime.utcnow() >= expiry_time
+            expiry_time = datetime.fromisoformat(credentials['token_expiry'])
+            # Consider token expired if it expires within 5 minutes
+            buffer_time = datetime.utcnow() + timedelta(minutes=5)
+            
+            return expiry_time <= buffer_time
         
         except Exception as e:
-            logger.error(f"Error checking token expiration: {str(e)}")
+            logger.error(f"Error checking token expiry: {str(e)}")
             return True
     
     def get_valid_token(self, encrypted_credentials):
         """Get a valid access token, refreshing if necessary"""
         try:
+            # Decrypt credentials
             credentials = decrypt_credentials(encrypted_credentials)
             
             # Check if token is expired
             if not self.is_token_expired(credentials):
-                return credentials['access_token']
+                return {
+                    'success': True,
+                    'access_token': credentials['access_token'],
+                    'credentials': credentials
+                }
             
-            # Try to refresh token
+            # Token is expired, try to refresh
             refresh_token = credentials.get('refresh_token')
-            if refresh_token:
-                refresh_result = self.refresh_token(refresh_token)
-                if refresh_result['success']:
-                    return refresh_result['credentials']['access_token']
+            if not refresh_token:
+                return {
+                    'success': False,
+                    'message': 'No refresh token available, re-authorization required'
+                }
             
-            # Token expired and refresh failed
-            return None
+            # Refresh the token
+            refresh_result = self.refresh_token(refresh_token)
+            
+            if refresh_result['success']:
+                return {
+                    'success': True,
+                    'access_token': refresh_result['credentials']['access_token'],
+                    'credentials': refresh_result['credentials']
+                }
+            else:
+                return {
+                    'success': False,
+                    'message': f'Token refresh failed: {refresh_result["message"]}'
+                }
         
         except Exception as e:
-            logger.error(f"Error getting valid Coinbase token: {str(e)}")
-            return None
+            logger.error(f"Error getting valid token: {str(e)}")
+            return {
+                'success': False,
+                'message': f'Token validation error: {str(e)}'
+            }
     
     def test_connection(self, access_token):
         """Test the connection with Coinbase API"""
@@ -290,29 +254,32 @@ class CoinbaseOAuth:
                 'Content-Type': 'application/json'
             }
             
-            # Test with user endpoint
+            # Test with accounts endpoint
             response = requests.get(
-                f'{self.api_base_url}/user',
+                f'{self.api_base_url}/accounts',
                 headers=headers,
                 timeout=30
             )
             
             if response.status_code == 200:
+                accounts_data = response.json()
+                account_count = len(accounts_data.get('data', []))
+                
                 return {
                     'success': True,
-                    'message': 'Coinbase API connection successful'
+                    'message': f'Coinbase API connection successful. Found {account_count} accounts.'
                 }
             else:
                 return {
                     'success': False,
-                    'message': f'Coinbase API connection failed: {response.status_code}'
+                    'message': f'API test failed: {response.status_code} - {response.text}'
                 }
         
         except Exception as e:
             logger.error(f"Error testing Coinbase connection: {str(e)}")
             return {
                 'success': False,
-                'message': f'Connection test failed: {str(e)}'
+                'message': f'Connection test error: {str(e)}'
             }
     
     def get_accounts(self, access_token):
@@ -330,14 +297,22 @@ class CoinbaseOAuth:
             )
             
             if response.status_code == 200:
-                return response.json()
+                return {
+                    'success': True,
+                    'data': response.json()
+                }
             else:
-                logger.error(f"Failed to get accounts: {response.status_code}")
-                return None
+                return {
+                    'success': False,
+                    'message': f'Failed to fetch accounts: {response.text}'
+                }
         
         except Exception as e:
-            logger.error(f"Error getting Coinbase accounts: {str(e)}")
-            return None
+            logger.error(f"Error fetching accounts: {str(e)}")
+            return {
+                'success': False,
+                'message': f'Account fetch error: {str(e)}'
+            }
     
     def get_account_transactions(self, access_token, account_id, limit=25):
         """Get transactions for a specific account"""
@@ -357,11 +332,19 @@ class CoinbaseOAuth:
             )
             
             if response.status_code == 200:
-                return response.json()
+                return {
+                    'success': True,
+                    'data': response.json()
+                }
             else:
-                logger.error(f"Failed to get transactions: {response.status_code}")
-                return None
+                return {
+                    'success': False,
+                    'message': f'Failed to fetch transactions: {response.text}'
+                }
         
         except Exception as e:
-            logger.error(f"Error getting Coinbase transactions: {str(e)}")
-            return None
+            logger.error(f"Error fetching transactions: {str(e)}")
+            return {
+                'success': False,
+                'message': f'Transaction fetch error: {str(e)}'
+            }

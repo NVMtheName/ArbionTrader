@@ -156,6 +156,9 @@ Changelog:
   - Each user can now configure their own OAuth2 client credentials independently
   - System now supports multiple users without requiring server environment variable access
   - Enhanced API settings interface with step-by-step OAuth2 setup instructions
+  - Applied same multi-user architecture to Coinbase OAuth2 system for consistency
+  - Created comprehensive setup guides for both Schwab and Coinbase OAuth2 integration
+  - Both OAuth2 systems now work independently without environment variable dependencies
 
 ## User Preferences
 

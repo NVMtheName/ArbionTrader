@@ -55,14 +55,77 @@
                 <p class="text-sm text-gray-300 mb-3">
                     Secure OAuth2 authentication for production-ready Coinbase integration.
                 </p>
-                <form method="POST">
-                    <input type="hidden" name="provider" value="coinbase">
-                    <input type="hidden" name="oauth_flow" value="true">
-                    <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
-                        <i data-feather="shield" class="w-4 h-4 inline mr-2"></i>
-                        Authenticate with Coinbase OAuth2
+                {% if coinbase_oauth_configured %}
+                    <form method="POST">
+                        <input type="hidden" name="provider" value="coinbase">
+                        <input type="hidden" name="oauth_flow" value="true">
+                        <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
+                            <i data-feather="shield" class="w-4 h-4 inline mr-2"></i>
+                            Authenticate with Coinbase OAuth2
+                        </button>
+                    </form>
+                {% else %}
+                    <button 
+                        type="button" 
+                        onclick="toggleCoinbaseOAuthSetup()" 
+                        class="btn-secondary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors"
+                    >
+                        <i data-feather="settings" class="w-4 h-4 inline mr-2"></i>
+                        Configure OAuth2 Credentials
                     </button>
-                </form>
+                    
+                    <!-- OAuth2 Client Credentials Setup Form -->
+                    <div id="coinbase-oauth-setup" class="hidden mt-4 p-4 bg-gray-700 rounded-lg">
+                        <h5 class="text-sm font-semibold text-white mb-3">OAuth2 Client Credentials</h5>
+                        <p class="text-xs text-gray-400 mb-4">Enter your OAuth2 client credentials from Coinbase Developer Portal</p>
+                        
+                        <form method="POST" class="space-y-3">
+                            <input type="hidden" name="provider" value="coinbase">
+                            <input type="hidden" name="oauth_setup" value="true">
+                            
+                            <div>
+                                <label class="block text-xs font-medium text-gray-300 mb-1">Client ID</label>
+                                <input 
+                                    type="text" 
+                                    name="client_id" 
+                                    class="input-field w-full text-sm" 
+                                    placeholder="Enter your Coinbase Client ID"
+                                    required
+                                >
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs font-medium text-gray-300 mb-1">Client Secret</label>
+                                <input 
+                                    type="password" 
+                                    name="client_secret" 
+                                    class="input-field w-full text-sm" 
+                                    placeholder="Enter your Coinbase Client Secret"
+                                    required
+                                >
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs font-medium text-gray-300 mb-1">Redirect URI</label>
+                                <input 
+                                    type="text" 
+                                    name="redirect_uri" 
+                                    class="input-field w-full text-sm" 
+                                    placeholder="https://www.arbion.ai/oauth_callback/coinbase"
+                                    value="https://www.arbion.ai/oauth_callback/coinbase"
+                                    required
+                                >
+                            </div>
+                            
+                            <button 
+                                type="submit" 
+                                class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors"
+                            >
+                                Save OAuth2 Credentials
+                            </button>
+                        </form>
+                    </div>
+                {% endif %}
             </div>
 
             <!-- Legacy API Key Method -->
@@ -653,6 +716,12 @@
         if (modal) {
             modal.remove();
         }
+    }
+    
+    // Toggle Coinbase OAuth2 setup form
+    function toggleCoinbaseOAuthSetup() {
+        const setupForm = document.getElementById('coinbase-oauth-setup');
+        setupForm.classList.toggle('hidden');
     }
 </script>
 {% endblock %}
