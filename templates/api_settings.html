@@ -56,14 +56,77 @@
                     Secure OAuth2 authentication for production-ready Coinbase integration.
                 </p>
                 {% if coinbase_oauth_configured %}
-                    <form method="POST">
-                        <input type="hidden" name="provider" value="coinbase">
-                        <input type="hidden" name="oauth_flow" value="true">
-                        <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
-                            <i data-feather="shield" class="w-4 h-4 inline mr-2"></i>
-                            Authenticate with Coinbase OAuth2
+                    <div class="space-y-3">
+                        <form method="POST">
+                            <input type="hidden" name="provider" value="coinbase">
+                            <input type="hidden" name="oauth_flow" value="true">
+                            <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
+                                <i data-feather="shield" class="w-4 h-4 inline mr-2"></i>
+                                Authenticate with Coinbase OAuth2
+                            </button>
+                        </form>
+                        
+                        <button 
+                            type="button" 
+                            onclick="toggleCoinbaseOAuthSetup()" 
+                            class="btn-secondary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors"
+                        >
+                            <i data-feather="settings" class="w-4 h-4 inline mr-2"></i>
+                            Reconfigure OAuth2 Client Credentials
                         </button>
-                    </form>
+                        
+                        <!-- OAuth2 Client Credentials Setup Form -->
+                        <div id="coinbase-oauth-setup" class="hidden mt-4 p-4 bg-gray-700 rounded-lg">
+                            <h5 class="text-sm font-semibold text-white mb-3">OAuth2 Client Credentials</h5>
+                            <p class="text-xs text-gray-400 mb-4">Enter your OAuth2 client credentials from Coinbase Developer Portal</p>
+                            
+                            <form method="POST" class="space-y-3">
+                                <input type="hidden" name="provider" value="coinbase">
+                                <input type="hidden" name="oauth_setup" value="true">
+                                
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-300 mb-1">Client ID</label>
+                                    <input 
+                                        type="text" 
+                                        name="client_id" 
+                                        class="input-field w-full text-sm" 
+                                        placeholder="Enter your Coinbase Client ID"
+                                        required
+                                    >
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-300 mb-1">Client Secret</label>
+                                    <input 
+                                        type="password" 
+                                        name="client_secret" 
+                                        class="input-field w-full text-sm" 
+                                        placeholder="Enter your Coinbase Client Secret"
+                                        required
+                                    >
+                                </div>
+                                
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-300 mb-1">Redirect URI</label>
+                                    <input 
+                                        type="text" 
+                                        name="redirect_uri" 
+                                        class="input-field w-full text-sm" 
+                                        placeholder="https://arbion.ai/oauth_callback/coinbase"
+                                        value="https://arbion.ai/oauth_callback/coinbase"
+                                        readonly
+                                    >
+                                </div>
+                                
+                                <button 
+                                    type="submit" 
+                                    class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors"
+                                >
+                                    Save OAuth2 Credentials
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 {% else %}
                     <button 
                         type="button" 
@@ -231,40 +294,100 @@
                     Secure OAuth2 authentication with PKCE for production use.
                 </p>
                 
-                {% if not schwab_oauth_configured %}
-                <div class="bg-amber-900/20 border border-amber-500 rounded-lg p-3 mb-3">
-                    <div class="flex items-center">
-                        <i data-feather="alert-triangle" class="text-amber-500 mr-2 w-4 h-4"></i>
-                        <span class="text-amber-300 text-sm">OAuth2 client credentials not configured</span>
-                    </div>
-                </div>
-                
-                <!-- OAuth2 Client Credentials Setup Form -->
-                <div class="mt-4 p-4 bg-gray-900 rounded-lg">
-                    <h4 class="text-md font-semibold mb-3 text-blue-300">Setup OAuth2 Client Credentials</h4>
-                    <form method="POST" action="{{ url_for('main.api_settings') }}">
-                        <input type="hidden" name="provider" value="schwab">
-                        <input type="hidden" name="oauth_setup" value="true">
+                {% if schwab_oauth_configured %}
+                    <div class="space-y-3">
+                        <form method="POST" action="{{ url_for('main.schwab_oauth_setup') }}">
+                            <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
+                                <i data-feather="shield" class="w-4 h-4 inline mr-2"></i>
+                                Authenticate with Schwab OAuth2
+                            </button>
+                        </form>
                         
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">Client ID</label>
-                            <input type="text" name="client_id" class="input-field w-full" placeholder="Your Schwab OAuth2 Client ID" required>
-                        </div>
-                        
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">Client Secret</label>
-                            <input type="password" name="client_secret" class="input-field w-full" placeholder="Your Schwab OAuth2 Client Secret" required>
-                        </div>
-                        
-                        <div class="mb-4">
-                            <label class="block text-sm font-medium mb-2">Redirect URI</label>
-                            <input type="url" name="redirect_uri" value="https://www.arbion.ai/oauth_callback/schwab" class="input-field w-full" readonly>
-                            <p class="text-xs text-gray-400 mt-1">Use this exact redirect URI when registering your Schwab OAuth2 app</p>
-                        </div>
-                        
-                        <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
-                            Save OAuth2 Client Credentials
+                        <button 
+                            type="button" 
+                            onclick="toggleSchwabOAuthSetup()" 
+                            class="btn-secondary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors"
+                        >
+                            <i data-feather="settings" class="w-4 h-4 inline mr-2"></i>
+                            Reconfigure OAuth2 Client Credentials
                         </button>
+                        
+                        <!-- OAuth2 Client Credentials Setup Form -->
+                        <div id="schwab-oauth-setup" class="hidden mt-4 p-4 bg-gray-700 rounded-lg">
+                            <h5 class="text-sm font-semibold text-white mb-3">OAuth2 Client Credentials</h5>
+                            <p class="text-xs text-gray-400 mb-4">Enter your OAuth2 client credentials from Schwab Developer Portal</p>
+                            
+                            <form method="POST" action="{{ url_for('main.api_settings') }}">
+                                <input type="hidden" name="provider" value="schwab">
+                                <input type="hidden" name="oauth_setup" value="true">
+                                
+                                <div class="mb-4">
+                                    <label class="block text-xs font-medium text-gray-300 mb-1">Client ID</label>
+                                    <input type="text" name="client_id" class="input-field w-full text-sm" placeholder="Your Schwab OAuth2 Client ID" required>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label class="block text-xs font-medium text-gray-300 mb-1">Client Secret</label>
+                                    <input type="password" name="client_secret" class="input-field w-full text-sm" placeholder="Your Schwab OAuth2 Client Secret" required>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <label class="block text-xs font-medium text-gray-300 mb-1">Redirect URI</label>
+                                    <input type="url" name="redirect_uri" value="https://www.arbion.ai/oauth_callback/schwab" class="input-field w-full text-sm" readonly>
+                                    <p class="text-xs text-gray-400 mt-1">Use this exact redirect URI when registering your Schwab OAuth2 app</p>
+                                </div>
+                                
+                                <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
+                                    Save OAuth2 Client Credentials
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="bg-amber-900/20 border border-amber-500 rounded-lg p-3 mb-3">
+                        <div class="flex items-center">
+                            <i data-feather="alert-triangle" class="text-amber-500 mr-2 w-4 h-4"></i>
+                            <span class="text-amber-300 text-sm">OAuth2 client credentials not configured</span>
+                        </div>
+                    </div>
+                    
+                    <button 
+                        type="button" 
+                        onclick="toggleSchwabOAuthSetup()" 
+                        class="btn-secondary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors"
+                    >
+                        <i data-feather="settings" class="w-4 h-4 inline mr-2"></i>
+                        Configure OAuth2 Credentials
+                    </button>
+                    
+                    <!-- OAuth2 Client Credentials Setup Form -->
+                    <div id="schwab-oauth-setup" class="hidden mt-4 p-4 bg-gray-700 rounded-lg">
+                        <h5 class="text-sm font-semibold text-white mb-3">OAuth2 Client Credentials</h5>
+                        <p class="text-xs text-gray-400 mb-4">Enter your OAuth2 client credentials from Schwab Developer Portal</p>
+                        
+                        <form method="POST" action="{{ url_for('main.api_settings') }}">
+                            <input type="hidden" name="provider" value="schwab">
+                            <input type="hidden" name="oauth_setup" value="true">
+                            
+                            <div class="mb-4">
+                                <label class="block text-xs font-medium text-gray-300 mb-1">Client ID</label>
+                                <input type="text" name="client_id" class="input-field w-full text-sm" placeholder="Your Schwab OAuth2 Client ID" required>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="block text-xs font-medium text-gray-300 mb-1">Client Secret</label>
+                                <input type="password" name="client_secret" class="input-field w-full text-sm" placeholder="Your Schwab OAuth2 Client Secret" required>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="block text-xs font-medium text-gray-300 mb-1">Redirect URI</label>
+                                <input type="url" name="redirect_uri" value="https://www.arbion.ai/oauth_callback/schwab" class="input-field w-full text-sm" readonly>
+                                <p class="text-xs text-gray-400 mt-1">Use this exact redirect URI when registering your Schwab OAuth2 app</p>
+                            </div>
+                            
+                            <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
+                                Save OAuth2 Client Credentials
+                            </button>
                     </form>
                     
                     <div class="mt-4 p-3 bg-blue-900 bg-opacity-50 rounded-lg">
@@ -721,6 +844,12 @@
     // Toggle Coinbase OAuth2 setup form
     function toggleCoinbaseOAuthSetup() {
         const setupForm = document.getElementById('coinbase-oauth-setup');
+        setupForm.classList.toggle('hidden');
+    }
+    
+    // Toggle Schwab OAuth2 setup form
+    function toggleSchwabOAuthSetup() {
+        const setupForm = document.getElementById('schwab-oauth-setup');
         setupForm.classList.toggle('hidden');
     }
 </script>
