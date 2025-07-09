@@ -1,16 +1,6 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
-from models import User, APICredential, Trade, Strategy, SystemLog, AutoTradingSettings, OAuthClientCredential
-from app import db
-from utils.encryption import encrypt_credentials, decrypt_credentials
-from utils.coinbase_connector import CoinbaseConnector
-from utils.coinbase_oauth import CoinbaseOAuth
-from utils.schwab_connector import SchwabConnector
-from utils.schwab_oauth import SchwabOAuth
-from utils.openai_trader import OpenAITrader
-from utils.market_data import MarketDataProvider
-from utils.risk_management import RiskManager
 from functools import wraps
 import logging
 import json
@@ -40,6 +30,7 @@ def superadmin_required(f):
 def get_dashboard_market_data():
     """Get real-time market data for dashboard display"""
     try:
+        from utils.market_data import MarketDataProvider
         market_provider = MarketDataProvider()
         
         # Key market symbols to display
@@ -75,6 +66,10 @@ def get_dashboard_market_data():
 
 def get_account_balance():
     """Get total account balance from connected APIs"""
+    from models import APICredential
+    from utils.encryption import decrypt_credentials
+    from utils.market_data import MarketDataProvider
+    
     total_balance = 0
     balance_breakdown = {}
     
@@ -153,6 +148,8 @@ def get_account_balance():
 @main_bp.route('/')
 @login_required
 def dashboard():
+    from models import Trade, APICredential, AutoTradingSettings
+    
     # Get user's recent trades
     recent_trades = Trade.query.filter_by(user_id=current_user.id).order_by(Trade.created_at.desc()).limit(10).all()
     
@@ -190,6 +187,9 @@ def enhanced_dashboard():
 @login_required
 def natural_trade():
     if request.method == 'POST':
+        from utils.openai_trader import OpenAITrader
+        from models import AutoTradingSettings
+        
         prompt = request.form.get('prompt')
         
         if not prompt:
@@ -234,6 +234,12 @@ def natural_trade():
 @main_bp.route('/api-settings', methods=['GET', 'POST'])
 @login_required
 def api_settings():
+    from models import APICredential, OAuthClientCredential
+    from utils.encryption import encrypt_credentials
+    from utils.coinbase_oauth import CoinbaseOAuth
+    from utils.schwab_oauth import SchwabOAuth
+    from app import db
+    
     if request.method == 'POST':
         provider = request.form.get('provider')
         
@@ -431,6 +437,15 @@ def api_settings():
 @main_bp.route('/test-api-connection', methods=['POST'])
 @login_required
 def test_api_connection():
+    from models import APICredential
+    from utils.encryption import decrypt_credentials
+    from utils.coinbase_connector import CoinbaseConnector
+    from utils.coinbase_oauth import CoinbaseOAuth
+    from utils.schwab_connector import SchwabConnector
+    from utils.schwab_oauth import SchwabOAuth
+    from utils.openai_trader import OpenAITrader
+    from app import db
+    
     provider = request.form.get('provider')
     
     credential = APICredential.query.filter_by(
@@ -496,6 +511,11 @@ def test_api_connection():
 @main_bp.route('/oauth_callback/schwab')
 def oauth_callback_schwab():
     """Handle Schwab OAuth2 callback"""
+    from models import APICredential
+    from utils.encryption import encrypt_credentials
+    from utils.schwab_oauth import SchwabOAuth
+    from app import db
+    
     try:
         # Log all callback parameters for debugging
         logging.info(f"Schwab OAuth callback received. Query params: {dict(request.args)}")
@@ -560,6 +580,8 @@ def oauth_callback_schwab():
 @login_required
 def schwab_oauth_setup():
     """Initiate Schwab OAuth2 flow"""
+    from utils.schwab_oauth import SchwabOAuth
+    
     try:
         schwab_oauth = SchwabOAuth()
         auth_url = schwab_oauth.get_authorization_url()
@@ -571,6 +593,11 @@ def schwab_oauth_setup():
 @main_bp.route('/oauth_callback/coinbase')
 def oauth_callback_coinbase():
     """Handle Coinbase OAuth2 callback"""
+    from models import APICredential
+    from utils.encryption import encrypt_credentials
+    from utils.coinbase_oauth import CoinbaseOAuth
+    from app import db
+    
     try:
         # Log callback details for debugging
         logging.info(f"Coinbase OAuth callback received. Query params: {dict(request.args)}")
