@@ -56,11 +56,17 @@
         <div class="card">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-gray-400">Account Status</p>
-                    <p class="text-2xl font-bold text-coinbase-green">{{ current_user.role.title() }}</p>
+                    <p class="text-sm text-gray-400">Account Value</p>
+                    <p class="text-2xl font-bold text-coinbase-green">
+                        {% if account_balance and account_balance.total > 0 %}
+                            ${{ "{:,.2f}".format(account_balance.total) }}
+                        {% else %}
+                            $0.00
+                        {% endif %}
+                    </p>
                 </div>
                 <div class="p-3 bg-purple-500 bg-opacity-20 rounded-lg">
-                    <i data-feather="user" class="w-6 h-6 text-purple-400"></i>
+                    <i data-feather="dollar-sign" class="w-6 h-6 text-purple-400"></i>
                 </div>
             </div>
         </div>
@@ -68,17 +74,11 @@
         <div class="card">
             <div class="flex items-center justify-between">
                 <div>
-                    <p class="text-sm text-gray-400">Last Trade</p>
-                    <p class="text-2xl font-bold text-white">
-                        {% if recent_trades %}
-                            {{ recent_trades[0].created_at.strftime('%H:%M') }}
-                        {% else %}
-                            --:--
-                        {% endif %}
-                    </p>
+                    <p class="text-sm text-gray-400">Account Status</p>
+                    <p class="text-2xl font-bold text-white">{{ current_user.role.title() }}</p>
                 </div>
                 <div class="p-3 bg-yellow-500 bg-opacity-20 rounded-lg">
-                    <i data-feather="clock" class="w-6 h-6 text-yellow-400"></i>
+                    <i data-feather="user" class="w-6 h-6 text-yellow-400"></i>
                 </div>
             </div>
         </div>

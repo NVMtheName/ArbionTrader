@@ -73,6 +73,83 @@ def get_dashboard_market_data():
         logging.error(f"Error in get_dashboard_market_data: {str(e)}")
         return {}
 
+def get_account_balance():
+    """Get total account balance from connected APIs"""
+    total_balance = 0
+    balance_breakdown = {}
+    
+    try:
+        # Get user's API credentials
+        coinbase_cred = APICredential.query.filter_by(
+            user_id=current_user.id,
+            provider='coinbase',
+            is_active=True,
+            test_status='success'
+        ).first()
+        
+        schwab_cred = APICredential.query.filter_by(
+            user_id=current_user.id,
+            provider='schwab',
+            is_active=True,
+            test_status='success'
+        ).first()
+        
+        # Get Coinbase balance
+        if coinbase_cred:
+            try:
+                from utils.coinbase_oauth import CoinbaseOAuth
+                coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
+                encrypted_creds = coinbase_cred.encrypted_credentials
+                
+                # Get valid token
+                credentials = decrypt_credentials(encrypted_creds)
+                access_token = coinbase_oauth.get_valid_token(encrypted_creds)
+                
+                if access_token:
+                    accounts = coinbase_oauth.get_accounts(access_token)
+                    if accounts and 'data' in accounts:
+                        coinbase_balance = 0
+                        for account in accounts['data']:
+                            if account.get('balance') and account['balance'].get('amount'):
+                                try:
+                                    amount = float(account['balance']['amount'])
+                                    currency = account['balance']['currency']
+                                    
+                                    # Convert to USD if needed (simplified)
+                                    if currency == 'USD':
+                                        coinbase_balance += amount
+                                    elif currency in ['BTC', 'ETH']:
+                                        # Get current price for conversion
+                                        market_provider = MarketDataProvider()
+                                        price_data = market_provider.get_crypto_price(currency)
+                                        if price_data:
+                                            coinbase_balance += amount * price_data.get('price', 0)
+                                except:
+                                    continue
+                        
+                        balance_breakdown['coinbase'] = coinbase_balance
+                        total_balance += coinbase_balance
+            except Exception as e:
+                logging.error(f"Error getting Coinbase balance: {str(e)}")
+        
+        # Get Schwab balance (simplified - would need actual API implementation)
+        if schwab_cred:
+            try:
+                # For now, show placeholder - real implementation would use Schwab API
+                balance_breakdown['schwab'] = 0  # Placeholder
+                # total_balance += schwab_balance
+            except Exception as e:
+                logging.error(f"Error getting Schwab balance: {str(e)}")
+        
+        return {
+            'total': total_balance,
+            'breakdown': balance_breakdown
+        }
+    
+    except Exception as e:
+        logging.error(f"Error in get_account_balance: {str(e)}")
+        return {'total': 0, 'breakdown': {}}
+
 @main_bp.route('/')
 @login_required
 def dashboard():
@@ -93,11 +170,15 @@ def dashboard():
     # Get real-time market data
     market_data = get_dashboard_market_data()
     
+    # Get account balance if APIs are connected
+    account_balance = get_account_balance()
+    
     return render_template('dashboard.html', 
                          recent_trades=recent_trades,
                          api_status=api_status,
                          auto_trading_settings=auto_trading_settings,
-                         market_data=market_data)
+                         market_data=market_data,
+                         account_balance=account_balance)
 
 @main_bp.route('/enhanced-dashboard')
 @login_required
@@ -972,3 +1053,27 @@ def api_market_data():
     except Exception as e:
         logging.error(f"Error fetching market data: {str(e)}")
         return jsonify({"success": False, "error": str(e)})
+
+@main_bp.route('/debug-toggle', methods=['GET', 'POST'])
+@login_required
+@superadmin_required
+def debug_toggle():
+    """Debug endpoint to test auto-trading toggle"""
+    if request.method == 'POST':
+        action = request.form.get('action')
+        logging.info(f"Debug toggle received action: {action}")
+        
+        # Test the toggle functionality
+        result = toggle_auto_trading()
+        return result
+    
+    settings = AutoTradingSettings.get_settings()
+    return f"""
+    <h1>Debug Toggle</h1>
+    <p>Current simulation mode: {settings.simulation_mode}</p>
+    <p>Current auto-trading enabled: {settings.is_enabled}</p>
+    <form method="POST">
+        <input type="hidden" name="action" value="toggle_simulation">
+        <button type="submit">Toggle Simulation Mode</button>
+    </form>
+    """

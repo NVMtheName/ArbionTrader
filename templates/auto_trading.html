@@ -46,7 +46,7 @@
                         <h4 class="text-sm font-medium text-white">Auto-Trading System</h4>
                         <p class="text-xs text-gray-400">Enable or disable all automated trading</p>
                     </div>
-                    <form method="POST" class="inline">
+                    <form method="POST" action="{{ url_for('main.toggle_auto_trading') }}" class="inline">
                         <input type="hidden" name="action" value="toggle_main">
                         <button type="submit" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-coinbase-blue focus:ring-offset-2 {% if settings.is_enabled %}bg-coinbase-blue{% else %}bg-gray-600{% endif %}">
                             <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {% if settings.is_enabled %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
@@ -59,7 +59,7 @@
                         <h4 class="text-sm font-medium text-white">Simulation Mode</h4>
                         <p class="text-xs text-gray-400">Test strategies without real money</p>
                     </div>
-                    <form method="POST" class="inline">
+                    <form method="POST" action="{{ url_for('main.toggle_auto_trading') }}" class="inline">
                         <input type="hidden" name="action" value="toggle_simulation">
                         <button type="submit" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:ring-offset-2 {% if settings.simulation_mode %}bg-yellow-400{% else %}bg-gray-600{% endif %}">
                             <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {% if settings.simulation_mode %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
@@ -125,7 +125,7 @@
                             <p class="text-xs text-gray-400">Cash-secured puts + covered calls</p>
                         </div>
                     </div>
-                    <form method="POST" class="inline">
+                    <form method="POST" action="{{ url_for('main.toggle_auto_trading') }}" class="inline">
                         <input type="hidden" name="action" value="toggle_wheel">
                         <button type="submit" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-coinbase-blue focus:ring-offset-2 {% if settings.wheel_enabled %}bg-coinbase-blue{% else %}bg-gray-600{% endif %}">
                             <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {% if settings.wheel_enabled %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
@@ -163,7 +163,7 @@
                             <p class="text-xs text-gray-400">Protective puts + covered calls</p>
                         </div>
                     </div>
-                    <form method="POST" class="inline">
+                    <form method="POST" action="{{ url_for('main.toggle_auto_trading') }}" class="inline">
                         <input type="hidden" name="action" value="toggle_collar">
                         <button type="submit" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-coinbase-green focus:ring-offset-2 {% if settings.collar_enabled %}bg-coinbase-green{% else %}bg-gray-600{% endif %}">
                             <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {% if settings.collar_enabled %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
@@ -201,9 +201,9 @@
                             <p class="text-xs text-gray-400">Machine learning driven</p>
                         </div>
                     </div>
-                    <form method="POST" class="inline">
+                    <form method="POST" action="{{ url_for('main.toggle_auto_trading') }}" class="inline">
                         <input type="hidden" name="action" value="toggle_ai">
-                        <button type="submit" class="relative inline-flex h-6 w-11 items-centers rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 {% if settings.ai_enabled %}bg-purple-400{% else %}bg-gray-600{% endif %}">
+                        <button type="submit" class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-offset-2 {% if settings.ai_enabled %}bg-purple-400{% else %}bg-gray-600{% endif %}">
                             <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {% if settings.ai_enabled %}translate-x-6{% else %}translate-x-1{% endif %}"></span>
                         </button>
                     </form>
