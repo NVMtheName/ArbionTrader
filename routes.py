@@ -136,7 +136,7 @@ def api_settings():
                 try:
                     client_id = request.form.get('client_id')
                     client_secret = request.form.get('client_secret')
-                    redirect_uri = request.form.get('redirect_uri', 'https://www.arbion.ai/oauth_callback/coinbase')
+                    redirect_uri = request.form.get('redirect_uri', 'https://arbion.ai/oauth_callback/coinbase')
                     
                     if not client_id or not client_secret:
                         flash('Client ID and Client Secret are required for OAuth2 setup', 'error')
@@ -452,6 +452,9 @@ def schwab_oauth_setup():
 def oauth_callback_coinbase():
     """Handle Coinbase OAuth2 callback"""
     try:
+        # Log callback details for debugging
+        logging.info(f"Coinbase OAuth callback received. Query params: {dict(request.args)}")
+        
         # Get authorization code and state from callback
         auth_code = request.args.get('code')
         state = request.args.get('state')
@@ -459,18 +462,28 @@ def oauth_callback_coinbase():
         
         if error:
             flash(f'Coinbase authorization failed: {error}', 'error')
+            logging.error(f"Coinbase OAuth error: {error}")
             return redirect(url_for('main.api_settings'))
         
         if not auth_code:
             flash('Authorization code missing from Coinbase callback', 'error')
+            logging.error(f"Authorization code missing. Available params: {dict(request.args)}")
             return redirect(url_for('main.api_settings'))
+        
+        # Additional validation - ensure user is logged in
+        if not current_user.is_authenticated:
+            flash('Please log in to complete OAuth authentication', 'error')
+            logging.error("User not authenticated during Coinbase OAuth callback")
+            return redirect(url_for('auth.login'))
         
         # Exchange code for token
         coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
+        logging.info(f"Attempting token exchange for user {current_user.id}")
         token_result = coinbase_oauth.exchange_code_for_token(auth_code, state)
         
         if not token_result['success']:
             flash(f'Token exchange failed: {token_result["message"]}', 'error')
+            logging.error(f"Token exchange failed: {token_result['message']}")
             return redirect(url_for('main.api_settings'))
         
         # Encrypt and save credentials
@@ -486,12 +499,16 @@ def oauth_callback_coinbase():
             existing_cred.encrypted_credentials = encrypted_creds
             existing_cred.updated_at = datetime.utcnow()
             existing_cred.test_status = 'success'
+            existing_cred.is_active = True
+            existing_cred.last_tested = datetime.utcnow()
         else:
             new_cred = APICredential(
                 user_id=current_user.id,
                 provider='coinbase',
                 encrypted_credentials=encrypted_creds,
-                test_status='success'
+                test_status='success',
+                is_active=True,
+                last_tested=datetime.utcnow()
             )
             db.session.add(new_cred)
         
