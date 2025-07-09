@@ -263,7 +263,7 @@ def api_settings():
                 try:
                     client_id = request.form.get('client_id')
                     client_secret = request.form.get('client_secret')
-                    redirect_uri = request.form.get('redirect_uri', 'https://arbion.ai/oauth_callback/coinbase')
+                    redirect_uri = request.form.get('redirect_uri', url_for('main.oauth_callback_coinbase', _external=True))
                     
                     if not client_id or not client_secret:
                         flash('Client ID and Client Secret are required for OAuth2 setup', 'error')
@@ -324,7 +324,7 @@ def api_settings():
                 try:
                     client_id = request.form.get('client_id')
                     client_secret = request.form.get('client_secret')
-                    redirect_uri = request.form.get('redirect_uri', 'https://www.arbion.ai/oauth_callback/schwab')
+                    redirect_uri = request.form.get('redirect_uri', url_for('main.oauth_callback_schwab', _external=True))
                     
                     if not client_id or not client_secret:
                         flash('Client ID and Client Secret are required for OAuth2 setup', 'error')

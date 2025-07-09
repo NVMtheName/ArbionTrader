@@ -112,8 +112,8 @@
                                         type="text" 
                                         name="redirect_uri" 
                                         class="input-field w-full text-sm" 
-                                        placeholder="https://arbion.ai/oauth_callback/coinbase"
-                                        value="https://arbion.ai/oauth_callback/coinbase"
+                                        placeholder="{{ url_for('main.oauth_callback_coinbase', _external=True) }}"
+                                        value="{{ url_for('main.oauth_callback_coinbase', _external=True) }}"
                                         readonly
                                     >
                                 </div>
@@ -174,8 +174,8 @@
                                     type="text" 
                                     name="redirect_uri" 
                                     class="input-field w-full text-sm" 
-                                    placeholder="https://arbion.ai/oauth_callback/coinbase"
-                                    value="https://arbion.ai/oauth_callback/coinbase"
+                                    placeholder="{{ url_for('main.oauth_callback_coinbase', _external=True) }}"
+                                    value="{{ url_for('main.oauth_callback_coinbase', _external=True) }}"
                                     readonly
                                 >
                             </div>
@@ -333,7 +333,7 @@
                                 
                                 <div class="mb-4">
                                     <label class="block text-xs font-medium text-gray-300 mb-1">Redirect URI</label>
-                                    <input type="url" name="redirect_uri" value="https://www.arbion.ai/oauth_callback/schwab" class="input-field w-full text-sm" readonly>
+                                    <input type="url" name="redirect_uri" value="{{ url_for('main.oauth_callback_schwab', _external=True) }}" class="input-field w-full text-sm" readonly>
                                     <p class="text-xs text-gray-400 mt-1">Use this exact redirect URI when registering your Schwab OAuth2 app</p>
                                 </div>
                                 
@@ -395,7 +395,7 @@
                         <ol class="text-xs text-gray-300 space-y-1">
                             <li>1. Go to Schwab Developer Portal</li>
                             <li>2. Create a new OAuth2 application</li>
-                            <li>3. Set the redirect URI to: <code class="bg-gray-700 px-1 rounded">https://www.arbion.ai/oauth_callback/schwab</code></li>
+                            <li>3. Set the redirect URI to: <code class="bg-gray-700 px-1 rounded">{{ url_for('main.oauth_callback_schwab', _external=True) }}</code></li>
                             <li>4. Copy the Client ID and Client Secret here</li>
                             <li>5. Save the credentials and then authenticate</li>
                         </ol>
