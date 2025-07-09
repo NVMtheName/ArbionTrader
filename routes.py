@@ -601,6 +601,8 @@ def oauth_callback_coinbase():
     try:
         # Log callback details for debugging
         logging.info(f"Coinbase OAuth callback received. Query params: {dict(request.args)}")
+        logging.info(f"Request URL: {request.url}")
+        logging.info(f"Request headers: {dict(request.headers)}")
         
         # Get authorization code and state from callback
         auth_code = request.args.get('code')

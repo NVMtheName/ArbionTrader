@@ -150,6 +150,9 @@ class CoinbaseOAuth:
             }
             
             # Make token request
+            logger.info(f"Making token request to {self.token_url}")
+            logger.info(f"Token request data: {token_data}")
+            
             response = requests.post(
                 self.token_url,
                 headers={
@@ -159,6 +162,9 @@ class CoinbaseOAuth:
                 data=token_data,
                 timeout=30
             )
+            
+            logger.info(f"Token response status: {response.status_code}")
+            logger.info(f"Token response content: {response.text}")
             
             if response.status_code == 200:
                 token_info = response.json()

@@ -27,6 +27,10 @@ def create_app():
     # Configuration
     app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
     
+    # Configure proper URL generation for OAuth redirects
+    app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME', 'arbion.ai')
+    app.config['PREFERRED_URL_SCHEME'] = 'https'
+    
     # Fix DATABASE_URL for newer SQLAlchemy versions
     database_url = os.environ.get("DATABASE_URL", "postgresql://localhost/arbion_db")
     if database_url.startswith("postgres://"):
