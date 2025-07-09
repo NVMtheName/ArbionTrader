@@ -13,6 +13,10 @@ class SchwabOAuth:
     """Schwab OAuth2 integration with PKCE"""
     
     def __init__(self):
+        # Load environment variables explicitly
+        from dotenv import load_dotenv
+        load_dotenv()
+        
         self.client_id = os.environ.get('SCHWAB_CLIENT_ID')
         # Use development redirect URI for testing
         self.redirect_uri = os.environ.get('SCHWAB_REDIRECT_URI', 'https://www.arbion.ai/oauth_callback/schwab')
@@ -20,7 +24,9 @@ class SchwabOAuth:
         self.token_url = 'https://api.schwabapi.com/v1/oauth/token'
         
         if not self.client_id:
-            logger.warning("SCHWAB_CLIENT_ID environment variable not set")
+            logger.warning(f"SCHWAB_CLIENT_ID environment variable not set. Available env vars: {list(os.environ.keys())[:10]}")
+            logger.info(f"Current working directory: {os.getcwd()}")
+            logger.info(f"Looking for .env file: {os.path.exists('.env')}")
     
     def get_authorization_url(self):
         """Generate authorization URL with PKCE"""
