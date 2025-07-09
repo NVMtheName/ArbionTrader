@@ -75,23 +75,13 @@ def natural_trade():
             flash('Please enter a trading prompt.', 'error')
             return render_template('natural_trade.html')
         
-        # Get user's OpenAI credentials
-        openai_cred = APICredential.query.filter_by(
-            user_id=current_user.id, 
-            provider='openai', 
-            is_active=True
-        ).first()
-        
-        if not openai_cred:
-            flash('OpenAI API credentials not configured. Please set up your API credentials first.', 'error')
-            return redirect(url_for('main.api_settings'))
-        
         try:
-            # Decrypt OpenAI credentials
-            credentials = decrypt_credentials(openai_cred.encrypted_credentials)
+            # Initialize OpenAI trader with user ID (will auto-load credentials)
+            trader = OpenAITrader(user_id=current_user.id)
             
-            # Initialize OpenAI trader
-            trader = OpenAITrader(credentials['api_key'])
+            if not trader.client:
+                flash('OpenAI API credentials not configured. Please set up your API credentials first.', 'error')
+                return redirect(url_for('main.api_settings'))
             
             # Parse the natural language prompt
             trade_instruction = trader.parse_trading_prompt(prompt)
@@ -363,7 +353,7 @@ def test_api_connection():
                 result = connector.test_connection()
         
         elif provider == 'openai':
-            trader = OpenAITrader(credentials['api_key'])
+            trader = OpenAITrader(api_key=credentials['api_key'])
             result = trader.test_connection()
         
         else:

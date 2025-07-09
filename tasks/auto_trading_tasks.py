@@ -355,7 +355,7 @@ class AutoTradingEngine:
             credentials = decrypt_credentials(openai_cred.encrypted_credentials)
             
             # Initialize OpenAI trader
-            trader = OpenAITrader(credentials['api_key'])
+            trader = OpenAITrader(user_id=user_id)
             
             # Get market analysis from AI
             symbols = params.get('symbols', ['SPY', 'QQQ'])

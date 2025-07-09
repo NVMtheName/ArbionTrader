@@ -159,6 +159,15 @@ Changelog:
   - Applied same multi-user architecture to Coinbase OAuth2 system for consistency
   - Created comprehensive setup guides for both Schwab and Coinbase OAuth2 integration
   - Both OAuth2 systems now work independently without environment variable dependencies
+- July 09, 2025. Completed multi-user architecture for all API integrations:
+  - **BREAKING CHANGE**: Updated OpenAI trader to use per-user API credentials instead of environment variables
+  - Modified OpenAITrader class to accept user_id parameter and auto-load credentials from database
+  - Updated natural language trading routes to use new user-specific OpenAI integration
+  - Modified auto-trading tasks to work with user-specific OpenAI credentials
+  - All three major API integrations (Schwab, Coinbase, OpenAI) now consistently use per-user credentials
+  - Enhanced error handling for missing API credentials across all integrations
+  - Comprehensive multi-user system eliminates all environment variable dependencies for API keys
+  - Each user can independently configure their own credentials for all supported platforms
 
 ## User Preferences
 

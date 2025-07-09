@@ -10,14 +10,57 @@ from utils.schwab_connector import SchwabConnector
 from utils.encryption import decrypt_credentials
 from models import APICredential
 
+logger = logging.getLogger(__name__)
+
 class OpenAITrader:
-    def __init__(self, api_key):
+    def __init__(self, api_key=None, user_id=None):
+        """
+        Initialize OpenAI trader with API key or user ID for database lookup
+        """
+        self.user_id = user_id
         self.api_key = api_key
-        self.client = OpenAI(api_key=api_key)
+        self.client = None
+        
+        # If user_id provided but no API key, load from database
+        if user_id and not api_key:
+            self.api_key = self._load_api_key(user_id)
+        
+        # Initialize OpenAI client if we have an API key
+        if self.api_key:
+            self.client = OpenAI(api_key=self.api_key)
+    
+    def _load_api_key(self, user_id):
+        """Load OpenAI API key from database for the user"""
+        try:
+            from models import APICredential
+            from utils.encryption import decrypt_credentials
+            
+            api_cred = APICredential.query.filter_by(
+                user_id=user_id,
+                provider='openai',
+                is_active=True
+            ).first()
+            
+            if api_cred:
+                credentials = decrypt_credentials(api_cred.encrypted_credentials)
+                return credentials.get('api_key')
+            else:
+                logger.warning(f"No active OpenAI API credentials found for user {user_id}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Failed to load OpenAI API key for user {user_id}: {e}")
+            return None
         
     def test_connection(self):
         """Test OpenAI API connection"""
         try:
+            if not self.client:
+                return {
+                    'success': False,
+                    'message': 'OpenAI API key not configured'
+                }
+            
             # Simple test with minimal token usage
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",  # Use cheaper model for testing
@@ -60,6 +103,12 @@ class OpenAITrader:
     def parse_trading_prompt(self, prompt):
         """Parse natural language trading prompt into structured instructions"""
         try:
+            if not self.client:
+                return {
+                    'success': False,
+                    'message': 'OpenAI API key not configured'
+                }
+            
             system_prompt = """You are an AI trading assistant that converts natural language trading instructions into structured JSON format.
 
 Parse the user's trading request and return a JSON object with the following structure:
