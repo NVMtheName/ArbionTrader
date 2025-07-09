@@ -1053,6 +1053,51 @@ def api_market_data():
         logging.error(f"Error fetching market data: {str(e)}")
         return jsonify({"success": False, "error": str(e)})
 
+@main_bp.route("/api/search-symbol/<symbol>")
+@login_required
+def search_symbol(symbol):
+    """API endpoint to search for a specific symbol"""
+    try:
+        market_provider = MarketDataProvider()
+        
+        # Clean up symbol input
+        symbol = symbol.strip().upper()
+        
+        # Try to fetch as stock first
+        data = market_provider.get_stock_quote(symbol)
+        
+        # If no stock data, try crypto
+        if not data:
+            crypto_symbol = symbol.replace('-USD', '')
+            data = market_provider.get_crypto_price(crypto_symbol)
+            if data:
+                symbol = f"{crypto_symbol}-USD"
+        
+        if data:
+            result = {
+                symbol: {
+                    'price': data.get('price', 0),
+                    'change': data.get('change', 0),
+                    'change_percent': data.get('change_percent', 0),
+                    'volume': data.get('volume', 0),
+                    'high': data.get('high', 0),
+                    'low': data.get('low', 0)
+                }
+            }
+            return jsonify({
+                "success": True,
+                "data": result,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": f"Symbol '{symbol}' not found"
+            })
+    except Exception as e:
+        logging.error(f"Error searching symbol {symbol}: {str(e)}")
+        return jsonify({"success": False, "error": str(e)})
+
 @main_bp.route('/debug-toggle', methods=['GET', 'POST'])
 @login_required
 @superadmin_required

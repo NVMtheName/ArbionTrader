@@ -93,10 +93,42 @@
                 </div>
                 <h3 class="text-lg font-semibold text-white">Real-Time Market Data</h3>
             </div>
-            <button onclick="refreshMarketData()" class="text-coinbase-green hover:text-green-400 text-sm">
-                <i data-feather="refresh-cw" class="w-4 h-4 inline mr-1"></i>
-                Refresh
-            </button>
+            
+            <div class="flex items-center space-x-4">
+                <!-- Search Bar -->
+                <div class="relative">
+                    <input type="text" 
+                           id="symbol-search" 
+                           placeholder="Search symbol (e.g., AAPL, BTC)" 
+                           class="bg-gray-800 border border-gray-600 rounded-md px-3 py-2 text-sm text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-coinbase-blue focus:border-transparent w-48">
+                    <button onclick="searchSymbol()" class="absolute right-2 top-2 text-gray-400 hover:text-white">
+                        <i data-feather="search" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                
+                <!-- Auto-refresh toggle -->
+                <div class="flex items-center space-x-2">
+                    <label class="flex items-center space-x-2 cursor-pointer">
+                        <input type="checkbox" id="auto-refresh-toggle" checked class="sr-only">
+                        <div class="relative">
+                            <div class="w-10 h-6 bg-gray-600 rounded-full shadow-inner"></div>
+                            <div class="absolute top-1 left-1 w-4 h-4 bg-coinbase-green rounded-full shadow transform transition-transform duration-300"></div>
+                        </div>
+                        <span class="text-xs text-gray-400">Auto-refresh</span>
+                    </label>
+                </div>
+                
+                <!-- Manual refresh button -->
+                <button onclick="refreshMarketData()" class="text-coinbase-green hover:text-green-400 text-sm">
+                    <i data-feather="refresh-cw" class="w-4 h-4 inline mr-1"></i>
+                    Refresh
+                </button>
+                
+                <!-- Last updated time -->
+                <span class="text-xs text-gray-400" id="last-updated">
+                    Updated: Just now
+                </span>
+            </div>
         </div>
         
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4" id="market-data-container">
@@ -423,12 +455,159 @@
         feather.replace();
     }
     
-    // Auto-refresh market data every 30 seconds
-    setInterval(refreshMarketData, 30000);
+    // Auto-refresh functionality
+    let autoRefreshInterval;
+    let isAutoRefreshEnabled = true;
     
-    // Initial load
+    // Search symbol functionality
+    function searchSymbol() {
+        const searchInput = document.getElementById('symbol-search');
+        const symbol = searchInput.value.trim().toUpperCase();
+        
+        if (!symbol) {
+            alert('Please enter a symbol to search');
+            return;
+        }
+        
+        // Show loading state
+        const container = document.getElementById('market-data-container');
+        container.innerHTML = '<div class="col-span-full text-center py-8"><div class="text-gray-400">Searching for ' + symbol + '...</div></div>';
+        
+        fetch(`/api/search-symbol/${symbol}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateMarketDataDisplay(data.data);
+                    updateLastUpdated();
+                } else {
+                    container.innerHTML = `
+                        <div class="col-span-full text-center py-8">
+                            <div class="text-red-400 mb-2">
+                                <i data-feather="search" class="w-8 h-8 mx-auto mb-2"></i>
+                                Symbol not found
+                            </div>
+                            <p class="text-sm text-gray-500">${data.error}</p>
+                            <button onclick="refreshMarketData()" class="mt-4 btn-secondary px-4 py-2 rounded text-sm">
+                                Back to Market Overview
+                            </button>
+                        </div>
+                    `;
+                    feather.replace();
+                }
+            })
+            .catch(error => {
+                console.error('Error searching symbol:', error);
+                container.innerHTML = `
+                    <div class="col-span-full text-center py-8">
+                        <div class="text-red-400 mb-2">
+                            <i data-feather="alert-circle" class="w-8 h-8 mx-auto mb-2"></i>
+                            Search failed
+                        </div>
+                        <p class="text-sm text-gray-500">Unable to search for symbol</p>
+                    </div>
+                `;
+                feather.replace();
+            });
+    }
+    
+    // Enable search on Enter key
     document.addEventListener('DOMContentLoaded', function() {
-        // Refresh market data on page load
+        const searchInput = document.getElementById('symbol-search');
+        if (searchInput) {
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    searchSymbol();
+                }
+            });
+        }
+    });
+    
+    // Auto-refresh toggle functionality
+    function toggleAutoRefresh() {
+        const toggle = document.getElementById('auto-refresh-toggle');
+        const toggleDiv = toggle.nextElementSibling;
+        const slider = toggleDiv.querySelector('div:last-child');
+        
+        isAutoRefreshEnabled = !isAutoRefreshEnabled;
+        toggle.checked = isAutoRefreshEnabled;
+        
+        if (isAutoRefreshEnabled) {
+            // Enable auto-refresh
+            slider.style.transform = 'translateX(1rem)';
+            slider.style.backgroundColor = '#10b981'; // coinbase-green
+            toggleDiv.querySelector('div:first-child').style.backgroundColor = '#374151'; // gray-700
+            startAutoRefresh();
+        } else {
+            // Disable auto-refresh
+            slider.style.transform = 'translateX(0)';
+            slider.style.backgroundColor = '#6b7280'; // gray-500
+            toggleDiv.querySelector('div:first-child').style.backgroundColor = '#4b5563'; // gray-600
+            stopAutoRefresh();
+        }
+    }
+    
+    // Start auto-refresh
+    function startAutoRefresh() {
+        stopAutoRefresh(); // Clear any existing interval
+        autoRefreshInterval = setInterval(refreshMarketData, 30000); // 30 seconds
+    }
+    
+    // Stop auto-refresh
+    function stopAutoRefresh() {
+        if (autoRefreshInterval) {
+            clearInterval(autoRefreshInterval);
+            autoRefreshInterval = null;
+        }
+    }
+    
+    // Update last updated timestamp
+    function updateLastUpdated() {
+        const lastUpdated = document.getElementById('last-updated');
+        if (lastUpdated) {
+            const now = new Date();
+            lastUpdated.textContent = `Updated: ${now.toLocaleTimeString()}`;
+        }
+    }
+    
+    // Enhanced refresh function with timestamp update
+    function refreshMarketData() {
+        const refreshButton = document.querySelector('[onclick="refreshMarketData()"]');
+        const refreshIcon = refreshButton.querySelector('i');
+        
+        // Add loading state
+        refreshIcon.classList.add('animate-spin');
+        refreshButton.disabled = true;
+        
+        fetch('/api/market-data')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateMarketDataDisplay(data.data);
+                    updateLastUpdated();
+                } else {
+                    console.error('Failed to fetch market data:', data.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching market data:', error);
+            })
+            .finally(() => {
+                // Remove loading state
+                refreshIcon.classList.remove('animate-spin');
+                refreshButton.disabled = false;
+            });
+    }
+    
+    // Initialize auto-refresh toggle
+    document.addEventListener('DOMContentLoaded', function() {
+        const toggle = document.getElementById('auto-refresh-toggle');
+        if (toggle) {
+            toggle.addEventListener('change', toggleAutoRefresh);
+            // Set initial state
+            toggleAutoRefresh();
+        }
+        
+        // Initial data load
         setTimeout(refreshMarketData, 2000);
     });
 </script>
