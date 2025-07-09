@@ -307,16 +307,21 @@ def test_api_connection():
 def oauth_callback_schwab():
     """Handle Schwab OAuth2 callback"""
     try:
+        # Log all callback parameters for debugging
+        logging.info(f"Schwab OAuth callback received. Query params: {dict(request.args)}")
+        
         # Get authorization code from callback
         auth_code = request.args.get('code')
         error = request.args.get('error')
         
         if error:
             flash(f'Schwab authorization failed: {error}', 'error')
+            logging.error(f"Schwab OAuth error: {error}")
             return redirect(url_for('main.api_settings'))
         
         if not auth_code:
             flash('Authorization code missing from Schwab callback', 'error')
+            logging.error(f"Authorization code missing. Available params: {dict(request.args)}")
             return redirect(url_for('main.api_settings'))
         
         # Exchange code for token

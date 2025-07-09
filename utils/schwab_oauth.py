@@ -27,6 +27,16 @@ class SchwabOAuth:
             logger.warning(f"SCHWAB_CLIENT_ID environment variable not set. Available env vars: {list(os.environ.keys())[:10]}")
             logger.info(f"Current working directory: {os.getcwd()}")
             logger.info(f"Looking for .env file: {os.path.exists('.env')}")
+            # Try to load from .env file one more time
+            try:
+                with open('.env', 'r') as f:
+                    for line in f:
+                        if line.startswith('SCHWAB_CLIENT_ID='):
+                            self.client_id = line.split('=', 1)[1].strip()
+                            logger.info(f"Loaded SCHWAB_CLIENT_ID from .env file: {self.client_id[:10]}...")
+                            break
+            except Exception as e:
+                logger.error(f"Failed to read .env file: {e}")
     
     def get_authorization_url(self):
         """Generate authorization URL with PKCE"""
