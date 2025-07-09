@@ -39,6 +39,7 @@
                     </ul>
                 </div>
                 
+                {% if not schwab_oauth_configured %}
                 <div class="bg-amber-900 bg-opacity-50 rounded-lg p-4 border border-amber-500 mb-4">
                     <h4 class="font-medium text-amber-300 mb-2">Setup Required</h4>
                     <p class="text-sm">
@@ -46,6 +47,15 @@
                         <strong>Error:</strong> "Schwab client ID not configured"
                     </p>
                 </div>
+                {% else %}
+                <div class="bg-green-900 bg-opacity-50 rounded-lg p-4 border border-green-500 mb-4">
+                    <h4 class="font-medium text-green-300 mb-2">Ready for Authentication</h4>
+                    <p class="text-sm">
+                        <strong>Status:</strong> Schwab OAuth2 is properly configured and ready to use.<br>
+                        <strong>Redirect URI:</strong> https://www.arbion.ai/oauth_callback/schwab
+                    </p>
+                </div>
+                {% endif %}
                 
                 <div class="bg-blue-900 bg-opacity-50 rounded-lg p-4 border border-blue-500 mb-4">
                     <h4 class="font-medium text-blue-300 mb-2">How to Set Up Schwab OAuth2</h4>

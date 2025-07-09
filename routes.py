@@ -230,7 +230,12 @@ def api_settings():
             'last_tested': cred.last_tested
         }
     
-    return render_template('api_settings.html', cred_status=cred_status)
+    # Check if Schwab OAuth2 is configured
+    schwab_oauth_configured = bool(os.environ.get('SCHWAB_CLIENT_ID'))
+    
+    return render_template('api_settings.html', 
+                         cred_status=cred_status, 
+                         schwab_oauth_configured=schwab_oauth_configured)
 
 @main_bp.route('/test-api-connection', methods=['POST'])
 @login_required
