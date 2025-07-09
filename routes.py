@@ -162,10 +162,16 @@ def api_settings():
             if oauth_flow == 'true':
                 # Initiate OAuth2 flow
                 try:
+                    # Load environment variables explicitly
+                    from dotenv import load_dotenv
+                    load_dotenv()
+                    
                     schwab_oauth = SchwabOAuth()
+                    logging.info(f"Schwab OAuth initialization - Client ID: {schwab_oauth.client_id[:10] if schwab_oauth.client_id else 'None'}...")
                     auth_url = schwab_oauth.get_authorization_url()
                     return redirect(auth_url)
                 except Exception as e:
+                    logging.error(f"OAuth2 initialization error: {str(e)}")
                     flash(f'OAuth2 initialization failed: {str(e)}', 'error')
                     return redirect(url_for('main.api_settings'))
             else:
@@ -232,6 +238,8 @@ def api_settings():
         }
     
     # Check if Schwab OAuth2 is configured
+    from dotenv import load_dotenv
+    load_dotenv()
     schwab_oauth_configured = bool(os.environ.get('SCHWAB_CLIENT_ID'))
     
     return render_template('api_settings.html', 

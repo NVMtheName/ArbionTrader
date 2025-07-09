@@ -41,6 +41,23 @@ class SchwabOAuth:
     def get_authorization_url(self):
         """Generate authorization URL with PKCE"""
         try:
+            # Double-check client_id loading
+            if not self.client_id:
+                # Try to load from .env file again
+                from dotenv import load_dotenv
+                load_dotenv()
+                self.client_id = os.environ.get('SCHWAB_CLIENT_ID')
+                if not self.client_id:
+                    # Final fallback - read directly from .env
+                    try:
+                        with open('.env', 'r') as f:
+                            for line in f:
+                                if line.startswith('SCHWAB_CLIENT_ID='):
+                                    self.client_id = line.split('=', 1)[1].strip()
+                                    break
+                    except:
+                        pass
+            
             if not self.client_id:
                 raise ValueError("Schwab client ID not configured. Please set SCHWAB_CLIENT_ID environment variable or contact support.")
             
