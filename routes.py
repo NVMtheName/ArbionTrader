@@ -1,7 +1,7 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
-from models import User, APICredential, Trade, Strategy, SystemLog, AutoTradingSettings
+from models import User, APICredential, Trade, Strategy, SystemLog, AutoTradingSettings, OAuthClientCredential
 from app import db
 from utils.encryption import encrypt_credentials, decrypt_credentials
 from utils.coinbase_connector import CoinbaseConnector
@@ -407,7 +407,6 @@ def api_settings():
         }
     
     # Check OAuth2 client credentials configuration for this user
-    from models import OAuthClientCredential
     schwab_oauth_configured = bool(
         OAuthClientCredential.query.filter_by(
             user_id=current_user.id,
