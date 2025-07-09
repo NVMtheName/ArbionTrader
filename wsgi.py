@@ -1,5 +1,10 @@
-from app import create_app
+from dotenv import load_dotenv
 import os
+
+# Load environment variables before importing app
+load_dotenv()
+
+from app import create_app
 
 # Create application instance for WSGI
 app = create_app()

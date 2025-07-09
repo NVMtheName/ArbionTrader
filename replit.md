@@ -142,6 +142,12 @@ Changelog:
   - Complete production-ready OAuth2 system with encrypted token storage
   - Fixed PostgreSQL dialect compatibility for newer SQLAlchemy versions
   - Added custom domain setup documentation and scripts for arbion.ai
+- July 09, 2025. Fixed OAuth2 integration issues:
+  - Resolved internal server error in API settings route (missing os import)
+  - Added python-dotenv for proper environment variable loading
+  - Fixed Schwab OAuth2 configuration by loading .env file in main.py and wsgi.py
+  - Schwab OAuth2 now properly configured with client credentials
+  - Environment variables properly loaded at application startup
 
 ## User Preferences
 
