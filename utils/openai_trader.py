@@ -32,17 +32,27 @@ class OpenAITrader:
             if "401" in error_msg and "missing_scope" in error_msg:
                 return {
                     "success": False, 
-                    "message": "API key lacks required permissions. Please create a new API key with 'model.request' scope at https://platform.openai.com/api-keys"
+                    "message": "API key lacks required permissions. Create a new API key with 'All' permissions at https://platform.openai.com/api-keys. Ensure you have Writer/Owner role in your organization."
+                }
+            elif "401" in error_msg and "organization" in error_msg.lower():
+                return {
+                    "success": False, 
+                    "message": "Organization access issue. Check your organization role at https://platform.openai.com/settings/organization/general"
                 }
             elif "401" in error_msg:
                 return {
                     "success": False, 
-                    "message": "Invalid API key. Please check your OpenAI API key at https://platform.openai.com/api-keys"
+                    "message": "Invalid API key. Create a new API key at https://platform.openai.com/api-keys"
                 }
-            elif "quota" in error_msg.lower():
+            elif "quota" in error_msg.lower() or "billing" in error_msg.lower():
                 return {
                     "success": False, 
-                    "message": "OpenAI API quota exceeded. Please check your usage at https://platform.openai.com/usage"
+                    "message": "API quota exceeded or billing issue. Check your usage at https://platform.openai.com/usage"
+                }
+            elif "rate" in error_msg.lower():
+                return {
+                    "success": False, 
+                    "message": "Rate limit exceeded. Please wait and try again."
                 }
             else:
                 return {"success": False, "message": f"OpenAI API connection failed: {error_msg}"}
