@@ -26,7 +26,7 @@ class SchwabOAuth:
         """Generate authorization URL with PKCE"""
         try:
             if not self.client_id:
-                raise ValueError("Schwab client ID not configured")
+                raise ValueError("Schwab client ID not configured. Please set SCHWAB_CLIENT_ID environment variable or contact support.")
             
             # Generate PKCE pair
             code_verifier, code_challenge = generate_pkce_pair()
