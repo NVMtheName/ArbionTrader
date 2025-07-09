@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}OpenAI API Key Setup Help{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-900 py-8">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="bg-gray-800 rounded-lg shadow-xl p-6">
+            <div class="mb-6">
+                <h1 class="text-3xl font-bold text-white mb-2">OpenAI API Key Setup</h1>
+                <p class="text-gray-400">Complete guide to setting up your OpenAI API key with proper permissions</p>
+            </div>
+
+            <!-- Error Explanation -->
+            <div class="bg-red-900/20 border border-red-500 rounded-lg p-4 mb-6">
+                <div class="flex items-center mb-2">
+                    <i data-feather="alert-circle" class="text-red-500 mr-2"></i>
+                    <h3 class="text-red-400 font-semibold">Common Error: Missing Permissions</h3>
+                </div>
+                <p class="text-red-300 text-sm">
+                    Error 401: "You have insufficient permissions for this operation. Missing scopes: model.request"
+                </p>
+                <p class="text-gray-300 text-sm mt-2">
+                    This means your API key doesn't have the required permissions to use OpenAI's models.
+                </p>
+            </div>
+
+            <!-- Step-by-Step Solution -->
+            <div class="space-y-6">
+                <div class="bg-gray-700 rounded-lg p-6">
+                    <h3 class="text-xl font-semibold text-white mb-4">Step 1: Create a New API Key</h3>
+                    <div class="space-y-3">
+                        <p class="text-gray-300">1. Go to <a href="https://platform.openai.com/api-keys" target="_blank" class="text-blue-400 hover:text-blue-300">OpenAI API Keys</a></p>
+                        <p class="text-gray-300">2. Click "Create new secret key"</p>
+                        <p class="text-gray-300">3. Give it a name (e.g., "Arbion Trading Bot")</p>
+                        <p class="text-gray-300">4. Select permissions: <strong class="text-yellow-400">All</strong> or ensure "model.request" is included</p>
+                        <p class="text-gray-300">5. Click "Create secret key"</p>
+                        <p class="text-gray-300">6. Copy the key immediately (it won't be shown again)</p>
+                    </div>
+                </div>
+
+                <div class="bg-gray-700 rounded-lg p-6">
+                    <h3 class="text-xl font-semibold text-white mb-4">Step 2: Check Your Organization Role</h3>
+                    <div class="space-y-3">
+                        <p class="text-gray-300">1. Go to <a href="https://platform.openai.com/organization" target="_blank" class="text-blue-400 hover:text-blue-300">Organization Settings</a></p>
+                        <p class="text-gray-300">2. Ensure your role is <strong class="text-green-400">Owner</strong> or <strong class="text-green-400">Writer</strong></p>
+                        <p class="text-gray-300">3. If you're a Reader, ask an Owner to upgrade your permissions</p>
+                    </div>
+                </div>
+
+                <div class="bg-gray-700 rounded-lg p-6">
+                    <h3 class="text-xl font-semibold text-white mb-4">Step 3: Verify Your Project Access</h3>
+                    <div class="space-y-3">
+                        <p class="text-gray-300">1. Go to <a href="https://platform.openai.com/projects" target="_blank" class="text-blue-400 hover:text-blue-300">Projects</a></p>
+                        <p class="text-gray-300">2. Select your project or create a new one</p>
+                        <p class="text-gray-300">3. Ensure you're an <strong class="text-green-400">Owner</strong> or <strong class="text-green-400">Member</strong></p>
+                        <p class="text-gray-300">4. Create the API key within this project</p>
+                    </div>
+                </div>
+
+                <div class="bg-gray-700 rounded-lg p-6">
+                    <h3 class="text-xl font-semibold text-white mb-4">Step 4: Check Your Billing</h3>
+                    <div class="space-y-3">
+                        <p class="text-gray-300">1. Go to <a href="https://platform.openai.com/usage" target="_blank" class="text-blue-400 hover:text-blue-300">Usage & Billing</a></p>
+                        <p class="text-gray-300">2. Add a payment method if you haven't already</p>
+                        <p class="text-gray-300">3. Ensure you have available credit or billing limits</p>
+                        <p class="text-gray-300">4. Free trial accounts have limited access</p>
+                    </div>
+                </div>
+
+                <div class="bg-blue-900/20 border border-blue-500 rounded-lg p-4">
+                    <div class="flex items-center mb-2">
+                        <i data-feather="info" class="text-blue-400 mr-2"></i>
+                        <h3 class="text-blue-400 font-semibold">Important Notes</h3>
+                    </div>
+                    <ul class="text-blue-300 text-sm space-y-1">
+                        <li>• API keys created before recent updates may lack required scopes</li>
+                        <li>• Always use the latest API key format from platform.openai.com</li>
+                        <li>• Keep your API key secure and never share it publicly</li>
+                        <li>• The trading bot uses minimal tokens for testing connections</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="mt-8 flex space-x-4">
+                <a href="https://platform.openai.com/api-keys" target="_blank" 
+                   class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors">
+                    Create New API Key
+                </a>
+                <a href="{{ url_for('main.api_settings') }}" 
+                   class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-lg transition-colors">
+                    Back to API Settings
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    feather.replace();
+</script>
+{% endblock %}

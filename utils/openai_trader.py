@@ -18,24 +18,34 @@ class OpenAITrader:
     def test_connection(self):
         """Test OpenAI API connection"""
         try:
-            # Simple test by making a basic completion request
+            # Simple test with minimal token usage
             response = self.client.chat.completions.create(
-                model="gpt-4o",  # the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-                messages=[
-                    {"role": "user", "content": "Hello, this is a test. Please respond with 'OK'."}
-                ],
-                max_tokens=10
+                model="gpt-4o-mini",  # Use cheaper model for testing
+                messages=[{"role": "user", "content": "Hi"}],
+                max_tokens=1
             )
-            
-            return {
-                'success': True,
-                'message': 'OpenAI API connection successful'
-            }
+            return {"success": True, "message": "OpenAI API connection successful"}
         except Exception as e:
-            return {
-                'success': False,
-                'message': f'OpenAI API connection failed: {str(e)}'
-            }
+            error_msg = str(e)
+            
+            # Provide specific guidance for common errors
+            if "401" in error_msg and "missing_scope" in error_msg:
+                return {
+                    "success": False, 
+                    "message": "API key lacks required permissions. Please create a new API key with 'model.request' scope at https://platform.openai.com/api-keys"
+                }
+            elif "401" in error_msg:
+                return {
+                    "success": False, 
+                    "message": "Invalid API key. Please check your OpenAI API key at https://platform.openai.com/api-keys"
+                }
+            elif "quota" in error_msg.lower():
+                return {
+                    "success": False, 
+                    "message": "OpenAI API quota exceeded. Please check your usage at https://platform.openai.com/usage"
+                }
+            else:
+                return {"success": False, "message": f"OpenAI API connection failed: {error_msg}"}
     
     def parse_trading_prompt(self, prompt):
         """Parse natural language trading prompt into structured instructions"""

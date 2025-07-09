@@ -262,7 +262,13 @@
                 <input type="hidden" name="provider" value="openai">
                 
                 <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">API Key</label>
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-sm font-medium text-gray-300">API Key</label>
+                        <button type="button" onclick="showOpenAIHelp()" class="text-blue-400 hover:text-blue-300 text-sm">
+                            <i data-feather="help-circle" class="w-4 h-4 inline mr-1"></i>
+                            Need help?
+                        </button>
+                    </div>
                     <input 
                         type="password" 
                         name="openai_api_key" 
@@ -471,6 +477,88 @@
         const modal = document.getElementById('testModal');
         modal.classList.add('hidden');
         modal.classList.remove('flex');
+    }
+    
+    function showOpenAIHelp() {
+        const modal = document.getElementById('openai-help-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+        } else {
+            // Create and show help modal
+            const modalHTML = `
+                <div id="openai-help-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-gray-800 rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-y-auto">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-2xl font-bold text-white">OpenAI API Key Setup Help</h2>
+                            <button onclick="closeOpenAIHelp()" class="text-gray-400 hover:text-white">
+                                <i data-feather="x" class="w-6 h-6"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="bg-red-900/20 border border-red-500 rounded-lg p-4 mb-6">
+                            <div class="flex items-center mb-2">
+                                <i data-feather="alert-circle" class="text-red-500 mr-2"></i>
+                                <h3 class="text-red-400 font-semibold">Common Error: Missing Permissions</h3>
+                            </div>
+                            <p class="text-red-300 text-sm">
+                                Error 401: "You have insufficient permissions for this operation. Missing scopes: model.request"
+                            </p>
+                            <p class="text-gray-300 text-sm mt-2">
+                                This means your API key doesn't have the required permissions to use OpenAI's models.
+                            </p>
+                        </div>
+                        
+                        <div class="space-y-4">
+                            <div class="bg-gray-700 rounded-lg p-4">
+                                <h3 class="text-lg font-semibold text-white mb-3">How to Fix This:</h3>
+                                <ol class="text-gray-300 space-y-2">
+                                    <li>1. Go to <a href="https://platform.openai.com/api-keys" target="_blank" class="text-blue-400 hover:text-blue-300">OpenAI API Keys</a></li>
+                                    <li>2. Click "Create new secret key"</li>
+                                    <li>3. Give it a name (e.g., "Arbion Trading Bot")</li>
+                                    <li>4. Select permissions: <strong class="text-yellow-400">All</strong> or ensure "model.request" is included</li>
+                                    <li>5. Click "Create secret key"</li>
+                                    <li>6. Copy the key immediately (it won't be shown again)</li>
+                                    <li>7. Paste it into the OpenAI API Key field above</li>
+                                </ol>
+                            </div>
+                            
+                            <div class="bg-blue-900/20 border border-blue-500 rounded-lg p-4">
+                                <div class="flex items-center mb-2">
+                                    <i data-feather="info" class="text-blue-400 mr-2"></i>
+                                    <h3 class="text-blue-400 font-semibold">Important Notes</h3>
+                                </div>
+                                <ul class="text-blue-300 text-sm space-y-1">
+                                    <li>• API keys created before recent updates may lack required scopes</li>
+                                    <li>• Always use the latest API key format from platform.openai.com</li>
+                                    <li>• Ensure your organization role is Owner or Writer</li>
+                                    <li>• Add a payment method if you haven't already</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-6 flex space-x-4">
+                            <a href="https://platform.openai.com/api-keys" target="_blank" 
+                               class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                                Create New API Key
+                            </a>
+                            <button onclick="closeOpenAIHelp()" 
+                                    class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors">
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            feather.replace();
+        }
+    }
+    
+    function closeOpenAIHelp() {
+        const modal = document.getElementById('openai-help-modal');
+        if (modal) {
+            modal.remove();
+        }
     }
 </script>
 {% endblock %}
