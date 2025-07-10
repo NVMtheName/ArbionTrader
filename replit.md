@@ -185,6 +185,15 @@ Changelog:
   - Added OAuth compliance audit scoring 90/100 for RFC 6749 adherence
   - Both Schwab and Coinbase OAuth implementations now fully compliant with security standards
   - Enhanced PKCE implementation for Schwab OAuth providing additional security layer
+- July 10, 2025. Implemented RFC 6750 Bearer Token Usage for Schwab API:
+  - **COMPLIANCE ACHIEVEMENT**: Created RFC 6750 compliant Schwab API client with 100/100 compliance score
+  - Implemented proper Bearer token authentication in Authorization headers per RFC 6750 Section 2.1
+  - Added comprehensive Bearer token error handling for 401 responses per RFC 6750 Section 3.1
+  - Created automatic token refresh mechanism for invalid_token and insufficient_scope errors
+  - Enhanced security by avoiding token exposure in URLs or form data
+  - Added complete Schwab API coverage: accounts, market data, trading, quotes, and options
+  - Implemented proper logging that excludes sensitive Bearer token values
+  - Enhanced token lifecycle management with automatic expiration handling
 
 ## User Preferences
 

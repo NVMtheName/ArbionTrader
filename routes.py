@@ -480,8 +480,10 @@ def test_api_connection():
         elif provider == 'schwab':
             # Check if credentials contain OAuth2 token
             if 'access_token' in credentials:
-                schwab_oauth = SchwabOAuth(user_id=current_user.id)
-                result = schwab_oauth.test_connection(credentials['access_token'])
+                # Use RFC 6750 compliant Schwab API client
+                from utils.schwab_api_client import SchwabAPIClient
+                schwab_client = SchwabAPIClient(user_id=current_user.id)
+                result = schwab_client.test_connection()
             else:
                 # Legacy API key method
                 connector = SchwabConnector(
