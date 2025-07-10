@@ -639,7 +639,24 @@ def oauth_callback_coinbase():
         if not current_user.is_authenticated:
             flash('Please log in to complete OAuth authentication', 'error')
             logging.error("User not authenticated during Coinbase OAuth callback")
-            return redirect(url_for('auth.login'))
+            # Redirect to login and preserve OAuth callback parameters
+            login_url = url_for('auth.login')
+            if auth_code and state:
+                login_url += f'?next=/oauth_callback/crypto&code={auth_code}&state={state}'
+            return redirect(login_url)
+        
+        # Check if user has OAuth client credentials configured
+        from models import OAuthClientCredential
+        oauth_client = OAuthClientCredential.query.filter_by(
+            user_id=current_user.id,
+            provider='coinbase',
+            is_active=True
+        ).first()
+        
+        if not oauth_client:
+            flash('Please configure your Coinbase OAuth client credentials first in API Settings', 'error')
+            logging.error(f"No Coinbase OAuth client credentials found for user {current_user.id}")
+            return redirect(url_for('main.api_settings'))
         
         # Exchange code for token
         coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
@@ -679,10 +696,11 @@ def oauth_callback_coinbase():
         
         db.session.commit()
         
-        flash('Coinbase OAuth2 authentication successful!', 'success')
+        flash('Coinbase OAuth2 authentication successful! Your account is now connected.', 'success')
         logging.info(f"Coinbase OAuth2 credentials saved for user {current_user.id}")
         
-        return redirect(url_for('main.api_settings'))
+        # Redirect to API settings to show the connected status
+        return redirect(url_for('main.api_settings') + '#coinbase-section')
     
     except Exception as e:
         logging.error(f"Error in Coinbase OAuth2 callback: {str(e)}")
