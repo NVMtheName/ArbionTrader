@@ -6,6 +6,7 @@ import logging
 import json
 import os
 from datetime import datetime
+from models import User, Strategy, AutoTradingSettings, APICredential
 
 main_bp = Blueprint('main', __name__)
 
