@@ -606,7 +606,7 @@ def schwab_oauth_setup():
         flash(f'OAuth2 setup failed: {str(e)}', 'error')
         return redirect(url_for('main.api_settings'))
 
-@main_bp.route('/oauth_callback/crypto')
+@main_bp.route('/oauth_callback/crypto', methods=['GET', 'POST'])
 def oauth_callback_coinbase():
     """Handle Coinbase OAuth2 callback"""
     from models import APICredential
@@ -620,10 +620,10 @@ def oauth_callback_coinbase():
         logging.info(f"Request URL: {request.url}")
         logging.info(f"Request headers: {dict(request.headers)}")
         
-        # Get authorization code and state from callback
-        auth_code = request.args.get('code')
-        state = request.args.get('state')
-        error = request.args.get('error')
+        # Get authorization code and state from callback (support both GET and POST)
+        auth_code = request.args.get('code') or request.form.get('code')
+        state = request.args.get('state') or request.form.get('state')
+        error = request.args.get('error') or request.form.get('error')
         
         if error:
             flash(f'Coinbase authorization failed: {error}', 'error')
