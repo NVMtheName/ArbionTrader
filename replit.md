@@ -194,6 +194,15 @@ Changelog:
   - Added complete Schwab API coverage: accounts, market data, trading, quotes, and options
   - Implemented proper logging that excludes sensitive Bearer token values
   - Enhanced token lifecycle management with automatic expiration handling
+- July 10, 2025. Fixed internal server errors and implemented branding:
+  - **PERFORMANCE FIX**: Resolved dashboard timeout issues by optimizing market data fetching
+  - Removed slow yfinance API calls that were causing 30+ second page load times
+  - Dashboard now loads instantly with optimized market data display
+  - **BRANDING UPDATE**: Integrated custom Arbion logo throughout platform
+  - Login page features prominent logo display for strong brand presence
+  - All internal pages show logo in sidebar and top navigation bar
+  - Fixed account page template error with proper days calculation
+  - All navigation routes now working correctly without internal server errors
 
 ## User Preferences
 

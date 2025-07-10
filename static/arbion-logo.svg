@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400">
+  <!-- Dark background similar to the image -->
+  <defs>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#05d9a1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1652f0;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Letter A with chart bars -->
+  <g fill="url(#logoGradient)">
+    <!-- Main A shape -->
+    <path d="M120 90 L160 30 L200 90 L190 90 L185 75 L135 75 L130 90 Z M145 60 L175 60 L160 40 Z" />
+    
+    <!-- Chart bars inside A -->
+    <rect x="140" y="65" width="8" height="20" />
+    <rect x="152" y="60" width="8" height="25" />
+    <rect x="164" y="55" width="8" height="30" />
+    
+    <!-- Upward arrow -->
+    <path d="M190 75 L210 55 L230 75 L220 75 L220 85 L200 85 L200 75 Z" />
+  </g>
+  
+  <!-- Text "arbion" -->
+  <text x="200" y="150" font-family="Arial, sans-serif" font-size="48" font-weight="300" text-anchor="middle" fill="#05d9a1">arbion</text>
+</svg>

@@ -815,7 +815,15 @@ def toggle_user_status():
 @main_bp.route('/account')
 @login_required
 def account():
-    return render_template('account.html')
+    from datetime import datetime
+    
+    # Calculate days since account creation
+    days_active = 0
+    if current_user.created_at:
+        delta = datetime.utcnow() - current_user.created_at
+        days_active = delta.days
+    
+    return render_template('account.html', days_active=days_active)
 
 # Advanced API endpoints for enhanced features
 @main_bp.route('/api/market-data/<symbol>')

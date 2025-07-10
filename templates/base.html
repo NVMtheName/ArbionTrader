@@ -157,8 +157,15 @@
         <!-- Sidebar -->
         <div class="w-64 bg-dark-surface border-r border-dark-border flex flex-col">
             <div class="p-6 border-b border-dark-border">
-                <h1 class="text-2xl font-bold text-white">Arbion</h1>
-                <p class="text-sm text-gray-400">AI Trading Platform</p>
+                <div class="flex items-center space-x-3">
+                    <img src="{{ url_for('static', filename='arbion-logo.png') }}" 
+                         alt="Arbion Logo" 
+                         class="h-8 w-auto">
+                    <div>
+                        <h1 class="text-xl font-bold text-white">Arbion</h1>
+                        <p class="text-xs text-gray-400">AI Trading Platform</p>
+                    </div>
+                </div>
             </div>
             
             <nav class="flex-1 p-4 space-y-2">
@@ -219,6 +226,11 @@
                 </div>
                 
                 <div class="flex items-center space-x-4">
+                    <!-- Logo in top right -->
+                    <img src="{{ url_for('static', filename='arbion-logo.png') }}" 
+                         alt="Arbion Logo" 
+                         class="h-6 w-auto">
+                    
                     <!-- API Status Indicators -->
                     <div class="flex items-center space-x-3">
                         {% if api_status %}
