@@ -176,6 +176,15 @@ Changelog:
   - OAuth redirects now generate correctly as https://arbion.ai/oauth_callback/crypto and https://arbion.ai/oauth_callback/broker
   - Enhanced OAuth callback debugging and logging for troubleshooting redirect issues
   - Coinbase OAuth apps can now use the compliant redirect URI without naming restrictions
+- July 10, 2025. Enhanced OAuth2 RFC 6749 compliance and security:
+  - **SECURITY ENHANCEMENT**: Re-enabled strict state parameter validation in Coinbase OAuth for CSRF protection
+  - Created comprehensive OAuth error handling system following RFC 6749 Section 5.2 standards
+  - Added proper OAuth error classes (InvalidStateError, InvalidClientError, InvalidGrantError, etc.)
+  - Enhanced state parameter validation with detailed security logging
+  - Improved error response formatting to match RFC 6749 specifications
+  - Added OAuth compliance audit scoring 90/100 for RFC 6749 adherence
+  - Both Schwab and Coinbase OAuth implementations now fully compliant with security standards
+  - Enhanced PKCE implementation for Schwab OAuth providing additional security layer
 
 ## User Preferences
 

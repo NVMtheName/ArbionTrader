@@ -123,18 +123,24 @@ class CoinbaseOAuth:
             if not self.client_id or not self.client_secret:
                 raise ValueError("Coinbase OAuth2 credentials not configured")
             
-            # Validate state parameter
+            # Validate state parameter (RFC 6749 Section 10.12 - CSRF Protection)
             stored_state = session.get('coinbase_oauth_state')
             logger.info(f"State validation - stored: {stored_state}, received: {state}")
             
-            # Note: State validation - temporarily relaxed for debugging
-            # TODO: Re-enable strict state validation after debugging session issues
             if not state:
-                logger.warning("No state parameter received in callback")
-            elif stored_state and stored_state != state:
-                logger.warning(f"State parameter mismatch but continuing. Expected: {stored_state}, Got: {state}")
-                # In production, we would raise an error here for security
-                # raise ValueError(f"Invalid state parameter. Expected: {stored_state}, Got: {state}")
+                logger.error("No state parameter received in callback - potential CSRF attack")
+                from utils.oauth_errors import InvalidStateError
+                raise InvalidStateError("Missing state parameter in OAuth callback")
+            
+            if not stored_state:
+                logger.error("No stored state found in session - session may have expired")
+                from utils.oauth_errors import InvalidStateError
+                raise InvalidStateError("No OAuth state found in session")
+            
+            if stored_state != state:
+                logger.error(f"State parameter mismatch - potential CSRF attack. Expected: {stored_state}, Got: {state}")
+                from utils.oauth_errors import InvalidStateError
+                raise InvalidStateError(f"Invalid state parameter. Expected: {stored_state}, Got: {state}")
             
             # Prepare token request
             token_data = {
