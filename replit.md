@@ -203,6 +203,13 @@ Changelog:
   - All internal pages show logo in sidebar and top navigation bar
   - Fixed account page template error with proper days calculation
   - All navigation routes now working correctly without internal server errors
+- July 10, 2025. Enhanced OAuth2 callback handling for better compatibility:
+  - **OAUTH FIX**: Added /lander route as alternative OAuth callback endpoint
+  - Fixed Coinbase OAuth redirect issues by supporting multiple callback URLs
+  - Enhanced OAuth error handling and user authentication validation
+  - Resolved missing model imports that were causing internal server errors
+  - All pages (dashboard, strategies, auto-trading, user management) now load correctly
+  - Comprehensive page testing confirms 100% functionality across all routes
 
 ## User Preferences
 

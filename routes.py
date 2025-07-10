@@ -606,6 +606,7 @@ def schwab_oauth_setup():
         flash(f'OAuth2 setup failed: {str(e)}', 'error')
         return redirect(url_for('main.api_settings'))
 
+@main_bp.route('/lander')
 @main_bp.route('/oauth_callback/crypto')
 def oauth_callback_coinbase():
     """Handle Coinbase OAuth2 callback"""
