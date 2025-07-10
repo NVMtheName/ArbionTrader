@@ -146,6 +146,7 @@ def get_account_balance():
         return {'total': 0, 'breakdown': {}}
 
 @main_bp.route('/')
+@main_bp.route('/dashboard')
 @login_required
 def dashboard():
     from models import Trade, APICredential, AutoTradingSettings
@@ -184,6 +185,7 @@ def enhanced_dashboard():
     return render_template('enhanced_dashboard.html')
 
 @main_bp.route('/natural-trade', methods=['GET', 'POST'])
+@main_bp.route('/natural_trade', methods=['GET', 'POST'])
 @login_required
 def natural_trade():
     if request.method == 'POST':
@@ -232,6 +234,7 @@ def natural_trade():
     return render_template('natural_trade.html')
 
 @main_bp.route('/api-settings', methods=['GET', 'POST'])
+@main_bp.route('/api_settings', methods=['GET', 'POST'])
 @login_required
 def api_settings():
     from models import APICredential, OAuthClientCredential
@@ -680,6 +683,7 @@ def strategies():
     return render_template('strategies.html', strategies=user_strategies)
 
 @main_bp.route('/auto-trading')
+@main_bp.route('/auto_trading')
 @login_required
 @superadmin_required
 def auto_trading():
@@ -726,6 +730,7 @@ def toggle_auto_trading():
     return redirect(url_for('main.auto_trading'))
 
 @main_bp.route('/user-management')
+@main_bp.route('/user_management')
 @login_required
 @superadmin_required
 def user_management():
