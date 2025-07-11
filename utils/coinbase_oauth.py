@@ -2,6 +2,7 @@ import os
 import requests
 import logging
 import secrets
+import time
 from datetime import datetime, timedelta
 from urllib.parse import urlencode
 from flask import session, request, redirect, url_for, flash
@@ -90,16 +91,25 @@ class CoinbaseOAuth:
             return False
     
     def get_authorization_url(self):
-        """Generate authorization URL with state parameter"""
+        """Generate authorization URL with enhanced security"""
         try:
             if not self.client_id:
                 raise ValueError("Coinbase OAuth client credentials not configured for this user. Please configure your OAuth2 client credentials first.")
             
-            # Generate secure state parameter
-            state = secrets.token_urlsafe(32)
-            session['coinbase_oauth_state'] = state
+            # Enhanced security checks
+            from utils.oauth_security import oauth_security
             
-            # Build authorization URL with required scopes
+            # Validate redirect URI security
+            is_valid, message = oauth_security.validate_redirect_uri(self.redirect_uri)
+            if not is_valid:
+                raise ValueError(f"Invalid redirect URI: {message}")
+            
+            # Generate cryptographically secure state parameter
+            state = oauth_security.generate_secure_state(self.user_id)
+            session['coinbase_oauth_state'] = state
+            session['coinbase_oauth_timestamp'] = int(time.time())
+            
+            # Build authorization URL with required scopes and security parameters
             auth_params = {
                 'response_type': 'code',
                 'client_id': self.client_id,
@@ -110,7 +120,9 @@ class CoinbaseOAuth:
             
             auth_url = f"{self.auth_url}?{urlencode(auth_params)}"
             
-            logger.info(f"Generated Coinbase authorization URL for user {self.user_id}")
+            logger.info(f"Generated secure Coinbase authorization URL for user {self.user_id}")
+            logger.info(f"Using redirect URI: {self.redirect_uri}")
+            
             return auth_url
         
         except Exception as e:
@@ -118,29 +130,37 @@ class CoinbaseOAuth:
             raise
     
     def exchange_code_for_token(self, auth_code, state):
-        """Exchange authorization code for access token"""
+        """Exchange authorization code for access token with enhanced security"""
         try:
             if not self.client_id or not self.client_secret:
                 raise ValueError("Coinbase OAuth2 credentials not configured")
             
-            # Validate state parameter (RFC 6749 Section 10.12 - CSRF Protection)
+            # Enhanced security validation
+            from utils.oauth_security import oauth_security
+            
+            # Check rate limiting
+            allowed, message = oauth_security.check_rate_limiting(self.user_id, "token_exchange")
+            if not allowed:
+                logger.warning(f"Rate limit exceeded for token exchange - user {self.user_id}")
+                return {'success': False, 'message': message}
+            
+            # Comprehensive state parameter validation
             stored_state = session.get('coinbase_oauth_state')
-            logger.info(f"State validation - stored: {stored_state}, received: {state}")
+            logger.info(f"Enhanced state validation - stored: {stored_state}, received: {state}")
             
-            if not state:
-                logger.error("No state parameter received in callback - potential CSRF attack")
+            is_valid, validation_message = oauth_security.validate_state_security(stored_state, state, self.user_id)
+            if not is_valid:
+                oauth_security.record_failed_attempt(self.user_id, "token_exchange")
                 from utils.oauth_errors import InvalidStateError
-                raise InvalidStateError("Missing state parameter in OAuth callback")
+                raise InvalidStateError(validation_message)
             
-            if not stored_state:
-                logger.error("No stored state found in session - session may have expired")
+            # Check session timestamp to prevent replay attacks
+            session_timestamp = session.get('coinbase_oauth_timestamp', 0)
+            current_time = int(time.time())
+            if current_time - session_timestamp > 600:  # 10 minutes max
+                logger.error("OAuth session expired - potential replay attack")
                 from utils.oauth_errors import InvalidStateError
-                raise InvalidStateError("No OAuth state found in session")
-            
-            if stored_state != state:
-                logger.error(f"State parameter mismatch - potential CSRF attack. Expected: {stored_state}, Got: {state}")
-                from utils.oauth_errors import InvalidStateError
-                raise InvalidStateError(f"Invalid state parameter. Expected: {stored_state}, Got: {state}")
+                raise InvalidStateError("OAuth session expired")
             
             # Prepare token request
             token_data = {
@@ -150,6 +170,10 @@ class CoinbaseOAuth:
                 'client_secret': self.client_secret,
                 'redirect_uri': self.redirect_uri
             }
+            
+            # Log the exact redirect URI being used for debugging
+            logger.info(f"Token exchange using redirect URI: {self.redirect_uri}")
+            logger.info(f"Token request data: {token_data}")
             
             headers = {
                 'Content-Type': 'application/x-www-form-urlencoded'
@@ -197,8 +221,10 @@ class CoinbaseOAuth:
                     'scope': token_info.get('scope', 'wallet:accounts:read,wallet:transactions:read')
                 }
                 
-                # Clean up session
-                session.pop('coinbase_oauth_state', None)
+                # Enhanced session cleanup with security manager
+                from utils.oauth_security import oauth_security
+                oauth_security.secure_session_cleanup(['coinbase_oauth_state', 'coinbase_oauth_timestamp'])
+                oauth_security.clear_successful_attempt(self.user_id, "token_exchange")
                 
                 logger.info("Successfully exchanged Coinbase OAuth code for tokens")
                 return {

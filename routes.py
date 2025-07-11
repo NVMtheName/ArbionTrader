@@ -299,6 +299,11 @@ def api_settings():
                         host = request.host
                         redirect_uri = f"{scheme}://{host}/oauth_callback/crypto"
                     
+                    # Log the redirect URI for debugging
+                    logging.info(f"Setting up Coinbase OAuth with redirect URI: {redirect_uri}")
+                    logging.info(f"Current request host: {request.host}")
+                    logging.info(f"Current request scheme: {request.scheme}")
+                    
                     if not client_id or not client_secret:
                         flash('Client ID and Client Secret are required for OAuth2 setup', 'error')
                         return redirect(url_for('main.api_settings'))
@@ -657,10 +662,11 @@ def schwab_oauth_setup():
 
 @main_bp.route('/oauth_callback/crypto', methods=['GET', 'POST'])
 def oauth_callback_coinbase():
-    """Handle Coinbase OAuth2 callback"""
+    """Handle Coinbase OAuth2 callback with enhanced security"""
     from models import APICredential
     from utils.encryption import encrypt_credentials
     from utils.coinbase_oauth import CoinbaseOAuth
+    from utils.oauth_security import oauth_security
     from app import db
     
     try:
@@ -724,13 +730,21 @@ def oauth_callback_coinbase():
             logging.error(f"No Coinbase OAuth client credentials found for user {current_user.id}")
             return redirect(url_for('main.api_settings'))
         
-        # Exchange code for token
+        # Enhanced security checks before token exchange
+        rate_allowed, rate_message = oauth_security.check_rate_limiting(current_user.id, "oauth_callback")
+        if not rate_allowed:
+            flash(f'Too many authentication attempts: {rate_message}', 'error')
+            logging.error(f"Rate limit exceeded for OAuth callback - user {current_user.id}")
+            return redirect(url_for('main.api_settings'))
+        
+        # Exchange code for token with enhanced security
         coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
-        logging.info(f"Attempting token exchange for user {current_user.id}")
+        logging.info(f"Attempting secure token exchange for user {current_user.id}")
         logging.info(f"Coinbase OAuth redirect URI: {oauth_client.redirect_uri}")
         token_result = coinbase_oauth.exchange_code_for_token(auth_code, state)
         
         if not token_result['success']:
+            oauth_security.record_failed_attempt(current_user.id, "oauth_callback")
             flash(f'Token exchange failed: {token_result["message"]}', 'error')
             logging.error(f"Token exchange failed: {token_result['message']}")
             return redirect(url_for('main.api_settings'))
@@ -763,8 +777,11 @@ def oauth_callback_coinbase():
         
         db.session.commit()
         
+        # Clear successful attempt tracking
+        oauth_security.clear_successful_attempt(current_user.id, "oauth_callback")
+        
         flash('Coinbase OAuth2 authentication successful! Your account is now connected.', 'success')
-        logging.info(f"Coinbase OAuth2 credentials saved for user {current_user.id}")
+        logging.info(f"Coinbase OAuth2 credentials saved securely for user {current_user.id}")
         
         # Redirect to API settings to show the connected status
         return redirect(url_for('main.api_settings') + '#coinbase-section')
