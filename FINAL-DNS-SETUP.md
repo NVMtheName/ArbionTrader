@@ -4,11 +4,18 @@
 
 Configure these **exact** DNS records at your domain registrar:
 
-### Record 1: Root Domain
+### Record 1: Root Domain (GoDaddy Configuration)
 ```
-Type: ALIAS or ANAME
+Type: CNAME
 Name: @
 Value: fathomless-honeydew-zv6ene3xmo3rbgkjenzxyql4.herokudns.com
+```
+
+**Note**: If GoDaddy doesn't accept CNAME for @ (root domain), use:
+```
+Type: A
+Name: @
+Value: [Get IP from: dig fathomless-honeydew-zv6ene3xmo3rbgkjenzxyql4.herokudns.com]
 ```
 
 ### Record 2: WWW Subdomain
