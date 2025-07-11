@@ -55,6 +55,12 @@
                 <p class="text-sm text-gray-300 mb-3">
                     Secure OAuth2 authentication for production-ready Coinbase integration.
                 </p>
+                <div class="mb-3 p-3 bg-yellow-900 bg-opacity-30 rounded-lg border border-yellow-500">
+                    <p class="text-xs text-yellow-300">
+                        <strong>🔧 Setup Required:</strong> Configure your Coinbase OAuth app with redirect URI: 
+                        <code class="bg-gray-700 px-1 py-0.5 rounded text-xs">{{ url_for('main.oauth_callback_coinbase', _external=True) }}</code>
+                    </p>
+                </div>
                 {% if coinbase_oauth_configured %}
                     <div class="space-y-3">
                         <form method="POST">
@@ -116,6 +122,13 @@
                                         value="{{ url_for('main.oauth_callback_coinbase', _external=True) }}"
                                         readonly
                                     >
+                                    <div class="mt-2 p-3 bg-red-900 bg-opacity-30 rounded-lg border border-red-500">
+                                        <p class="text-xs text-red-300">
+                                            <strong>⚠️ IMPORTANT:</strong> Your Coinbase Developer Console must use this exact URL. 
+                                            If you're being redirected to <code>arbion.ai/console/app/</code>, 
+                                            update your Coinbase OAuth app settings.
+                                        </p>
+                                    </div>
                                 </div>
                                 
                                 <button 
