@@ -291,7 +291,13 @@ def api_settings():
                 try:
                     client_id = request.form.get('client_id')
                     client_secret = request.form.get('client_secret')
-                    redirect_uri = request.form.get('redirect_uri', url_for('main.oauth_callback_coinbase', _external=True))
+                    # Generate redirect URI based on current request domain
+                    redirect_uri = request.form.get('redirect_uri')
+                    if not redirect_uri:
+                        # Use the same domain as the current request
+                        scheme = request.scheme
+                        host = request.host
+                        redirect_uri = f"{scheme}://{host}/oauth_callback/crypto"
                     
                     if not client_id or not client_secret:
                         flash('Client ID and Client Secret are required for OAuth2 setup', 'error')
@@ -352,7 +358,13 @@ def api_settings():
                 try:
                     client_id = request.form.get('client_id')
                     client_secret = request.form.get('client_secret')
-                    redirect_uri = request.form.get('redirect_uri', url_for('main.oauth_callback_schwab', _external=True))
+                    # Generate redirect URI based on current request domain
+                    redirect_uri = request.form.get('redirect_uri')
+                    if not redirect_uri:
+                        # Use the same domain as the current request
+                        scheme = request.scheme
+                        host = request.host
+                        redirect_uri = f"{scheme}://{host}/oauth_callback/broker"
                     
                     if not client_id or not client_secret:
                         flash('Client ID and Client Secret are required for OAuth2 setup', 'error')

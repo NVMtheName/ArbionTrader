@@ -28,7 +28,8 @@ def create_app():
     app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
     
     # Configure proper URL generation for OAuth redirects
-    app.config['SERVER_NAME'] = os.environ.get('SERVER_NAME', 'arbion.ai')
+    # Allow flexible domain handling for OAuth callbacks (both arbion.ai and www.arbion.ai)
+    app.config['SERVER_NAME'] = None  # Enable flexible domain handling
     app.config['PREFERRED_URL_SCHEME'] = 'https'
     
     # Fix DATABASE_URL for newer SQLAlchemy versions
