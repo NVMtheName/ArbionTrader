@@ -718,6 +718,19 @@
             } else {
                 testResult.className = 'mt-4 p-3 rounded-lg bg-coinbase-red bg-opacity-20 border border-coinbase-red border-opacity-30';
                 testMessage.className = 'text-sm text-coinbase-red';
+                
+                // Show OpenAI help for authentication errors
+                if (provider === 'openai' && (data.message.includes('401') || data.message.includes('permission'))) {
+                    const helpButton = document.createElement('button');
+                    helpButton.innerHTML = '<i data-feather="help-circle" class="w-4 h-4 inline mr-1"></i> Get Help';
+                    helpButton.className = 'mt-2 text-blue-400 hover:text-blue-300 text-sm';
+                    helpButton.onclick = () => {
+                        closeTestModal();
+                        showOpenAIHelp();
+                    };
+                    testResult.appendChild(helpButton);
+                    feather.replace();
+                }
             }
         })
         .catch(error => {
