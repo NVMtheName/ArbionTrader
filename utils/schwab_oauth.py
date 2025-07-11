@@ -4,6 +4,7 @@ import base64
 import hashlib
 import secrets
 import requests
+import time
 from datetime import datetime, timedelta
 from flask import session, url_for
 from urllib.parse import urlencode
@@ -90,23 +91,32 @@ class SchwabOAuth:
             return False
     
     def get_authorization_url(self):
-        """Generate authorization URL with PKCE"""
+        """Generate authorization URL with enhanced security and PKCE"""
         try:
             if not self.client_id:
                 raise ValueError("Schwab OAuth client credentials not configured for this user. Please configure your OAuth2 client credentials first.")
             
-            # Generate PKCE parameters
+            # Enhanced security checks
+            from utils.oauth_security import oauth_security
+            
+            # Validate redirect URI security
+            is_valid, message = oauth_security.validate_redirect_uri(self.redirect_uri)
+            if not is_valid:
+                raise ValueError(f"Invalid redirect URI: {message}")
+            
+            # Generate PKCE parameters with enhanced security
             from utils.pkce_utils import generate_pkce_pair
             code_verifier, code_challenge = generate_pkce_pair()
             
-            # Store code verifier in session for later use
+            # Generate cryptographically secure state parameter
+            state = oauth_security.generate_secure_state(self.user_id)
+            
+            # Store in session with security enhancements
             session['schwab_code_verifier'] = code_verifier
-            
-            # Generate state for CSRF protection
-            state = secrets.token_urlsafe(32)
             session['schwab_oauth_state'] = state
+            session['schwab_oauth_timestamp'] = int(time.time())
             
-            # Build authorization URL
+            # Build authorization URL with security parameters
             params = {
                 'client_id': self.client_id,
                 'redirect_uri': self.redirect_uri,
@@ -118,30 +128,59 @@ class SchwabOAuth:
             }
             
             auth_url = f"{self.auth_url}?{urlencode(params)}"
-            logger.info(f"Generated Schwab OAuth authorization URL for user {self.user_id}")
+            logger.info(f"Generated secure Schwab OAuth authorization URL for user {self.user_id}")
+            logger.info(f"Using redirect URI: {self.redirect_uri}")
             return auth_url
             
         except Exception as e:
             logger.error(f"Error generating Schwab OAuth authorization URL: {e}")
             raise
     
-    def exchange_code_for_token(self, auth_code):
-        """Exchange authorization code for access token"""
+    def exchange_code_for_token(self, auth_code, state):
+        """Exchange authorization code for access token with enhanced security"""
         try:
             if not self.client_id or not self.client_secret:
                 raise ValueError("Schwab OAuth client credentials not configured")
+            
+            # Enhanced security validation
+            from utils.oauth_security import oauth_security
+            
+            # Check rate limiting
+            allowed, message = oauth_security.check_rate_limiting(self.user_id, "schwab_token_exchange")
+            if not allowed:
+                logger.warning(f"Rate limit exceeded for Schwab token exchange - user {self.user_id}")
+                return {'success': False, 'message': message}
+            
+            # Comprehensive state parameter validation
+            stored_state = session.get('schwab_oauth_state')
+            logger.info(f"Enhanced Schwab state validation - stored: {stored_state}, received: {state}")
+            
+            is_valid, validation_message = oauth_security.validate_state_security(stored_state, state, self.user_id)
+            if not is_valid:
+                oauth_security.record_failed_attempt(self.user_id, "schwab_token_exchange")
+                from utils.oauth_errors import InvalidStateError
+                raise InvalidStateError(validation_message)
+            
+            # Check session timestamp to prevent replay attacks
+            session_timestamp = session.get('schwab_oauth_timestamp', 0)
+            current_time = int(time.time())
+            if current_time - session_timestamp > 600:  # 10 minutes max
+                logger.error("Schwab OAuth session expired - potential replay attack")
+                from utils.oauth_errors import InvalidStateError
+                raise InvalidStateError("OAuth session expired")
             
             # Get code verifier from session
             code_verifier = session.get('schwab_code_verifier')
             if not code_verifier:
                 raise ValueError("Code verifier not found in session")
             
-            # Prepare token request
+            # Prepare token request with security headers
             auth_header = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
             
             headers = {
                 'Authorization': f'Basic {auth_header}',
-                'Content-Type': 'application/x-www-form-urlencoded'
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'User-Agent': 'Arbion-Trading-Platform/1.0'
             }
             
             data = {
@@ -151,14 +190,19 @@ class SchwabOAuth:
                 'code_verifier': code_verifier
             }
             
-            response = requests.post(self.token_url, headers=headers, data=data)
+            response = requests.post(self.token_url, headers=headers, data=data, timeout=30)
             response.raise_for_status()
             
             token_data = response.json()
             
-            # Clean up session
-            session.pop('schwab_code_verifier', None)
-            session.pop('schwab_oauth_state', None)
+            # Enhanced session cleanup with security manager
+            from utils.oauth_security import oauth_security
+            oauth_security.secure_session_cleanup([
+                'schwab_code_verifier', 
+                'schwab_oauth_state', 
+                'schwab_oauth_timestamp'
+            ])
+            oauth_security.clear_successful_attempt(self.user_id, "schwab_token_exchange")
             
             # Calculate expiration time
             expires_in = token_data.get('expires_in', 3600)

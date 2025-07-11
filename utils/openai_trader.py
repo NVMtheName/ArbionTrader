@@ -53,13 +53,22 @@ class OpenAITrader:
             return None
         
     def test_connection(self):
-        """Test OpenAI API connection with enhanced error handling"""
+        """Test OpenAI API connection with enhanced security and error handling"""
         try:
             if not self.client:
                 return {
                     'success': False,
                     'message': 'OpenAI API key not configured'
                 }
+            
+            # Enhanced security checks
+            from utils.oauth_security import oauth_security
+            
+            # Check rate limiting for API testing
+            allowed, message = oauth_security.check_rate_limiting(self.user_id, "openai_test")
+            if not allowed:
+                logger.warning(f"Rate limit exceeded for OpenAI API test - user {self.user_id}")
+                return {'success': False, 'message': message}
             
             # Test with the models endpoint first (simpler and more reliable)
             models_response = self.client.models.list()
@@ -70,8 +79,13 @@ class OpenAITrader:
                     messages=[{"role": "user", "content": "Test"}],
                     max_tokens=1
                 )
+                
+                # Clear successful attempt tracking
+                oauth_security.clear_successful_attempt(self.user_id, "openai_test")
+                
                 return {"success": True, "message": "OpenAI API connection successful"}
             else:
+                oauth_security.record_failed_attempt(self.user_id, "openai_test")
                 return {"success": False, "message": "OpenAI API returned empty response"}
                 
         except Exception as e:
@@ -129,13 +143,30 @@ class OpenAITrader:
                 return {"success": False, "message": f"OpenAI API error: {error_msg}"}
     
     def parse_trading_prompt(self, prompt):
-        """Parse natural language trading prompt into structured instructions"""
+        """Parse natural language trading prompt with enhanced security"""
         try:
             if not self.client:
                 return {
                     'success': False,
                     'message': 'OpenAI API key not configured'
                 }
+            
+            # Enhanced security checks
+            from utils.oauth_security import oauth_security
+            
+            # Check rate limiting for API calls
+            allowed, message = oauth_security.check_rate_limiting(self.user_id, "openai_parse")
+            if not allowed:
+                logger.warning(f"Rate limit exceeded for OpenAI parsing - user {self.user_id}")
+                return {'success': False, 'message': message}
+            
+            # Input validation and sanitization
+            if not prompt or len(prompt.strip()) == 0:
+                return {'success': False, 'message': 'Empty instruction provided'}
+            
+            # Limit instruction length to prevent abuse
+            if len(prompt) > 1000:
+                return {'success': False, 'message': 'Instruction too long (max 1000 characters)'}
             
             system_prompt = """You are an AI trading assistant that converts natural language trading instructions into structured JSON format.
 
@@ -169,10 +200,26 @@ Rules:
                     {"role": "user", "content": prompt}
                 ],
                 response_format={"type": "json_object"},
-                max_tokens=300
+                max_tokens=300,
+                temperature=0.1  # Lower temperature for more consistent parsing
             )
             
             parsed_instruction = json.loads(response.choices[0].message.content)
+            
+            # Validate parsed instruction
+            if not parsed_instruction.get('action') or not parsed_instruction.get('symbol'):
+                oauth_security.record_failed_attempt(self.user_id, "openai_parse")
+                return {
+                    'success': False,
+                    'message': 'Could not parse trading instruction. Please specify action and symbol.'
+                }
+            
+            # Clear successful attempt tracking
+            oauth_security.clear_successful_attempt(self.user_id, "openai_parse")
+            
+            # Log successful parsing (without sensitive content)
+            logger.info(f"Successfully parsed trading prompt for user {self.user_id}")
+            
             return {
                 'success': True,
                 'instruction': parsed_instruction,
@@ -180,6 +227,7 @@ Rules:
             }
             
         except Exception as e:
+            oauth_security.record_failed_attempt(self.user_id, "openai_parse")
             logger.error(f"Failed to parse trading prompt: {e}")
             return {
                 'success': False,

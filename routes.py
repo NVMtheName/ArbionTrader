@@ -590,8 +590,9 @@ def oauth_callback_schwab():
         # Log all callback parameters for debugging
         logging.info(f"Schwab OAuth callback received. Query params: {dict(request.args)}")
         
-        # Get authorization code from callback
+        # Get authorization code and state from callback
         auth_code = request.args.get('code')
+        state = request.args.get('state')
         error = request.args.get('error')
         
         if error:
@@ -604,11 +605,25 @@ def oauth_callback_schwab():
             logging.error(f"Authorization code missing. Available params: {dict(request.args)}")
             return redirect(url_for('main.api_settings'))
         
-        # Exchange code for token
+        if not state:
+            flash('State parameter missing from Schwab callback', 'error')
+            logging.error(f"State parameter missing. Available params: {dict(request.args)}")
+            return redirect(url_for('main.api_settings'))
+        
+        # Enhanced security checks before token exchange
+        from utils.oauth_security import oauth_security
+        rate_allowed, rate_message = oauth_security.check_rate_limiting(current_user.id, "schwab_oauth_callback")
+        if not rate_allowed:
+            flash(f'Too many authentication attempts: {rate_message}', 'error')
+            logging.error(f"Rate limit exceeded for Schwab OAuth callback - user {current_user.id}")
+            return redirect(url_for('main.api_settings'))
+        
+        # Exchange code for token with enhanced security
         schwab_oauth = SchwabOAuth(user_id=current_user.id)
-        token_result = schwab_oauth.exchange_code_for_token(auth_code)
+        token_result = schwab_oauth.exchange_code_for_token(auth_code, state)
         
         if not token_result['success']:
+            oauth_security.record_failed_attempt(current_user.id, "schwab_oauth_callback")
             flash(f'Token exchange failed: {token_result["message"]}', 'error')
             return redirect(url_for('main.api_settings'))
         
@@ -636,8 +651,11 @@ def oauth_callback_schwab():
         
         db.session.commit()
         
+        # Clear successful attempt tracking
+        oauth_security.clear_successful_attempt(current_user.id, "schwab_oauth_callback")
+        
         flash('Schwab OAuth2 authentication successful!', 'success')
-        logging.info(f"Schwab OAuth2 credentials saved for user {current_user.id}")
+        logging.info(f"Schwab OAuth2 credentials saved securely for user {current_user.id}")
         
         return redirect(url_for('main.api_settings'))
     
