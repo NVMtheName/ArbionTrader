@@ -170,6 +170,35 @@
                         <h5 class="text-sm font-semibold text-white mb-3">OAuth2 Client Credentials</h5>
                         <p class="text-xs text-gray-400 mb-4">Enter your OAuth2 client credentials from Coinbase Developer Portal</p>
                         
+                        <!-- Show existing credentials if they exist -->
+                        {% if oauth_dict.get('coinbase') %}
+                        <div class="mb-4 p-3 bg-gray-800 rounded-lg">
+                            <h6 class="text-sm font-medium text-white mb-2">Current Credentials</h6>
+                            <div class="space-y-2 text-xs text-gray-300">
+                                <div>
+                                    <span class="font-medium">Client ID:</span> 
+                                    <span class="text-blue-400">{{ oauth_dict.coinbase.client_id }}</span>
+                                </div>
+                                <div>
+                                    <span class="font-medium">Client Secret:</span> 
+                                    <span class="text-blue-400">{{ oauth_dict.coinbase.client_secret }}</span>
+                                </div>
+                                <div>
+                                    <span class="font-medium">Redirect URI:</span> 
+                                    <span class="text-blue-400">{{ oauth_dict.coinbase.redirect_uri }}</span>
+                                </div>
+                                <div>
+                                    <span class="font-medium">Status:</span> 
+                                    <span class="text-green-400">{{ 'Active' if oauth_dict.coinbase.is_active else 'Inactive' }}</span>
+                                </div>
+                                <div>
+                                    <span class="font-medium">Last Updated:</span> 
+                                    <span class="text-gray-400">{{ oauth_dict.coinbase.updated_at.strftime('%Y-%m-%d %H:%M') if oauth_dict.coinbase.updated_at else 'N/A' }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                        
                         <form method="POST" class="space-y-3">
                             <input type="hidden" name="provider" value="coinbase">
                             <input type="hidden" name="oauth_setup" value="true">
@@ -181,6 +210,7 @@
                                     name="client_id" 
                                     class="input-field w-full text-sm" 
                                     placeholder="Enter your Coinbase Client ID"
+                                    value="{{ oauth_dict.coinbase.client_id if oauth_dict.get('coinbase') else '' }}"
                                     required
                                 >
                             </div>
@@ -194,6 +224,11 @@
                                     placeholder="Enter your Coinbase Client Secret"
                                     required
                                 >
+                                {% if oauth_dict.get('coinbase') %}
+                                <p class="text-xs text-gray-400 mt-1">
+                                    Current secret: {{ oauth_dict.coinbase.client_secret }} (enter new secret to update)
+                                </p>
+                                {% endif %}
                             </div>
                             
                             <div>
@@ -202,8 +237,7 @@
                                     type="text" 
                                     name="redirect_uri" 
                                     class="input-field w-full text-sm" 
-                                    placeholder="{{ url_for('main.oauth_callback_coinbase', _external=True) }}"
-                                    value="{{ url_for('main.oauth_callback_coinbase', _external=True) }}"
+                                    value="{{ oauth_dict.coinbase.redirect_uri if oauth_dict.get('coinbase') else request.scheme + '://' + request.host + '/oauth_callback/crypto' }}"
                                     readonly
                                 >
                             </div>
@@ -212,7 +246,11 @@
                                 type="submit" 
                                 class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors"
                             >
-                                Save OAuth2 Credentials
+                                {% if oauth_dict.get('coinbase') %}
+                                    Update OAuth2 Credentials
+                                {% else %}
+                                    Save OAuth2 Credentials
+                                {% endif %}
                             </button>
                         </form>
                     </div>

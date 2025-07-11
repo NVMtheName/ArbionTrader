@@ -475,10 +475,27 @@ def api_settings():
         ).first()
     )
     
+    # Get user's existing credentials for display
+    api_credentials = APICredential.query.filter_by(user_id=current_user.id).all()
+    oauth_credentials = OAuthClientCredential.query.filter_by(user_id=current_user.id).all()
+    
+    # Create OAuth dictionary for easy template access with existing credentials
+    oauth_dict = {}
+    for oauth_cred in oauth_credentials:
+        oauth_dict[oauth_cred.provider] = {
+            'client_id': oauth_cred.client_id,
+            'client_secret': oauth_cred.client_secret[:8] + '...' if oauth_cred.client_secret else None,  # Show first 8 chars for verification
+            'redirect_uri': oauth_cred.redirect_uri,
+            'is_active': oauth_cred.is_active,
+            'created_at': oauth_cred.created_at,
+            'updated_at': oauth_cred.updated_at
+        }
+    
     return render_template('api_settings.html', 
                          cred_status=cred_status, 
                          schwab_oauth_configured=schwab_oauth_configured,
-                         coinbase_oauth_configured=coinbase_oauth_configured)
+                         coinbase_oauth_configured=coinbase_oauth_configured,
+                         oauth_dict=oauth_dict)
 
 @main_bp.route('/test-api-connection', methods=['POST'])
 @login_required
