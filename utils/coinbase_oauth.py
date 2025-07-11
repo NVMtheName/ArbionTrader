@@ -172,6 +172,16 @@ class CoinbaseOAuth:
             logger.info(f"Token response status: {response.status_code}")
             logger.info(f"Token response content: {response.text}")
             
+            # Enhanced error handling for 401 status
+            if response.status_code == 401:
+                logger.error("401 Unauthorized - This is likely a redirect_uri mismatch issue")
+                logger.error(f"Current redirect_uri: {self.redirect_uri}")
+                logger.error("Please check that your Coinbase OAuth app has the correct redirect URI configured")
+                return {
+                    'success': False,
+                    'message': f'Authentication failed (401). This usually means the redirect URI in your Coinbase OAuth app ({self.redirect_uri}) doesn\'t match the one being used. Please check your Coinbase OAuth app settings.'
+                }
+            
             if response.status_code == 200:
                 token_info = response.json()
                 

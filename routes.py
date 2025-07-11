@@ -698,6 +698,7 @@ def oauth_callback_coinbase():
         # Exchange code for token
         coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
         logging.info(f"Attempting token exchange for user {current_user.id}")
+        logging.info(f"Coinbase OAuth redirect URI: {oauth_client.redirect_uri}")
         token_result = coinbase_oauth.exchange_code_for_token(auth_code, state)
         
         if not token_result['success']:
