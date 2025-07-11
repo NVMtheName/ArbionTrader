@@ -255,6 +255,20 @@ def api_settings():
     from app import db
     
     if request.method == 'POST':
+        # Enhanced debugging for form submission
+        logging.info("="*50)
+        logging.info("API SETTINGS FORM SUBMITTED")
+        logging.info("="*50)
+        logging.info(f"Form data: {dict(request.form)}")
+        logging.info(f"User: {current_user.id} ({current_user.username})")
+        logging.info(f"Request method: {request.method}")
+        logging.info(f"Content type: {request.content_type}")
+        
+        # Check for missing provider field
+        if not request.form.get('provider'):
+            logging.error("Missing provider field in form submission")
+            flash('Provider field is required', 'error')
+            return redirect(url_for('main.api_settings'))
         provider = request.form.get('provider')
         
         if provider == 'coinbase':
@@ -413,9 +427,15 @@ def api_settings():
             )
             db.session.add(new_cred)
         
-        db.session.commit()
-        flash(f'{provider.title()} credentials saved successfully.', 'success')
-        logging.info(f"API credentials saved for user {current_user.id}, provider: {provider}")
+        try:
+            db.session.commit()
+            flash(f'{provider.title()} credentials saved successfully!', 'success')
+            logging.info(f"✓ API credentials saved for user {current_user.id}, provider: {provider}")
+        except Exception as e:
+            db.session.rollback()
+            logging.error(f"✗ Database error saving credentials: {str(e)}")
+            flash(f'Error saving credentials: {str(e)}', 'error')
+            return redirect(url_for('main.api_settings'))
     
     # Get existing credentials
     credentials = APICredential.query.filter_by(user_id=current_user.id, is_active=True).all()

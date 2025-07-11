@@ -3,6 +3,21 @@
 {% block page_title %}API Settings{% endblock %}
 
 {% block content %}
+<!-- Success/Error Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+        <div class="mb-6 space-y-2">
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'success' if category == 'success' else 'error' }} p-4 rounded-lg border">
+                    <div class="flex items-center">
+                        <i data-feather="{% if category == 'success' %}check-circle{% else %}alert-circle{% endif %}" class="w-5 h-5 mr-3"></i>
+                        <span class="font-medium">{{ message }}</span>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+{% endwith %}
 <div class="space-y-6">
     <!-- Page Header -->
     <div class="card">
@@ -210,7 +225,7 @@
                 <p class="text-sm text-gray-300 mb-3">
                     Direct API key authentication (deprecated, use OAuth2 instead).
                 </p>
-                <form method="POST" class="space-y-4">
+                <form method="POST" action="{{ url_for('main.api_settings') }}" class="space-y-4">
                     <input type="hidden" name="provider" value="coinbase">
                     <input type="hidden" name="oauth_flow" value="false">
                     
@@ -423,7 +438,7 @@
                 <p class="text-sm text-gray-300 mb-3">
                     Direct API key authentication (deprecated, use OAuth2 instead).
                 </p>
-                <form method="POST" class="space-y-4">
+                <form method="POST" action="{{ url_for('main.api_settings') }}" class="space-y-4">
                     <input type="hidden" name="provider" value="schwab">
                     <input type="hidden" name="oauth_flow" value="false">
                     
@@ -498,7 +513,7 @@
                 </div>
             </div>
             
-            <form method="POST" class="space-y-4">
+            <form method="POST" action="{{ url_for('main.api_settings') }}" class="space-y-4">
                 <input type="hidden" name="provider" value="openai">
                 
                 <div>
