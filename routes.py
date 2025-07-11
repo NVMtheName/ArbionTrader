@@ -615,10 +615,27 @@ def oauth_callback_coinbase():
     from app import db
     
     try:
-        # Log callback details for debugging
-        logging.info(f"Coinbase OAuth callback received. Query params: {dict(request.args)}")
+        # Comprehensive logging for debugging redirect issue
+        logging.info("="*60)
+        logging.info("COINBASE OAUTH CALLBACK RECEIVED")
+        logging.info("="*60)
         logging.info(f"Request URL: {request.url}")
+        logging.info(f"Request method: {request.method}")
+        logging.info(f"Query params: {dict(request.args)}")
+        logging.info(f"Form data: {dict(request.form)}")
         logging.info(f"Request headers: {dict(request.headers)}")
+        logging.info(f"User agent: {request.headers.get('User-Agent', 'N/A')}")
+        logging.info(f"Referer: {request.headers.get('Referer', 'N/A')}")
+        logging.info("="*60)
+        
+        # Also print to console for immediate visibility
+        print("COINBASE OAUTH CALLBACK - SUCCESS! Route is working correctly")
+        print(f"URL: {request.url}")
+        print(f"Params: {dict(request.args)}")
+        
+        # Simple test response to confirm this route is being hit
+        if request.args.get('test'):
+            return f"<h1>OAuth Callback Working!</h1><p>URL: {request.url}</p><p>Params: {dict(request.args)}</p>"
         
         # Get authorization code and state from callback (support both GET and POST)
         auth_code = request.args.get('code') or request.form.get('code')
