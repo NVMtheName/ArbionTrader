@@ -238,8 +238,11 @@
                                     name="redirect_uri" 
                                     class="input-field w-full text-sm" 
                                     value="{{ oauth_dict.coinbase.redirect_uri if oauth_dict.get('coinbase') else request.scheme + '://' + request.host + '/oauth_callback/crypto' }}"
-                                    readonly
+                                    placeholder="https://arbion.ai/oauth_callback/crypto"
                                 >
+                                <p class="text-xs text-gray-400 mt-1">
+                                    Must match exactly with your Coinbase OAuth app settings
+                                </p>
                             </div>
                             
                             <button 
