@@ -10,14 +10,20 @@ from models import Trade
 from app import db
 
 class CoinbaseConnector:
-    def __init__(self, api_key, secret, passphrase, sandbox=False):
+    def __init__(self, api_key, secret, passphrase, sandbox=False, oauth_mode=False):
         self.api_key = api_key
         self.secret = secret
         self.passphrase = passphrase
+        self.sandbox = sandbox
+        self.oauth_mode = oauth_mode
         self.base_url = 'https://api-public.sandbox.pro.coinbase.com' if sandbox else 'https://api.pro.coinbase.com'
         
     def _generate_signature(self, timestamp, method, path, body=''):
         """Generate signature for Coinbase Pro API authentication"""
+        if self.oauth_mode:
+            # OAuth mode doesn't use signatures
+            return None
+            
         message = timestamp + method + path + body
         signature = hmac.new(
             base64.b64decode(self.secret),
@@ -32,15 +38,23 @@ class CoinbaseConnector:
         path = f'/{endpoint}'
         
         body = json.dumps(data) if data else ''
-        signature = self._generate_signature(timestamp, method, path, body)
         
-        headers = {
-            'CB-ACCESS-KEY': self.api_key,
-            'CB-ACCESS-SIGN': signature,
-            'CB-ACCESS-TIMESTAMP': timestamp,
-            'CB-ACCESS-PASSPHRASE': self.passphrase,
-            'Content-Type': 'application/json'
-        }
+        if self.oauth_mode:
+            # OAuth mode uses Bearer token
+            headers = {
+                'Authorization': f'Bearer {self.api_key}',
+                'Content-Type': 'application/json'
+            }
+        else:
+            # Legacy API key mode
+            signature = self._generate_signature(timestamp, method, path, body)
+            headers = {
+                'CB-ACCESS-KEY': self.api_key,
+                'CB-ACCESS-SIGN': signature,
+                'CB-ACCESS-TIMESTAMP': timestamp,
+                'CB-ACCESS-PASSPHRASE': self.passphrase,
+                'Content-Type': 'application/json'
+            }
         
         url = f'{self.base_url}{path}'
         

@@ -295,9 +295,13 @@ def api_settings():
                     redirect_uri = request.form.get('redirect_uri')
                     if not redirect_uri:
                         # Use the same domain as the current request
-                        scheme = request.scheme
+                        scheme = 'https'  # Always use HTTPS in production
                         host = request.host
-                        redirect_uri = f"{scheme}://{host}/oauth_callback/crypto"
+                        # Handle both www and non-www versions
+                        if host.startswith('www.'):
+                            redirect_uri = f"{scheme}://{host}/oauth_callback/crypto"
+                        else:
+                            redirect_uri = f"{scheme}://{host}/oauth_callback/crypto"
                     
                     # Log the redirect URI for debugging
                     logging.info(f"Setting up Coinbase OAuth with redirect URI: {redirect_uri}")

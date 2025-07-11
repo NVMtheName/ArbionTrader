@@ -42,6 +42,9 @@ class TaskScheduler:
             schedule.every(6).hours.do(self._update_api_status)
             schedule.every().day.at("00:00").do(self._daily_maintenance)
             
+            # Schedule token maintenance for persistent connections
+            schedule.every(5).minutes.do(self._run_token_maintenance)
+            
             # Start scheduler in a separate thread
             self.scheduler_thread = threading.Thread(target=self._scheduler_loop)
             self.scheduler_thread.daemon = True
@@ -301,3 +304,23 @@ def stop_scheduler():
             _scheduler.stop()
     except Exception as e:
         logging.error(f"Failed to stop scheduler: {e}")
+
+# Add token maintenance method to TaskScheduler class
+def add_token_maintenance_method():
+    """Add token maintenance method to TaskScheduler"""
+    def _run_token_maintenance(self):
+        """Run token maintenance for persistent connections"""
+        try:
+            self.logger.info("Running token maintenance for persistent connections")
+            from app import app
+            with app.app_context():
+                from tasks.token_maintenance import run_token_maintenance
+                run_token_maintenance()
+        except Exception as e:
+            self.logger.error(f"Error in token maintenance: {str(e)}")
+    
+    # Add the method to the TaskScheduler class
+    TaskScheduler._run_token_maintenance = _run_token_maintenance
+
+# Add the method when the module is imported
+add_token_maintenance_method()
