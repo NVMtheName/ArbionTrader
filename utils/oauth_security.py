@@ -217,6 +217,45 @@ class OAuthSecurityManager:
             
         except Exception as e:
             logger.error(f"Session cleanup error: {e}")
+    
+    def record_security_event(self, user_id, event_type, description):
+        """Record security events for monitoring and auditing"""
+        try:
+            # Create security event record
+            security_event = {
+                'user_id': user_id,
+                'event_type': event_type,
+                'description': description,
+                'timestamp': datetime.utcnow().isoformat(),
+                'ip_address': request.remote_addr if request else 'unknown',
+                'user_agent': request.headers.get('User-Agent', 'unknown') if request else 'unknown'
+            }
+            
+            # Log security event
+            logger.warning(f"Security Event [{event_type}] User {user_id}: {description}")
+            
+            # Store in database if SystemLog model is available
+            try:
+                from models import SystemLog
+                from app import db
+                
+                log_entry = SystemLog(
+                    level='warning',
+                    message=f"Security Event [{event_type}]: {description}",
+                    module='oauth_security',
+                    user_id=user_id
+                )
+                db.session.add(log_entry)
+                db.session.commit()
+                
+            except Exception as db_error:
+                logger.error(f"Failed to store security event in database: {db_error}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to record security event: {e}")
+            return False
 
 # Global security manager instance
 oauth_security = OAuthSecurityManager()
