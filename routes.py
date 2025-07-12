@@ -112,65 +112,71 @@ def get_account_balance():
                 if cred.provider == 'coinbase':
                     # Get Coinbase balance using OAuth
                     if 'access_token' in decrypted_creds:
-                        from utils.coinbase_oauth import CoinbaseOAuth
-                        coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
-                        
-                        # Get valid token
-                        access_token = coinbase_oauth.get_valid_token(cred.encrypted_credentials)
-                        
-                        if access_token:
-                            accounts = coinbase_oauth.get_accounts(access_token)
-                            if accounts and 'data' in accounts:
-                                coinbase_balance = 0
-                                crypto_holdings = []
-                                
-                                for account in accounts['data']:
-                                    if account.get('balance') and account['balance'].get('amount'):
-                                        try:
-                                            amount = float(account['balance']['amount'])
-                                            currency = account['balance']['currency']
-                                            
-                                            if amount > 0:  # Only include non-zero balances
-                                                crypto_holdings.append({
-                                                    'currency': currency,
-                                                    'amount': amount,
-                                                    'name': account.get('name', currency)
-                                                })
+                        try:
+                            from utils.coinbase_oauth import CoinbaseOAuth
+                            coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
+                            
+                            # Get valid token
+                            access_token = coinbase_oauth.get_valid_token(cred.encrypted_credentials)
+                            
+                            if access_token:
+                                accounts = coinbase_oauth.get_accounts(access_token)
+                                if accounts and 'data' in accounts:
+                                    coinbase_balance = 0
+                                    crypto_holdings = []
+                                    
+                                    for account in accounts['data']:
+                                        if account.get('balance') and account['balance'].get('amount'):
+                                            try:
+                                                amount = float(account['balance']['amount'])
+                                                currency = account['balance']['currency']
                                                 
-                                                # Convert to USD
-                                                if currency == 'USD':
-                                                    coinbase_balance += amount
-                                                else:
-                                                    # Get current price for conversion
-                                                    market_provider = MarketDataProvider()
-                                                    if currency == 'BTC':
-                                                        price_data = market_provider.get_crypto_price('bitcoin')
-                                                        if price_data:
-                                                            coinbase_balance += amount * price_data.get('price', 0)
-                                                    elif currency == 'ETH':
-                                                        price_data = market_provider.get_crypto_price('ethereum')
-                                                        if price_data:
-                                                            coinbase_balance += amount * price_data.get('price', 0)
-                                        except Exception as conversion_error:
-                                            logging.error(f"Error converting {currency}: {conversion_error}")
-                                            continue
-                                
-                                account_info['balance'] = coinbase_balance
-                                account_info['status'] = 'connected'
-                                account_info['account_type'] = 'crypto'
-                                account_info['holdings'] = crypto_holdings
-                                
-                                # Update credential status
-                                cred.last_tested = datetime.utcnow()
-                                cred.test_status = 'success'
+                                                if amount > 0:  # Only include non-zero balances
+                                                    crypto_holdings.append({
+                                                        'currency': currency,
+                                                        'amount': amount,
+                                                        'name': account.get('name', currency)
+                                                    })
+                                                    
+                                                    # Convert to USD
+                                                    if currency == 'USD':
+                                                        coinbase_balance += amount
+                                                    else:
+                                                        # Get current price for conversion
+                                                        market_provider = MarketDataProvider()
+                                                        if currency == 'BTC':
+                                                            price_data = market_provider.get_crypto_price('bitcoin')
+                                                            if price_data:
+                                                                coinbase_balance += amount * price_data.get('price', 0)
+                                                        elif currency == 'ETH':
+                                                            price_data = market_provider.get_crypto_price('ethereum')
+                                                            if price_data:
+                                                                coinbase_balance += amount * price_data.get('price', 0)
+                                            except Exception as conversion_error:
+                                                logging.error(f"Error converting {currency}: {conversion_error}")
+                                                continue
+                                    
+                                    account_info['balance'] = coinbase_balance
+                                    account_info['status'] = 'connected'
+                                    account_info['account_type'] = 'crypto'
+                                    account_info['holdings'] = crypto_holdings
+                                    
+                                    # Update credential status
+                                    cred.last_tested = datetime.utcnow()
+                                    cred.test_status = 'success'
+                                else:
+                                    account_info['status'] = 'error'
+                                    balance_data['errors'].append('Coinbase: No account data returned')
+                                    cred.test_status = 'failed'
                             else:
                                 account_info['status'] = 'error'
-                                balance_data['errors'].append('Coinbase: No account data returned')
+                                balance_data['errors'].append('Coinbase: Invalid or expired token')
                                 cred.test_status = 'failed'
-                        else:
+                        except Exception as e:
                             account_info['status'] = 'error'
-                            balance_data['errors'].append('Coinbase: Invalid or expired token')
+                            balance_data['errors'].append(f'Coinbase OAuth: {str(e)}')
                             cred.test_status = 'failed'
+                            logging.error(f"Coinbase OAuth error: {str(e)}")
                     else:
                         # Legacy API key support
                         from utils.coinbase_connector import CoinbaseConnector
@@ -199,7 +205,8 @@ def get_account_balance():
                     # Get Schwab balance using OAuth
                     if 'access_token' in decrypted_creds:
                         from utils.schwab_api import SchwabAPIClient
-                        api_client = SchwabAPIClient(user_id=current_user.id)
+                        access_token = decrypted_creds['access_token']
+                        api_client = SchwabAPIClient(access_token=access_token)
                         
                         try:
                             accounts = api_client.get_accounts()
@@ -244,23 +251,55 @@ def get_account_balance():
                             balance_data['errors'].append(f'Schwab: {str(e)}')
                             cred.test_status = 'failed'
                     else:
-                        # Legacy API key support
-                        from utils.schwab_connector import SchwabConnector
-                        connector = SchwabConnector(
-                            decrypted_creds.get('api_key', ''),
-                            decrypted_creds.get('secret', '')
-                        )
-                        
+                        # Try to get token using OAuth helper
                         try:
-                            balance = connector.get_account_balance()
-                            if balance:
-                                account_info['balance'] = balance
-                                account_info['status'] = 'connected'
-                                account_info['account_type'] = 'brokerage'
-                                cred.test_status = 'success'
+                            from utils.schwab_oauth import SchwabOAuth
+                            schwab_oauth = SchwabOAuth(user_id=current_user.id)
+                            
+                            # Get valid access token
+                            access_token = schwab_oauth.get_valid_token()
+                            
+                            if access_token:
+                                from utils.schwab_api import SchwabAPIClient
+                                api_client = SchwabAPIClient(access_token=access_token)
+                                
+                                accounts = api_client.get_accounts()
+                                if accounts:
+                                    schwab_balance = 0
+                                    account_details = []
+                                    
+                                    for account in accounts:
+                                        if 'securitiesAccount' in account:
+                                            sec_account = account['securitiesAccount']
+                                            account_number = sec_account.get('accountNumber', 'Unknown')
+                                            
+                                            # Get detailed balance information
+                                            balance_info = api_client.get_account_balance(account_number)
+                                            if balance_info:
+                                                account_value = balance_info.get('account_value', 0)
+                                                schwab_balance += account_value
+                                                
+                                                account_details.append({
+                                                    'account_number': account_number,
+                                                    'account_type': balance_info.get('account_type', 'UNKNOWN'),
+                                                    'balance': account_value,
+                                                    'cash_balance': balance_info.get('cash_balance', 0),
+                                                    'buying_power': balance_info.get('buying_power', 0),
+                                                    'long_market_value': balance_info.get('long_market_value', 0)
+                                                })
+                                    
+                                    account_info['balance'] = schwab_balance
+                                    account_info['status'] = 'connected'
+                                    account_info['account_type'] = 'brokerage'
+                                    account_info['accounts'] = account_details
+                                    cred.test_status = 'success'
+                                else:
+                                    account_info['status'] = 'error'
+                                    balance_data['errors'].append('Schwab: No accounts found')
+                                    cred.test_status = 'failed'
                             else:
                                 account_info['status'] = 'error'
-                                balance_data['errors'].append('Schwab: API key authentication failed')
+                                balance_data['errors'].append('Schwab: No valid access token available')
                                 cred.test_status = 'failed'
                         except Exception as e:
                             account_info['status'] = 'error'
