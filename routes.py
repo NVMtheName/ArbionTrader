@@ -29,21 +29,22 @@ def superadmin_required(f):
     return decorated_function
 
 def get_dashboard_market_data():
-    """Get real-time market data for dashboard display using enhanced provider"""
+    """Get real-time market data for dashboard display with entire market coverage"""
     try:
+        from utils.comprehensive_market_data import ComprehensiveMarketDataProvider
         from utils.enhanced_market_data import EnhancedMarketDataProvider
         
-        # Use the enhanced market data provider for REAL-TIME data
-        provider = EnhancedMarketDataProvider()
+        # Use comprehensive provider for entire market coverage
+        comprehensive_provider = ComprehensiveMarketDataProvider()
+        enhanced_provider = EnhancedMarketDataProvider()
         
-        # Get real-time quotes for key symbols
-        symbols = ['SPY', 'QQQ', 'AAPL', 'GOOGL', 'MSFT']
-        market_data = provider.get_multiple_quotes(symbols)
+        # Get data from comprehensive provider (entire market)
+        market_data = comprehensive_provider.get_comprehensive_market_data(15)
         
-        # Add crypto data
+        # Add crypto data using enhanced provider
         crypto_data = {}
-        for crypto_symbol in ['BTC', 'ETH']:
-            crypto_quote = provider.get_crypto_price(crypto_symbol)
+        for crypto_symbol in ['BTC', 'ETH', 'LTC']:
+            crypto_quote = enhanced_provider.get_crypto_price(crypto_symbol)
             if crypto_quote:
                 crypto_data[f'{crypto_symbol}-USD'] = {
                     'price': crypto_quote['price'],
@@ -57,12 +58,12 @@ def get_dashboard_market_data():
         # Combine stock and crypto data
         market_data.update(crypto_data)
         
-        logging.info(f"Enhanced market data fetched: {len(market_data)} symbols")
+        logging.info(f"Comprehensive market data fetched: {len(market_data)} symbols from entire market")
         return market_data
         
     except Exception as e:
         logging.error(f"Error in get_dashboard_market_data: {str(e)}")
-        # Return empty dict if enhanced provider fails
+        # Return empty dict if comprehensive provider fails
         return {}
 
 def get_account_balance():
@@ -1476,60 +1477,147 @@ def get_live_market_data_api():
 @main_bp.route('/api/symbol-search')
 @login_required
 def symbol_search():
-    """Search for symbols by name or ticker"""
+    """Search for symbols across entire stock market"""
     try:
+        from utils.comprehensive_market_data import ComprehensiveMarketDataProvider
         from utils.enhanced_market_data import EnhancedMarketDataProvider
-        market_provider = EnhancedMarketDataProvider()
+        
+        # Use both providers for comprehensive coverage
+        comprehensive_provider = ComprehensiveMarketDataProvider()
+        enhanced_provider = EnhancedMarketDataProvider()
         
         query = request.args.get('q', '').strip()
-        limit = request.args.get('limit', 10, type=int)
+        limit = request.args.get('limit', 20, type=int)
         
         if not query:
             return jsonify({'success': False, 'error': 'Query parameter required'})
         
-        results = market_provider.search_symbols(query, limit)
+        # Get results from both providers
+        comprehensive_results = comprehensive_provider.search_entire_market(query, limit)
+        enhanced_results = enhanced_provider.search_symbols(query, limit)
+        
+        # Combine and deduplicate results
+        all_results = []
+        seen_symbols = set()
+        
+        # Add comprehensive results first (entire market coverage)
+        for result in comprehensive_results:
+            symbol = result.get('symbol', '')
+            if symbol not in seen_symbols:
+                seen_symbols.add(symbol)
+                all_results.append(result)
+        
+        # Add enhanced results for any missing symbols
+        for result in enhanced_results:
+            symbol = result.get('symbol', '')
+            if symbol not in seen_symbols and len(all_results) < limit:
+                seen_symbols.add(symbol)
+                all_results.append(result)
         
         return jsonify({
             'success': True,
-            'data': results,
+            'data': all_results[:limit],
             'query': query,
+            'total_found': len(all_results),
+            'source': 'comprehensive_market_coverage',
             'timestamp': datetime.utcnow().isoformat()
         })
         
     except Exception as e:
-        logging.error(f"Error searching symbols: {str(e)}")
+        logging.error(f"Error searching entire market: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
 
 @main_bp.route('/api/trending-stocks')
 @login_required
 def trending_stocks():
-    """Get trending stocks"""
+    """Get trending stocks from entire market"""
     try:
-        from utils.enhanced_market_data import EnhancedMarketDataProvider
-        market_provider = EnhancedMarketDataProvider()
+        from utils.comprehensive_market_data import ComprehensiveMarketDataProvider
         
-        limit = request.args.get('limit', 10, type=int)
-        trending = market_provider.get_trending_stocks(limit)
+        comprehensive_provider = ComprehensiveMarketDataProvider()
+        
+        limit = request.args.get('limit', 20, type=int)
+        
+        # Get comprehensive market data to find trending stocks
+        market_data = comprehensive_provider.get_comprehensive_market_data(limit * 2)
+        
+        # Convert to trending format and sort by volume and movement
+        trending = []
+        for symbol, data in market_data.items():
+            volume = data.get('volume', 0)
+            change_percent = abs(data.get('change_percent', 0))
+            
+            # Calculate trending score
+            trending_score = volume * change_percent
+            
+            trending.append({
+                'symbol': symbol,
+                'name': data.get('name', symbol),
+                'price': data.get('price', 0),
+                'change': data.get('change', 0),
+                'change_percent': data.get('change_percent', 0),
+                'volume': volume,
+                'market_cap': data.get('market_cap', 0),
+                'sector': data.get('sector', ''),
+                'exchange': data.get('exchange', ''),
+                'trending_score': trending_score
+            })
+        
+        # Sort by trending score
+        trending.sort(key=lambda x: x['trending_score'], reverse=True)
         
         return jsonify({
             'success': True,
-            'data': trending,
+            'data': trending[:limit],
+            'source': 'entire_stock_market',
             'timestamp': datetime.utcnow().isoformat()
         })
         
     except Exception as e:
-        logging.error(f"Error fetching trending stocks: {str(e)}")
+        logging.error(f"Error fetching trending stocks from entire market: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
 
 @main_bp.route('/api/market-movers')
 @login_required
 def market_movers():
-    """Get market movers (gainers, losers, most active)"""
+    """Get market movers from entire stock market"""
     try:
-        from utils.enhanced_market_data import EnhancedMarketDataProvider
-        market_provider = EnhancedMarketDataProvider()
+        from utils.comprehensive_market_data import ComprehensiveMarketDataProvider
         
-        movers = market_provider.get_market_movers()
+        comprehensive_provider = ComprehensiveMarketDataProvider()
+        
+        # Get comprehensive market data (larger sample)
+        market_data = comprehensive_provider.get_comprehensive_market_data(100)
+        
+        # Separate into gainers, losers, and most active
+        valid_stocks = []
+        for symbol, data in market_data.items():
+            if data.get('change_percent', 0) != 0:
+                valid_stocks.append({
+                    'symbol': symbol,
+                    'name': data.get('name', symbol),
+                    'price': data.get('price', 0),
+                    'change': data.get('change', 0),
+                    'change_percent': data.get('change_percent', 0),
+                    'volume': data.get('volume', 0),
+                    'market_cap': data.get('market_cap', 0),
+                    'sector': data.get('sector', ''),
+                    'exchange': data.get('exchange', '')
+                })
+        
+        # Sort by different criteria
+        gainers = sorted(valid_stocks, key=lambda x: x['change_percent'], reverse=True)[:15]
+        losers = sorted(valid_stocks, key=lambda x: x['change_percent'])[:15]
+        most_active = sorted(valid_stocks, key=lambda x: x['volume'], reverse=True)[:15]
+        
+        movers = {
+            'gainers': gainers,
+            'losers': losers,
+            'most_active': most_active,
+            'total_analyzed': len(valid_stocks),
+            'source': 'entire_stock_market',
+            'timestamp': datetime.utcnow().isoformat()
+        }
         
         return jsonify({
             'success': True,
@@ -1538,7 +1626,7 @@ def market_movers():
         })
         
     except Exception as e:
-        logging.error(f"Error fetching market movers: {str(e)}")
+        logging.error(f"Error fetching market movers from entire market: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
 
 @main_bp.route('/api/enhanced-historical/<symbol>')
@@ -1560,4 +1648,74 @@ def enhanced_historical_data(symbol):
         
     except Exception as e:
         logging.error(f"Error fetching enhanced historical data: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+# Comprehensive Market Data Endpoints for Entire Stock Market
+@main_bp.route('/api/market-sectors')
+@login_required
+def market_sectors():
+    """Get overview of all market sectors"""
+    try:
+        from utils.comprehensive_market_data import ComprehensiveMarketDataProvider
+        
+        comprehensive_provider = ComprehensiveMarketDataProvider()
+        sector_data = comprehensive_provider.get_market_sectors_overview()
+        
+        return jsonify({
+            'success': True,
+            'data': sector_data,
+            'source': 'comprehensive_market_coverage',
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Error fetching market sectors: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@main_bp.route('/api/market-indices')
+@login_required
+def market_indices():
+    """Get overview of major market indices"""
+    try:
+        from utils.comprehensive_market_data import ComprehensiveMarketDataProvider
+        
+        comprehensive_provider = ComprehensiveMarketDataProvider()
+        indices_data = comprehensive_provider.get_market_indices_overview()
+        
+        return jsonify({
+            'success': True,
+            'data': indices_data,
+            'source': 'comprehensive_market_coverage',
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Error fetching market indices: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@main_bp.route('/api/comprehensive-market-data')
+@login_required
+def comprehensive_market_data():
+    """Get comprehensive market data from entire stock market"""
+    try:
+        from utils.comprehensive_market_data import ComprehensiveMarketDataProvider
+        
+        comprehensive_provider = ComprehensiveMarketDataProvider()
+        
+        limit = request.args.get('limit', 50, type=int)
+        limit = min(limit, 200)  # Cap at 200 for performance
+        
+        market_data = comprehensive_provider.get_comprehensive_market_data(limit)
+        
+        return jsonify({
+            'success': True,
+            'data': market_data,
+            'total_symbols': len(market_data),
+            'source': 'entire_stock_market',
+            'coverage': 'all_major_exchanges',
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Error fetching comprehensive market data: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
