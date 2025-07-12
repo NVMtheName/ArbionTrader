@@ -57,18 +57,20 @@
             <div class="flex items-center justify-between">
                 <div>
                     <p class="text-sm text-gray-400">Account Value</p>
-                    <p class="text-2xl font-bold text-coinbase-green">
+                    <p class="text-2xl font-bold text-coinbase-green" id="total-balance">
                         {% if account_balance and account_balance.total > 0 %}
                             ${{ "{:,.2f}".format(account_balance.total) }}
                         {% else %}
                             $0.00
                         {% endif %}
                     </p>
-                    {% if account_balance and account_balance.last_updated %}
-                        <p class="text-xs text-gray-500 mt-1">
+                    <p class="text-xs text-gray-500 mt-1" id="balance-timestamp">
+                        {% if account_balance and account_balance.last_updated %}
                             Updated: {{ account_balance.last_updated[:19] }}
-                        </p>
-                    {% endif %}
+                        {% else %}
+                            Loading...
+                        {% endif %}
+                    </p>
                 </div>
                 <div class="p-3 bg-purple-500 bg-opacity-20 rounded-lg">
                     <i data-feather="dollar-sign" class="w-6 h-6 text-purple-400"></i>
@@ -231,7 +233,7 @@
             </div>
         </div>
         
-        <div class="space-y-4">
+        <div class="space-y-4" id="account-breakdown">
             {% for account in account_balance.accounts %}
                 <div class="p-4 bg-gray-800 rounded-lg border border-gray-700">
                     <div class="flex items-center justify-between mb-3">
@@ -687,6 +689,131 @@
             });
     }
     
+    // Real-time balance refresh
+    function refreshAccountBalance() {
+        fetch('/api/live-balance')
+            .then(response => response.json())
+            .then(data => {
+                if (data.total !== undefined) {
+                    updateAccountBalanceDisplay(data);
+                }
+            })
+            .catch(error => {
+                console.error('Error refreshing account balance:', error);
+            });
+    }
+    
+    function updateAccountBalanceDisplay(data) {
+        // Update total balance
+        const totalBalance = document.getElementById('total-balance');
+        if (totalBalance) {
+            totalBalance.textContent = `$${data.total.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        }
+        
+        // Update timestamp
+        const timestamp = document.getElementById('balance-timestamp');
+        if (timestamp) {
+            const updateTime = new Date(data.last_updated);
+            timestamp.textContent = `Updated: ${updateTime.toLocaleString()}`;
+        }
+        
+        // Update account breakdown
+        const accountBreakdown = document.getElementById('account-breakdown');
+        if (accountBreakdown && data.accounts) {
+            updateAccountBreakdown(data.accounts);
+        }
+    }
+    
+    function updateAccountBreakdown(accounts) {
+        const container = document.getElementById('account-breakdown');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        accounts.forEach(account => {
+            const accountDiv = document.createElement('div');
+            accountDiv.className = 'p-4 bg-gray-800 rounded-lg border border-gray-700';
+            
+            const statusColor = account.status === 'connected' ? 'bg-coinbase-green' : 'bg-red-400';
+            const balanceText = account.status === 'connected' ? 
+                `$${account.balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : 
+                '<span class="text-red-400">Disconnected</span>';
+            
+            accountDiv.innerHTML = `
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-3 h-3 ${statusColor} rounded-full"></div>
+                        <div>
+                            <span class="font-medium text-white capitalize">${account.provider}</span>
+                            <p class="text-sm text-gray-400">${account.account_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-lg font-bold text-white">${balanceText}</p>
+                        <p class="text-xs text-gray-500">${account.status.charAt(0).toUpperCase() + account.status.slice(1)}</p>
+                    </div>
+                </div>
+            `;
+            
+            // Add holdings for crypto accounts
+            if (account.provider === 'coinbase' && account.holdings && account.holdings.length > 0) {
+                const holdingsDiv = document.createElement('div');
+                holdingsDiv.className = 'mt-3 space-y-2';
+                holdingsDiv.innerHTML = '<p class="text-sm text-gray-400 font-medium">Holdings:</p>';
+                
+                account.holdings.forEach(holding => {
+                    if (holding.amount > 0) {
+                        const holdingDiv = document.createElement('div');
+                        holdingDiv.className = 'flex items-center justify-between p-2 bg-gray-700 rounded';
+                        holdingDiv.innerHTML = `
+                            <span class="text-sm text-gray-300">${holding.currency}</span>
+                            <span class="text-sm text-white">${holding.amount.toFixed(8)}</span>
+                        `;
+                        holdingsDiv.appendChild(holdingDiv);
+                    }
+                });
+                
+                accountDiv.appendChild(holdingsDiv);
+            }
+            
+            container.appendChild(accountDiv);
+        });
+    }
+    
+    // Auto-refresh intervals
+    let autoRefreshEnabled = true;
+    let refreshInterval;
+    let balanceRefreshInterval;
+    
+    function toggleAutoRefresh() {
+        const toggle = document.getElementById('auto-refresh-toggle');
+        if (!toggle) return;
+        
+        autoRefreshEnabled = !autoRefreshEnabled;
+        
+        if (autoRefreshEnabled) {
+            startAutoRefresh();
+        } else {
+            stopAutoRefresh();
+        }
+    }
+    
+    function startAutoRefresh() {
+        if (autoRefreshEnabled) {
+            refreshInterval = setInterval(refreshMarketData, 15000); // Refresh every 15 seconds
+            balanceRefreshInterval = setInterval(refreshAccountBalance, 10000); // Refresh every 10 seconds
+        }
+    }
+    
+    function stopAutoRefresh() {
+        if (refreshInterval) {
+            clearInterval(refreshInterval);
+        }
+        if (balanceRefreshInterval) {
+            clearInterval(balanceRefreshInterval);
+        }
+    }
+
     // Initialize auto-refresh toggle
     document.addEventListener('DOMContentLoaded', function() {
         const toggle = document.getElementById('auto-refresh-toggle');
@@ -698,6 +825,10 @@
         
         // Initial data load
         setTimeout(refreshMarketData, 2000);
+        setTimeout(refreshAccountBalance, 1000);
+        
+        // Start real-time updates
+        startAutoRefresh();
     });
 </script>
 {% endblock %}
