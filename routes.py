@@ -29,50 +29,40 @@ def superadmin_required(f):
     return decorated_function
 
 def get_dashboard_market_data():
-    """Get real-time market data for dashboard display with timeout protection"""
+    """Get real-time market data for dashboard display using enhanced provider"""
     try:
-        # Return cached/placeholder data immediately to prevent timeouts
-        # This avoids the yfinance API calls that are causing slowdowns
-        market_data = {
-            'SPY': {
-                'price': 595.23,
-                'change': 2.45,
-                'change_percent': 0.41,
-                'volume': 45230000,
-                'high': 597.50,
-                'low': 593.12
-            },
-            'QQQ': {
-                'price': 523.67,
-                'change': -1.23,
-                'change_percent': -0.23,
-                'volume': 28456000,
-                'high': 525.89,
-                'low': 522.15
-            },
-            'BTC-USD': {
-                'price': 95432.50,
-                'change': 1245.30,
-                'change_percent': 1.32,
-                'volume': 15234567,
-                'high': 96500.00,
-                'low': 94123.45
-            },
-            'ETH-USD': {
-                'price': 3567.89,
-                'change': -45.67,
-                'change_percent': -1.26,
-                'volume': 8945678,
-                'high': 3620.45,
-                'low': 3534.12
-            }
-        }
+        from utils.enhanced_market_data import EnhancedMarketDataProvider
         
-        logging.info("Returning optimized market data to prevent dashboard timeouts")
+        # Use the enhanced market data provider for REAL-TIME data
+        provider = EnhancedMarketDataProvider()
+        
+        # Get real-time quotes for key symbols
+        symbols = ['SPY', 'QQQ', 'AAPL', 'GOOGL', 'MSFT']
+        market_data = provider.get_multiple_quotes(symbols)
+        
+        # Add crypto data
+        crypto_data = {}
+        for crypto_symbol in ['BTC', 'ETH']:
+            crypto_quote = provider.get_crypto_price(crypto_symbol)
+            if crypto_quote:
+                crypto_data[f'{crypto_symbol}-USD'] = {
+                    'price': crypto_quote['price'],
+                    'change': crypto_quote['change'],
+                    'change_percent': crypto_quote['change_percent'],
+                    'volume': crypto_quote.get('volume', 0),
+                    'high': crypto_quote.get('high', 0),
+                    'low': crypto_quote.get('low', 0)
+                }
+        
+        # Combine stock and crypto data
+        market_data.update(crypto_data)
+        
+        logging.info(f"Enhanced market data fetched: {len(market_data)} symbols")
         return market_data
         
     except Exception as e:
         logging.error(f"Error in get_dashboard_market_data: {str(e)}")
+        # Return empty dict if enhanced provider fails
         return {}
 
 def get_account_balance():
