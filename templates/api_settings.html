@@ -473,41 +473,7 @@
                 {% endif %}
 
 
-            <!-- Legacy API Key Method -->
-            <div class="mb-4 p-4 bg-yellow-900 bg-opacity-30 rounded-lg border border-yellow-500">
-                <h4 class="font-medium text-yellow-300 mb-2">Legacy API Key Method</h4>
-                <p class="text-sm text-gray-300 mb-3">
-                    Direct API key authentication (deprecated, use OAuth2 instead).
-                </p>
-                <form method="POST" action="{{ url_for('main.api_settings') }}" class="space-y-4">
-                    <input type="hidden" name="provider" value="schwab">
-                    <input type="hidden" name="oauth_flow" value="false">
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-1">API Key</label>
-                        <input 
-                            type="text" 
-                            name="schwab_api_key" 
-                            class="input-field w-full" 
-                            placeholder="Enter your Schwab API key"
-                        >
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-1">Secret</label>
-                        <input 
-                            type="password" 
-                            name="schwab_secret" 
-                            class="input-field w-full" 
-                            placeholder="Enter your Schwab secret"
-                        >
-                    </div>
-                    
-                    <button type="submit" class="btn-secondary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
-                        Save Legacy Credentials
-                    </button>
-                </form>
-            </div>
+
 
             <!-- Test Connection -->
             <div class="flex justify-end">

@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Schwab OAuth2 Setup Required{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto p-6">
+    <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded-lg p-6 mb-6">
+        <div class="flex items-center mb-4">
+            <i data-feather="alert-triangle" class="w-6 h-6 text-yellow-600 dark:text-yellow-400 mr-3"></i>
+            <h2 class="text-xl font-semibold text-yellow-800 dark:text-yellow-200">Schwab OAuth2 Setup Required</h2>
+        </div>
+        
+        <p class="text-yellow-700 dark:text-yellow-300 mb-4">
+            Your Schwab account is configured with legacy API keys, but Schwab now requires OAuth2 authentication for account access. 
+            To view your real account balance and execute trades, you need to set up OAuth2 credentials.
+        </p>
+        
+        <div class="bg-white dark:bg-gray-800 border border-yellow-200 dark:border-yellow-600 rounded-lg p-4">
+            <h3 class="font-semibold text-gray-800 dark:text-gray-200 mb-2">What you need to do:</h3>
+            <ol class="list-decimal list-inside space-y-2 text-gray-700 dark:text-gray-300">
+                <li>Create a Schwab Developer Account</li>
+                <li>Register your application</li>
+                <li>Get your OAuth2 Client ID and Secret</li>
+                <li>Configure the OAuth2 credentials in your API Settings</li>
+            </ol>
+        </div>
+    </div>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Step 1: Create Schwab Developer Account -->
+        <div class="card">
+            <h3 class="text-lg font-semibold text-white mb-4">Step 1: Schwab Developer Account</h3>
+            <div class="space-y-3">
+                <p class="text-gray-300">Create a developer account with Charles Schwab to access their APIs.</p>
+                
+                <div class="bg-gray-700 rounded-lg p-4">
+                    <h4 class="font-medium text-white mb-2">Instructions:</h4>
+                    <ol class="list-decimal list-inside space-y-1 text-gray-300 text-sm">
+                        <li>Visit <a href="https://developer.schwab.com" target="_blank" class="text-coinbase-blue hover:underline">developer.schwab.com</a></li>
+                        <li>Click "Get Started" and create an account</li>
+                        <li>Complete the developer application process</li>
+                        <li>Wait for approval (usually 1-2 business days)</li>
+                    </ol>
+                </div>
+                
+                <div class="flex items-center space-x-2 text-sm text-gray-400">
+                    <i data-feather="clock" class="w-4 h-4"></i>
+                    <span>Approval takes 1-2 business days</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Step 2: Register Application -->
+        <div class="card">
+            <h3 class="text-lg font-semibold text-white mb-4">Step 2: Register Application</h3>
+            <div class="space-y-3">
+                <p class="text-gray-300">Register your Arbion application to get OAuth2 credentials.</p>
+                
+                <div class="bg-gray-700 rounded-lg p-4">
+                    <h4 class="font-medium text-white mb-2">Application Details:</h4>
+                    <div class="space-y-2 text-sm">
+                        <div>
+                            <span class="text-gray-400">App Name:</span>
+                            <span class="text-white ml-2">Arbion Trading Platform</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400">Description:</span>
+                            <span class="text-white ml-2">AI-powered trading platform</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-400">Redirect URI:</span>
+                            <span class="text-white ml-2">https://www.arbion.ai/oauth_callback/broker</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-2 text-sm text-gray-400">
+                    <i data-feather="key" class="w-4 h-4"></i>
+                    <span>Save your Client ID and Secret</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Step 3: Configure OAuth2 -->
+        <div class="card">
+            <h3 class="text-lg font-semibold text-white mb-4">Step 3: Configure OAuth2</h3>
+            <div class="space-y-3">
+                <p class="text-gray-300">Add your OAuth2 credentials to Arbion.</p>
+                
+                <div class="bg-gray-700 rounded-lg p-4">
+                    <h4 class="font-medium text-white mb-2">Configuration:</h4>
+                    <ol class="list-decimal list-inside space-y-1 text-gray-300 text-sm">
+                        <li>Go to <a href="{{ url_for('main.api_settings') }}" class="text-coinbase-blue hover:underline">API Settings</a></li>
+                        <li>Find the "Schwab OAuth2" section</li>
+                        <li>Enter your Client ID and Client Secret</li>
+                        <li>Set Redirect URI to: <code class="bg-gray-600 px-1 rounded">https://www.arbion.ai/oauth_callback/broker</code></li>
+                        <li>Save and authorize your account</li>
+                    </ol>
+                </div>
+                
+                <a href="{{ url_for('main.api_settings') }}" class="inline-flex items-center space-x-2 bg-coinbase-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors">
+                    <i data-feather="settings" class="w-4 h-4"></i>
+                    <span>Go to API Settings</span>
+                </a>
+            </div>
+        </div>
+        
+        <!-- Step 4: Test Connection -->
+        <div class="card">
+            <h3 class="text-lg font-semibold text-white mb-4">Step 4: Test Connection</h3>
+            <div class="space-y-3">
+                <p class="text-gray-300">Verify your OAuth2 setup is working correctly.</p>
+                
+                <div class="bg-gray-700 rounded-lg p-4">
+                    <h4 class="font-medium text-white mb-2">Verification Steps:</h4>
+                    <ol class="list-decimal list-inside space-y-1 text-gray-300 text-sm">
+                        <li>Complete OAuth2 authorization flow</li>
+                        <li>Check connection status in API Settings</li>
+                        <li>Verify account balance appears on dashboard</li>
+                        <li>Test natural language trading</li>
+                    </ol>
+                </div>
+                
+                <div class="flex items-center space-x-2 text-sm text-green-400">
+                    <i data-feather="check-circle" class="w-4 h-4"></i>
+                    <span>Your account balance will appear automatically once configured</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Help Section -->
+    <div class="card mt-6">
+        <h3 class="text-lg font-semibold text-white mb-4">Need Help?</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="font-medium text-white mb-2">Common Issues:</h4>
+                <ul class="space-y-1 text-gray-300 text-sm">
+                    <li>• Developer account approval pending</li>
+                    <li>• Incorrect redirect URI</li>
+                    <li>• Missing OAuth2 scopes</li>
+                    <li>• Token expiration issues</li>
+                </ul>
+            </div>
+            
+            <div class="bg-gray-700 rounded-lg p-4">
+                <h4 class="font-medium text-white mb-2">Resources:</h4>
+                <ul class="space-y-1 text-gray-300 text-sm">
+                    <li>• <a href="https://developer.schwab.com/getting-started" target="_blank" class="text-coinbase-blue hover:underline">Schwab Developer Docs</a></li>
+                    <li>• <a href="https://developer.schwab.com/oauth" target="_blank" class="text-coinbase-blue hover:underline">OAuth2 Guide</a></li>
+                    <li>• <a href="{{ url_for('main.api_settings') }}" class="text-coinbase-blue hover:underline">API Settings</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Initialize Feather icons
+    feather.replace();
+</script>
+{% endblock %}

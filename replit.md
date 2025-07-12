@@ -276,6 +276,15 @@ Changelog:
   - Comprehensive error handling and connection status indicators
   - All data is now live and updates continuously without page refresh
   - Complete real-time trading platform with persistent live data connections
+- July 12, 2025. Streamlined authentication to OAuth2-only for Schwab:
+  - **BREAKING CHANGE**: Removed legacy API key authentication for Schwab
+  - System now exclusively uses OAuth2 authentication for Schwab integration
+  - Legacy API key forms removed from templates and routes
+  - Enhanced error handling to guide users to OAuth2 setup
+  - Created migration script to identify and update legacy credentials
+  - All existing Schwab users must now configure OAuth2 client credentials
+  - Improved balance error messages to clearly indicate OAuth2 requirement
+  - Streamlined API settings interface with OAuth2-only options
 
 ## User Preferences
 

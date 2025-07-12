@@ -170,6 +170,7 @@ def get_account_balance():
                 elif cred.provider == 'schwab':
                     # Get LIVE Schwab balance
                     if 'access_token' in decrypted_creds:
+                        # OAuth2 token available
                         access_token = decrypted_creds['access_token']
                         result = fetcher.get_live_schwab_balance(access_token)
                         
@@ -187,12 +188,19 @@ def get_account_balance():
                             balance_data['errors'].append(error_msg)
                             cred.test_status = 'failed'
                             logging.error(f"Schwab error: {error_msg}")
+                    elif 'api_key' in decrypted_creds and 'secret' in decrypted_creds:
+                        # Legacy API key format - remove and redirect to OAuth2
+                        account_info['status'] = 'error'
+                        error_msg = 'Schwab: OAuth2 authentication required. Please configure OAuth2 credentials in API Settings.'
+                        balance_data['errors'].append(error_msg)
+                        cred.test_status = 'failed'
+                        logging.warning(f"Schwab legacy credentials detected for user {current_user.id} - OAuth2 required")
                     else:
-                        # Try OAuth helper
+                        # Try OAuth helper to get token
                         try:
                             from utils.schwab_oauth import SchwabOAuth
                             schwab_oauth = SchwabOAuth(user_id=current_user.id)
-                            access_token = schwab_oauth.get_valid_token()
+                            access_token = schwab_oauth.get_valid_token(cred.encrypted_credentials)
                             
                             if access_token:
                                 result = fetcher.get_live_schwab_balance(access_token)
@@ -211,13 +219,13 @@ def get_account_balance():
                                     cred.test_status = 'failed'
                             else:
                                 account_info['status'] = 'error'
-                                balance_data['errors'].append('Schwab: No valid token available')
+                                balance_data['errors'].append('Schwab: OAuth2 setup required. Please configure OAuth2 credentials.')
                                 cred.test_status = 'failed'
                         except Exception as e:
                             account_info['status'] = 'error'
-                            balance_data['errors'].append(f'Schwab: {str(e)}')
+                            balance_data['errors'].append(f'Schwab: OAuth2 required - {str(e)}')
                             cred.test_status = 'failed'
-                            logging.error(f"Schwab error: {str(e)}")
+                            logging.error(f"Schwab OAuth error: {str(e)}")
                 
                 # Add to accounts list and update totals
                 balance_data['accounts'].append(account_info)
@@ -237,6 +245,7 @@ def get_account_balance():
         
         # Update database with test results
         try:
+            from app import db
             db.session.commit()
         except Exception as e:
             logging.error(f"Error updating credential test status: {str(e)}")
@@ -498,18 +507,9 @@ def api_settings():
                     flash(f'OAuth2 client setup failed: {str(e)}', 'error')
                     return redirect(url_for('main.api_settings'))
             else:
-                # Legacy API key method (deprecated)
-                api_key = request.form.get('schwab_api_key')
-                secret = request.form.get('schwab_secret')
-                
-                if not all([api_key, secret]):
-                    flash('All Schwab API fields are required.', 'error')
-                    return redirect(url_for('main.api_settings'))
-                
-                credentials = {
-                    'api_key': api_key,
-                    'secret': secret
-                }
+                # Schwab now only supports OAuth2
+                flash('Schwab requires OAuth2 authentication. Please use the OAuth2 setup.', 'error')
+                return redirect(url_for('main.api_settings'))
         
         elif provider == 'openai':
             api_key = request.form.get('openai_api_key')
