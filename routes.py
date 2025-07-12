@@ -1333,10 +1333,26 @@ def get_trade_history():
 def api_market_data():
     """API endpoint to get real-time market data"""
     try:
-        market_data = get_dashboard_market_data()
+        from utils.enhanced_market_data import EnhancedMarketDataProvider
+        market_provider = EnhancedMarketDataProvider()
+        
+        # Get real-time data for major indices and popular stocks
+        symbols = ['SPY', 'QQQ', 'AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'NVDA']
+        market_data = market_provider.get_multiple_quotes(symbols)
+        
+        # Add some crypto data
+        crypto_data = {}
+        for crypto in ['BTC', 'ETH', 'LTC']:
+            crypto_quote = market_provider.get_crypto_price(crypto)
+            if crypto_quote:
+                crypto_data[f"{crypto}-USD"] = crypto_quote
+        
+        # Combine stock and crypto data
+        combined_data = {**market_data, **crypto_data}
+        
         return jsonify({
             "success": True,
-            "data": market_data,
+            "data": combined_data,
             "timestamp": datetime.utcnow().isoformat()
         })
     except Exception as e:
@@ -1348,13 +1364,14 @@ def api_market_data():
 def search_symbol(symbol):
     """API endpoint to search for a specific symbol"""
     try:
-        market_provider = MarketDataProvider()
+        from utils.enhanced_market_data import EnhancedMarketDataProvider
+        market_provider = EnhancedMarketDataProvider()
         
         # Clean up symbol input
         symbol = symbol.strip().upper()
         
-        # Try to fetch as stock first
-        data = market_provider.get_stock_quote(symbol)
+        # Try to get real-time quote first
+        data = market_provider.get_real_time_quote(symbol)
         
         # If no stock data, try crypto
         if not data:
@@ -1371,7 +1388,12 @@ def search_symbol(symbol):
                     'change_percent': data.get('change_percent', 0),
                     'volume': data.get('volume', 0),
                     'high': data.get('high', 0),
-                    'low': data.get('low', 0)
+                    'low': data.get('low', 0),
+                    'name': data.get('name', symbol),
+                    'sector': data.get('sector', ''),
+                    'market_cap': data.get('market_cap', 0),
+                    'pe_ratio': data.get('pe_ratio', 0),
+                    'timestamp': data.get('timestamp', datetime.utcnow().isoformat())
                 }
             }
             return jsonify({
@@ -1459,3 +1481,93 @@ def get_live_market_data_api():
             'error': str(e),
             'data': {}
         })
+
+# Enhanced Market Data Endpoints
+@main_bp.route('/api/symbol-search')
+@login_required
+def symbol_search():
+    """Search for symbols by name or ticker"""
+    try:
+        from utils.enhanced_market_data import EnhancedMarketDataProvider
+        market_provider = EnhancedMarketDataProvider()
+        
+        query = request.args.get('q', '').strip()
+        limit = request.args.get('limit', 10, type=int)
+        
+        if not query:
+            return jsonify({'success': False, 'error': 'Query parameter required'})
+        
+        results = market_provider.search_symbols(query, limit)
+        
+        return jsonify({
+            'success': True,
+            'data': results,
+            'query': query,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Error searching symbols: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@main_bp.route('/api/trending-stocks')
+@login_required
+def trending_stocks():
+    """Get trending stocks"""
+    try:
+        from utils.enhanced_market_data import EnhancedMarketDataProvider
+        market_provider = EnhancedMarketDataProvider()
+        
+        limit = request.args.get('limit', 10, type=int)
+        trending = market_provider.get_trending_stocks(limit)
+        
+        return jsonify({
+            'success': True,
+            'data': trending,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Error fetching trending stocks: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@main_bp.route('/api/market-movers')
+@login_required
+def market_movers():
+    """Get market movers (gainers, losers, most active)"""
+    try:
+        from utils.enhanced_market_data import EnhancedMarketDataProvider
+        market_provider = EnhancedMarketDataProvider()
+        
+        movers = market_provider.get_market_movers()
+        
+        return jsonify({
+            'success': True,
+            'data': movers,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Error fetching market movers: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
+
+@main_bp.route('/api/enhanced-historical/<symbol>')
+@login_required
+def enhanced_historical_data(symbol):
+    """Get enhanced historical data for a symbol"""
+    try:
+        from utils.enhanced_market_data import EnhancedMarketDataProvider
+        market_provider = EnhancedMarketDataProvider()
+        
+        period = request.args.get('period', '1mo')
+        historical_data = market_provider.get_historical_data(symbol, period)
+        
+        return jsonify({
+            'success': True,
+            'data': historical_data,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        logging.error(f"Error fetching enhanced historical data: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)})
