@@ -135,13 +135,11 @@
                                         class="input-field w-full text-sm" 
                                         placeholder="{{ url_for('main.oauth_callback_coinbase', _external=True) }}"
                                         value="{{ url_for('main.oauth_callback_coinbase', _external=True) }}"
-                                        readonly
                                     >
-                                    <div class="mt-2 p-3 bg-red-900 bg-opacity-30 rounded-lg border border-red-500">
-                                        <p class="text-xs text-red-300">
-                                            <strong>⚠️ IMPORTANT:</strong> Your Coinbase Developer Console must use this exact URL. 
-                                            If you're being redirected to <code>arbion.ai/console/app/</code>, 
-                                            update your Coinbase OAuth app settings.
+                                    <div class="mt-2 p-3 bg-blue-900 bg-opacity-30 rounded-lg border border-blue-500">
+                                        <p class="text-xs text-blue-300">
+                                            <strong>💡 TIP:</strong> You can edit this redirect URI to match your OAuth app configuration. 
+                                            Common options: <code>https://arbion.ai/oauth_callback/crypto</code> or <code>https://www.arbion.ai/oauth_callback/crypto</code>
                                         </p>
                                     </div>
                                 </div>
@@ -402,8 +400,8 @@
                                 
                                 <div class="mb-4">
                                     <label class="block text-xs font-medium text-gray-300 mb-1">Redirect URI</label>
-                                    <input type="url" name="redirect_uri" value="{{ url_for('main.oauth_callback_schwab', _external=True) }}" class="input-field w-full text-sm" readonly>
-                                    <p class="text-xs text-gray-400 mt-1">Use this exact redirect URI when registering your Schwab OAuth2 app</p>
+                                    <input type="url" name="redirect_uri" value="{{ url_for('main.oauth_callback_schwab', _external=True) }}" class="input-field w-full text-sm">
+                                    <p class="text-xs text-gray-400 mt-1">Must match exactly with your Schwab OAuth2 app redirect URI</p>
                                 </div>
                                 
                                 <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
@@ -450,8 +448,8 @@
                             
                             <div class="mb-4">
                                 <label class="block text-xs font-medium text-gray-300 mb-1">Redirect URI</label>
-                                <input type="url" name="redirect_uri" value="https://www.arbion.ai/oauth_callback/schwab" class="input-field w-full text-sm" readonly>
-                                <p class="text-xs text-gray-400 mt-1">Use this exact redirect URI when registering your Schwab OAuth2 app</p>
+                                <input type="url" name="redirect_uri" value="https://www.arbion.ai/oauth_callback/broker" class="input-field w-full text-sm">
+                                <p class="text-xs text-gray-400 mt-1">Must match exactly with your Schwab OAuth2 app redirect URI</p>
                             </div>
                             
                             <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
@@ -464,9 +462,10 @@
                         <ol class="text-xs text-gray-300 space-y-1">
                             <li>1. Go to Schwab Developer Portal</li>
                             <li>2. Create a new OAuth2 application</li>
-                            <li>3. Set the redirect URI to: <code class="bg-gray-700 px-1 rounded">{{ url_for('main.oauth_callback_schwab', _external=True) }}</code></li>
+                            <li>3. Set the redirect URI to match the one above (editable)</li>
                             <li>4. Copy the Client ID and Client Secret here</li>
-                            <li>5. Save the credentials and then authenticate</li>
+                            <li>5. Ensure the redirect URI matches exactly</li>
+                            <li>6. Save the credentials and then authenticate</li>
                         </ol>
                     </div>
                 </div>

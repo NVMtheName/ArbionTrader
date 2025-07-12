@@ -242,6 +242,7 @@ Changelog:
   - Auto-trading system can now run indefinitely with persistent API authentication
   - Enhanced API settings interface with real account data fetching capabilities
   - Complete solution for continuous trading operations without user intervention
+  - Made OAuth redirect URIs fully editable in web interface for flexible configuration
 
 ## User Preferences
 
