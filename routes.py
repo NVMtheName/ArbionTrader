@@ -832,40 +832,52 @@ def auto_trading():
 @login_required
 @superadmin_required
 def toggle_auto_trading():
-    settings = AutoTradingSettings.get_settings()
+    from models import AutoTradingSettings
+    from app import db
+    from datetime import datetime
     
-    action = request.form.get('action')
-    
-    if action == 'toggle_main':
-        settings.is_enabled = not settings.is_enabled
-        message = 'Auto-trading enabled' if settings.is_enabled else 'Auto-trading disabled'
-    
-    elif action == 'toggle_simulation':
-        settings.simulation_mode = not settings.simulation_mode
-        message = 'Simulation mode enabled' if settings.simulation_mode else 'Simulation mode disabled'
-    
-    elif action == 'toggle_wheel':
-        settings.wheel_enabled = not settings.wheel_enabled
-        message = 'Wheel strategy enabled' if settings.wheel_enabled else 'Wheel strategy disabled'
-    
-    elif action == 'toggle_collar':
-        settings.collar_enabled = not settings.collar_enabled
-        message = 'Collar strategy enabled' if settings.collar_enabled else 'Collar strategy disabled'
-    
-    elif action == 'toggle_ai':
-        settings.ai_enabled = not settings.ai_enabled
-        message = 'AI strategy enabled' if settings.ai_enabled else 'AI strategy disabled'
-    
-    else:
-        flash('Invalid action.', 'error')
+    try:
+        settings = AutoTradingSettings.get_settings()
+        
+        action = request.form.get('action')
+        logging.info(f"Auto-trading toggle requested by user {current_user.id}: action={action}")
+        
+        if action == 'toggle_main':
+            settings.is_enabled = not settings.is_enabled
+            message = 'Auto-trading enabled' if settings.is_enabled else 'Auto-trading disabled'
+        
+        elif action == 'toggle_simulation':
+            settings.simulation_mode = not settings.simulation_mode
+            message = 'Simulation mode enabled' if settings.simulation_mode else 'Simulation mode disabled'
+        
+        elif action == 'toggle_wheel':
+            settings.wheel_enabled = not settings.wheel_enabled
+            message = 'Wheel strategy enabled' if settings.wheel_enabled else 'Wheel strategy disabled'
+        
+        elif action == 'toggle_collar':
+            settings.collar_enabled = not settings.collar_enabled
+            message = 'Collar strategy enabled' if settings.collar_enabled else 'Collar strategy disabled'
+        
+        elif action == 'toggle_ai':
+            settings.ai_enabled = not settings.ai_enabled
+            message = 'AI strategy enabled' if settings.ai_enabled else 'AI strategy disabled'
+        
+        else:
+            flash('Invalid action.', 'error')
+            logging.error(f"Invalid toggle action: {action}")
+            return redirect(url_for('main.auto_trading'))
+        
+        settings.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        flash(message, 'success')
+        logging.info(f"Auto-trading setting changed by {current_user.email}: {message}")
         return redirect(url_for('main.auto_trading'))
-    
-    settings.updated_at = datetime.utcnow()
-    db.session.commit()
-    
-    flash(message, 'success')
-    logging.info(f"Auto-trading setting changed by {current_user.email}: {message}")
-    return redirect(url_for('main.auto_trading'))
+        
+    except Exception as e:
+        logging.error(f"Error in toggle_auto_trading: {str(e)}")
+        flash(f'Error updating auto-trading settings: {str(e)}', 'error')
+        return redirect(url_for('main.auto_trading'))
 
 @main_bp.route('/user-management')
 @main_bp.route('/user_management')
