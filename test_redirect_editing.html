@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Redirect URI Editing</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .form-group { margin: 10px 0; }
+        .input-field { width: 100%; padding: 8px; }
+        .readonly { background-color: #f0f0f0; }
+    </style>
+</head>
+<body>
+    <h2>Test Redirect URI Editing</h2>
+    
+    <h3>Coinbase Redirect URI</h3>
+    <div class="form-group">
+        <label>Editable (should work):</label>
+        <input type="text" class="input-field" value="https://arbion.ai/oauth_callback/crypto" placeholder="Edit me">
+    </div>
+    
+    <div class="form-group">
+        <label>Readonly (should NOT work):</label>
+        <input type="text" class="input-field readonly" value="https://arbion.ai/oauth_callback/crypto" readonly>
+    </div>
+    
+    <h3>Schwab Redirect URI</h3>
+    <div class="form-group">
+        <label>Editable (should work):</label>
+        <input type="url" class="input-field" value="https://www.arbion.ai/oauth_callback/broker" placeholder="Edit me">
+    </div>
+    
+    <div class="form-group">
+        <label>Readonly (should NOT work):</label>
+        <input type="url" class="input-field readonly" value="https://www.arbion.ai/oauth_callback/broker" readonly>
+    </div>
+    
+    <p>If the first field in each section is editable but the second is not, the redirect URI editing should work properly.</p>
+</body>
+</html>

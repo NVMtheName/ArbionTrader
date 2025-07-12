@@ -237,9 +237,10 @@
                                     class="input-field w-full text-sm" 
                                     value="{{ oauth_dict.coinbase.redirect_uri if oauth_dict.get('coinbase') else request.scheme + '://' + request.host + '/oauth_callback/crypto' }}"
                                     placeholder="https://arbion.ai/oauth_callback/crypto"
+                                    style="background-color: #374151; color: white; border: 2px solid #10b981;"
                                 >
-                                <p class="text-xs text-gray-400 mt-1">
-                                    Must match exactly with your Coinbase OAuth app settings
+                                <p class="text-xs text-green-400 mt-1">
+                                    ✏️ EDITABLE: This redirect URI can be customized to match your Coinbase OAuth app
                                 </p>
                             </div>
                             
@@ -400,8 +401,8 @@
                                 
                                 <div class="mb-4">
                                     <label class="block text-xs font-medium text-gray-300 mb-1">Redirect URI</label>
-                                    <input type="url" name="redirect_uri" value="{{ url_for('main.oauth_callback_schwab', _external=True) }}" class="input-field w-full text-sm">
-                                    <p class="text-xs text-gray-400 mt-1">Must match exactly with your Schwab OAuth2 app redirect URI</p>
+                                    <input type="url" name="redirect_uri" value="{{ url_for('main.oauth_callback_schwab', _external=True) }}" class="input-field w-full text-sm" style="background-color: #374151; color: white;">
+                                    <p class="text-xs text-gray-400 mt-1">✏️ Edit this to match your Schwab OAuth2 app redirect URI exactly</p>
                                 </div>
                                 
                                 <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
@@ -448,8 +449,8 @@
                             
                             <div class="mb-4">
                                 <label class="block text-xs font-medium text-gray-300 mb-1">Redirect URI</label>
-                                <input type="url" name="redirect_uri" value="https://www.arbion.ai/oauth_callback/broker" class="input-field w-full text-sm">
-                                <p class="text-xs text-gray-400 mt-1">Must match exactly with your Schwab OAuth2 app redirect URI</p>
+                                <input type="url" name="redirect_uri" value="https://www.arbion.ai/oauth_callback/broker" class="input-field w-full text-sm" style="background-color: #374151; color: white;">
+                                <p class="text-xs text-gray-400 mt-1">✏️ Edit this to match your Schwab OAuth2 app redirect URI exactly</p>
                             </div>
                             
                             <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">

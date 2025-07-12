@@ -252,6 +252,7 @@ def api_settings():
     from utils.encryption import encrypt_credentials
     from utils.coinbase_oauth import CoinbaseOAuth
     from utils.schwab_oauth import SchwabOAuth
+    from utils.multi_user_config import multi_user_config
     from app import db
     
     if request.method == 'POST':
