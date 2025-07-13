@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_login import login_required, current_user
 from werkzeug.security import generate_password_hash
 from functools import wraps
