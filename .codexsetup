@@ -1,0 +1,40 @@
+# Codex Setup Configuration for Arbion AI Trading Platform
+
+# Python version
+python_version=3.11.10
+
+# Main entry point
+main_file=main.py
+
+# Application instance
+app_instance=app
+
+# Install command
+install_command=pip install -r requirements.txt
+
+# Start command
+start_command=gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app
+
+# Environment variables
+FLASK_ENV=development
+FLASK_DEBUG=1
+
+# Backend API endpoints for Codex
+codex_backend_api=utils/codex_backend_api.py
+codex_cli=codex_cli.py
+codex_rest_api=api_endpoints.py
+
+# Required directories
+required_dirs=static,templates,utils,logs
+
+# Setup script
+setup_script=scripts/setup.sh
+
+# Health check endpoint
+health_check=/
+
+# Port configuration
+port=5000
+
+# Features
+features=github_integration,openai_codex,trading_platform,oauth2_auth,real_time_data

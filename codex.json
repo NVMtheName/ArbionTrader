@@ -1,0 +1,51 @@
+{
+  "name": "arbion-ai-trading-platform",
+  "version": "1.0.0",
+  "description": "AI-powered trading platform with OpenAI Codex GitHub integration",
+  "main": "main.py",
+  "runtime": {
+    "language": "python",
+    "version": "3.11.10"
+  },
+  "environment": {
+    "variables": {
+      "FLASK_ENV": "development",
+      "FLASK_DEBUG": "1"
+    }
+  },
+  "dependencies": {
+    "install_command": "pip install -r requirements.txt",
+    "requirements_file": "requirements.txt"
+  },
+  "scripts": {
+    "start": "gunicorn --bind 0.0.0.0:5000 --reuse-port --reload main:app",
+    "dev": "python main.py",
+    "cli": "python codex_cli.py",
+    "api": "python api_endpoints.py"
+  },
+  "ports": {
+    "main": 5000,
+    "api": 5001
+  },
+  "features": {
+    "github_integration": true,
+    "openai_codex": true,
+    "trading_platform": true,
+    "oauth2_auth": true,
+    "real_time_data": true
+  },
+  "codex": {
+    "backend_api": "utils/codex_backend_api.py",
+    "cli_interface": "codex_cli.py",
+    "rest_endpoints": "api_endpoints.py",
+    "entry_points": [
+      "utils.codex_backend_api:codex_list_repos",
+      "utils.codex_backend_api:codex_read_file",
+      "utils.codex_backend_api:codex_write_file",
+      "utils.codex_backend_api:codex_analyze_code",
+      "utils.codex_backend_api:codex_improve_code",
+      "utils.codex_backend_api:codex_refactor_file",
+      "utils.codex_backend_api:codex_repo_summary"
+    ]
+  }
+}

@@ -25,5 +25,10 @@ def redirect_to_www():
         return redirect(f'https://www.arbion.ai{request.path}', code=301)
 
 if __name__ == '__main__':
+    # Set up environment for development
+    os.environ.setdefault('FLASK_ENV', 'development')
+    os.environ.setdefault('FLASK_DEBUG', '1')
+    
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    debug = os.environ.get('FLASK_DEBUG', '1') == '1'
+    app.run(host='0.0.0.0', port=port, debug=debug)
