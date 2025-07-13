@@ -7,6 +7,50 @@ import logging
 
 auth_bp = Blueprint('auth', __name__)
 
+@auth_bp.route('/register', methods=['GET', 'POST'])
+def register():
+    if current_user.is_authenticated:
+        return redirect(url_for('main.dashboard'))
+
+    if request.method == 'POST':
+        username = request.form.get('username')
+        email = request.form.get('email')
+        password = request.form.get('password')
+        confirm = request.form.get('confirm_password')
+
+        if not all([username, email, password, confirm]):
+            flash('All fields are required.', 'error')
+            return render_template('register.html')
+
+        if password != confirm:
+            flash('Passwords do not match.', 'error')
+            return render_template('register.html')
+
+        if User.query.filter_by(email=email).first():
+            flash('Email already registered.', 'error')
+            return render_template('register.html')
+
+        if User.query.filter_by(username=username).first():
+            flash('Username already taken.', 'error')
+            return render_template('register.html')
+
+        if len(password) < 8:
+            flash('Password must be at least 8 characters long.', 'error')
+            return render_template('register.html')
+
+        new_user = User(
+            username=username,
+            email=email,
+            password_hash=generate_password_hash(password)
+        )
+        db.session.add(new_user)
+        db.session.commit()
+        flash('Registration successful. Please log in.', 'success')
+        logging.info(f"New user registered: {email}")
+        return redirect(url_for('auth.login'))
+
+    return render_template('register.html')
+
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
