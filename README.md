@@ -170,6 +170,13 @@ export SUPERADMIN_PASSWORD='$@MP$0n9174201989'
 flask run
 ```
 
+## User Registration
+
+Regular users can create an account by visiting `/auth/register` on the running
+application. The form collects a username, email address and password. Submitted
+passwords are hashed using Werkzeug's password hashing utilities before being
+stored in the database. After registering, log in at `/auth/login`.
+
 
 ## Creating Pull Requests for Tasks
 
