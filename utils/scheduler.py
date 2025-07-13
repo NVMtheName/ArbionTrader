@@ -293,6 +293,14 @@ def start_scheduler():
             use_celery = os.environ.get('REDIS_URL') is not None
             _scheduler = TaskScheduler(use_celery=use_celery)
         _scheduler.start()
+        # Run an immediate token validation cycle for reliability
+        try:
+            from app import app
+            from tasks.token_maintenance import run_token_maintenance
+            with app.app_context():
+                run_token_maintenance()
+        except Exception as e:
+            logging.error(f"Initial token maintenance failed: {e}")
     except Exception as e:
         logging.error(f"Failed to start scheduler: {e}")
 
