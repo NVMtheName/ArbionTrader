@@ -164,12 +164,17 @@ def get_account_balance():
                         # OAuth2 token available
                         access_token = decrypted_creds['access_token']
                         result = fetcher.get_live_schwab_balance(access_token)
+                        positions_result = fetcher.get_live_schwab_positions(access_token)
                         
                         if result.get('success'):
                             account_info['balance'] = result['balance']
                             account_info['status'] = 'connected'
                             account_info['account_type'] = 'brokerage'
                             account_info['accounts'] = result.get('accounts', [])
+                            if positions_result.get('success'):
+                                position_map = {p['account_number']: p.get('positions', []) for p in positions_result.get('accounts', [])}
+                                for acc in account_info['accounts']:
+                                    acc['positions'] = position_map.get(acc['account_number'], [])
                             account_info['last_updated'] = result['timestamp']
                             cred.test_status = 'success'
                             logging.info(f"Schwab balance fetched: ${result['balance']:.2f}")
@@ -195,11 +200,16 @@ def get_account_balance():
                             
                             if access_token:
                                 result = fetcher.get_live_schwab_balance(access_token)
+                                positions_result = fetcher.get_live_schwab_positions(access_token)
                                 if result.get('success'):
                                     account_info['balance'] = result['balance']
                                     account_info['status'] = 'connected'
                                     account_info['account_type'] = 'brokerage'
                                     account_info['accounts'] = result.get('accounts', [])
+                                    if positions_result.get('success'):
+                                        position_map = {p['account_number']: p.get('positions', []) for p in positions_result.get('accounts', [])}
+                                        for acc in account_info['accounts']:
+                                            acc['positions'] = position_map.get(acc['account_number'], [])
                                     account_info['last_updated'] = result['timestamp']
                                     cred.test_status = 'success'
                                     logging.info(f"Schwab OAuth balance fetched: ${result['balance']:.2f}")
@@ -1465,7 +1475,7 @@ def get_live_balance():
         })
 
 @main_bp.route('/api/live-market-data')
-@login_required  
+@login_required
 def get_live_market_data_api():
     """API endpoint for real-time market data updates"""
     try:
@@ -1481,6 +1491,41 @@ def get_live_market_data_api():
             'error': str(e),
             'data': {}
         })
+
+@main_bp.route('/api/schwab-positions')
+@login_required
+def get_schwab_positions_api():
+    """API endpoint to fetch live Schwab positions"""
+    try:
+        from models import APICredential
+        from utils.encryption import decrypt_credentials
+        from utils.real_time_data import RealTimeDataFetcher
+        from utils.schwab_oauth import SchwabOAuth
+
+        cred = APICredential.query.filter_by(
+            user_id=current_user.id,
+            provider='schwab',
+            is_active=True
+        ).first()
+
+        if not cred:
+            return jsonify({'success': False, 'error': 'Schwab credentials not configured'})
+
+        decrypted = decrypt_credentials(cred.encrypted_credentials)
+        access_token = decrypted.get('access_token')
+
+        if not access_token:
+            schwab_oauth = SchwabOAuth(user_id=current_user.id)
+            access_token = schwab_oauth.get_valid_token(cred.encrypted_credentials)
+
+        if not access_token:
+            return jsonify({'success': False, 'error': 'No valid access token'})
+
+        fetcher = RealTimeDataFetcher(current_user.id)
+        result = fetcher.get_live_schwab_positions(access_token)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 # Enhanced Market Data Endpoints
 @main_bp.route('/api/symbol-search')

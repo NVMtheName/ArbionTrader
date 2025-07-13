@@ -222,3 +222,28 @@ class RealTimeDataFetcher:
         except Exception as e:
             logger.error(f"Error fetching market data: {str(e)}")
             return {}
+
+    def get_live_schwab_positions(self, access_token: str) -> Dict[str, Any]:
+        """Get live positions from Schwab accounts"""
+        try:
+            from utils.schwab_api import SchwabAPIClient
+
+            client = SchwabAPIClient(access_token)
+            account_numbers = client.get_account_numbers()
+            positions_data = []
+
+            for acc_num in account_numbers:
+                positions = client.get_positions(acc_num)
+                positions_data.append({
+                    'account_number': acc_num,
+                    'positions': positions,
+                })
+
+            return {
+                'success': True,
+                'accounts': positions_data,
+                'timestamp': datetime.utcnow().isoformat(),
+            }
+        except Exception as e:
+            logger.error(f"Error fetching Schwab positions: {str(e)}")
+            return {'success': False, 'error': str(e)}
