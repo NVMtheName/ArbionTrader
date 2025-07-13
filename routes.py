@@ -1338,6 +1338,22 @@ def get_trade_history():
         return jsonify({'success': False, 'message': str(e)})
 
 
+@main_bp.route('/api/token-maintenance-status')
+@login_required
+@admin_required
+def token_maintenance_status():
+    """Return status information for background token maintenance"""
+    try:
+        from tasks.token_maintenance import get_token_maintenance_status
+        status = get_token_maintenance_status()
+        if status.get('last_run'):
+            status['last_run'] = status['last_run'].isoformat()
+        return jsonify({'success': True, 'data': status})
+    except Exception as e:
+        logging.error(f"Error fetching token maintenance status: {str(e)}")
+        return jsonify({'success': False, 'message': str(e)})
+
+
 @main_bp.route("/api/market-data")
 @login_required
 def api_market_data():
