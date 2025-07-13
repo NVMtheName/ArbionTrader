@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}GitHub Repositories{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-900 py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-white">GitHub Repositories</h1>
+            <p class="text-gray-400 mt-2">Manage your repositories with AI-powered code editing</p>
+        </div>
+
+        <!-- Repositories Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for repo in repositories %}
+            <div class="bg-gray-800 rounded-lg p-6 hover:bg-gray-750 transition-colors duration-200">
+                <div class="flex items-start justify-between mb-4">
+                    <div class="flex items-center space-x-3">
+                        <i data-feather="github" class="w-6 h-6 text-gray-400"></i>
+                        <div>
+                            <h3 class="text-lg font-semibold text-white">{{ repo.name }}</h3>
+                            <p class="text-sm text-gray-400">{{ repo.full_name }}</p>
+                        </div>
+                    </div>
+                    {% if repo.private %}
+                    <span class="bg-yellow-600 text-yellow-100 text-xs px-2 py-1 rounded">Private</span>
+                    {% else %}
+                    <span class="bg-green-600 text-green-100 text-xs px-2 py-1 rounded">Public</span>
+                    {% endif %}
+                </div>
+
+                {% if repo.description %}
+                <p class="text-gray-300 text-sm mb-4">{{ repo.description }}</p>
+                {% endif %}
+
+                <div class="flex items-center space-x-4 text-sm text-gray-400 mb-4">
+                    {% if repo.language %}
+                    <div class="flex items-center space-x-1">
+                        <div class="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        <span>{{ repo.language }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="flex items-center space-x-1">
+                        <i data-feather="star" class="w-4 h-4"></i>
+                        <span>{{ repo.stargazers_count }}</span>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <i data-feather="git-branch" class="w-4 h-4"></i>
+                        <span>{{ repo.forks_count }}</span>
+                    </div>
+                </div>
+
+                <div class="flex items-center space-x-2">
+                    <a href="{{ url_for('github.repository_details', owner=repo.owner.login, repo=repo.name) }}" 
+                       class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors duration-200 flex items-center space-x-2 text-sm">
+                        <i data-feather="folder" class="w-4 h-4"></i>
+                        <span>Browse</span>
+                    </a>
+                    <a href="{{ url_for('github.code_editor', owner=repo.owner.login, repo=repo.name) }}" 
+                       class="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors duration-200 flex items-center space-x-2 text-sm">
+                        <i data-feather="edit" class="w-4 h-4"></i>
+                        <span>Edit</span>
+                    </a>
+                    <a href="{{ url_for('github.pull_requests', owner=repo.owner.login, repo=repo.name) }}" 
+                       class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors duration-200 flex items-center space-x-2 text-sm">
+                        <i data-feather="git-pull-request" class="w-4 h-4"></i>
+                        <span>PRs</span>
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {% if not repositories %}
+        <div class="text-center py-12">
+            <i data-feather="github" class="w-16 h-16 text-gray-600 mx-auto mb-4"></i>
+            <h3 class="text-xl font-semibold text-gray-400 mb-2">No repositories found</h3>
+            <p class="text-gray-500">Make sure your GitHub token has access to repositories.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+// Initialize Feather icons
+feather.replace();
+</script>
+{% endblock %}

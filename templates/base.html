@@ -203,6 +203,11 @@
                 </a>
                 {% endif %}
                 
+                <a href="{{ url_for('github.repositories') }}" class="sidebar-item flex items-center space-x-3 p-3 rounded-lg transition-colors {% if request.endpoint.startswith('github.') %}active{% endif %}">
+                    <i data-feather="github" class="w-5 h-5"></i>
+                    <span>GitHub</span>
+                </a>
+                
                 <a href="{{ url_for('main.account') }}" class="sidebar-item flex items-center space-x-3 p-3 rounded-lg transition-colors {% if request.endpoint == 'main.account' %}active{% endif %}">
                     <i data-feather="user" class="w-5 h-5"></i>
                     <span>Account</span>
