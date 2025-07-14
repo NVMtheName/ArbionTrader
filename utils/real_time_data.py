@@ -78,13 +78,17 @@ class RealTimeDataFetcher:
             from utils.schwab_api import SchwabAPIClient
 
             client = SchwabAPIClient(access_token)
-            account_numbers = client.get_account_numbers()
+            account_refs = client.get_account_numbers()
             total_balance = 0
             account_details = []
 
-            for account_number in account_numbers:
-                balance_info = client.get_account_balance(account_number)
+            for account_ref in account_refs:
+                # Use the hashed value for API requests
+                hashed = account_ref.get('hash_value')
+                display_number = account_ref.get('account_number')
+                balance_info = client.get_account_balance(hashed)
                 if balance_info:
+                    balance_info['account_number'] = display_number
                     total_balance += balance_info.get('account_value', 0)
                     account_details.append(balance_info)
 
@@ -188,13 +192,15 @@ class RealTimeDataFetcher:
             from utils.schwab_api import SchwabAPIClient
 
             client = SchwabAPIClient(access_token)
-            account_numbers = client.get_account_numbers()
+            account_refs = client.get_account_numbers()
             positions_data = []
 
-            for acc_num in account_numbers:
-                positions = client.get_positions(acc_num)
+            for acc_ref in account_refs:
+                hashed = acc_ref.get('hash_value')
+                display_number = acc_ref.get('account_number')
+                positions = client.get_positions(hashed)
                 positions_data.append({
-                    'account_number': acc_num,
+                    'account_number': display_number,
                     'positions': positions,
                 })
 

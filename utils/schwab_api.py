@@ -87,24 +87,33 @@ class SchwabAPIClient:
             logger.error(f"Schwab API request failed: {url} - {str(e)}")
             raise
     
-    def get_account_numbers(self) -> List[str]:
+    def get_account_numbers(self) -> List[Dict[str, str]]:
         """
-        Get list of account numbers for the authenticated user
-        
+        Get list of account numbers and their encrypted hashes for the
+        authenticated user.
+
+        Schwab's Trader API requires using the ``hashValue`` when accessing
+        account-specific endpoints. The plain account number is provided only
+        for display purposes.
+
         Returns:
-            List of account numbers
+            List of dictionaries with ``account_number`` and ``hash_value`` keys.
         """
         try:
             response = self._make_request('GET', '/trader/v1/accounts/accountNumbers')
             data = response.json()
-            
-            # Extract account numbers from response
+
             account_numbers = []
             for account in data:
-                if 'accountNumber' in account:
-                    account_numbers.append(account['accountNumber'])
-            
-            logger.info(f"Retrieved {len(account_numbers)} Schwab account numbers")
+                if 'accountNumber' in account and 'hashValue' in account:
+                    account_numbers.append({
+                        'account_number': account['accountNumber'],
+                        'hash_value': account['hashValue'],
+                    })
+
+            logger.info(
+                f"Retrieved {len(account_numbers)} Schwab account numbers"
+            )
             return account_numbers
             
         except Exception as e:
