@@ -75,67 +75,26 @@ class RealTimeDataFetcher:
     def get_live_schwab_balance(self, access_token: str) -> Dict[str, Any]:
         """Get live balance from Schwab API"""
         try:
-            headers = {
-                'Authorization': f'Bearer {access_token}',
-                'Accept': 'application/json',
-                'Content-Type': 'application/json'
+            from utils.schwab_api import SchwabAPIClient
+
+            client = SchwabAPIClient(access_token)
+            account_numbers = client.get_account_numbers()
+            total_balance = 0
+            account_details = []
+
+            for account_number in account_numbers:
+                balance_info = client.get_account_balance(account_number)
+                if balance_info:
+                    total_balance += balance_info.get('account_value', 0)
+                    account_details.append(balance_info)
+
+            return {
+                'success': True,
+                'balance': total_balance,
+                'accounts': account_details,
+                'timestamp': datetime.utcnow().isoformat()
             }
-            
-            # Get accounts
-            response = requests.get(
-                'https://api.schwabapi.com/trader/v1/accounts',
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                total_balance = 0
-                account_details = []
-                
-                for account in data:
-                    if 'securitiesAccount' in account:
-                        sec_account = account['securitiesAccount']
-                        account_number = sec_account.get('accountNumber', 'Unknown')
-                        
-                        # Get account balance
-                        balance_response = requests.get(
-                            f'https://api.schwabapi.com/trader/v1/accounts/{account_number}',
-                            headers=headers,
-                            timeout=10
-                        )
-                        
-                        if balance_response.status_code == 200:
-                            balance_data = balance_response.json()
-                            sec_account_data = balance_data.get('securitiesAccount', {})
-                            
-                            # Get current balances
-                            current_balances = sec_account_data.get('currentBalances', {})
-                            account_value = current_balances.get('liquidationValue', 0)
-                            cash_balance = current_balances.get('cashBalance', 0)
-                            buying_power = current_balances.get('buyingPower', 0)
-                            
-                            total_balance += account_value
-                            
-                            account_details.append({
-                                'account_number': account_number,
-                                'account_type': sec_account_data.get('type', 'UNKNOWN'),
-                                'balance': account_value,
-                                'cash_balance': cash_balance,
-                                'buying_power': buying_power,
-                                'long_market_value': current_balances.get('longMarketValue', 0)
-                            })
-                
-                return {
-                    'success': True,
-                    'balance': total_balance,
-                    'accounts': account_details,
-                    'timestamp': datetime.utcnow().isoformat()
-                }
-            else:
-                logger.error(f"Schwab API error: {response.status_code} - {response.text}")
-                return {'success': False, 'error': f'API error: {response.status_code}'}
-                
+
         except Exception as e:
             logger.error(f"Error fetching Schwab balance: {str(e)}")
             return {'success': False, 'error': str(e)}
