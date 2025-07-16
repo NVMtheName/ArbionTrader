@@ -23,7 +23,7 @@ class SchwabAPIClient:
         
         Args:
             access_token: Bearer token for API authentication
-            base_url: Schwab API base URL
+            base_url: Schwab API base URL (official: https://api.schwabapi.com)
         """
         self.access_token = access_token
         self.base_url = base_url.rstrip('/')
@@ -90,7 +90,7 @@ class SchwabAPIClient:
     def get_account_numbers(self) -> List[Dict[str, str]]:
         """
         Get list of account numbers and their encrypted hashes for the
-        authenticated user.
+        authenticated user using official Schwab Trader API.
 
         Schwab's Trader API requires using the ``hashValue`` when accessing
         account-specific endpoints. The plain account number is provided only
@@ -120,12 +120,12 @@ class SchwabAPIClient:
             logger.error(f"Failed to get Schwab account numbers: {str(e)}")
             return []
     
-    def get_account_details(self, account_number: str) -> Dict[str, Any]:
+    def get_account_details(self, account_hash: str) -> Dict[str, Any]:
         """
-        Get detailed account information
+        Get detailed account information using official Schwab Trader API
         
         Args:
-            account_number: Schwab account number
+            account_hash: Schwab account hash value (not plain account number)
             
         Returns:
             Account details dictionary
@@ -133,41 +133,43 @@ class SchwabAPIClient:
         try:
             response = self._make_request(
                 'GET', 
-                f'/trader/v1/accounts/{account_number}',
+                f'/trader/v1/accounts/{account_hash}',
                 params={'fields': 'positions,orders'}
             )
             data = response.json()
             
-            logger.info(f"Retrieved account details for {account_number}")
+            logger.info(f"Retrieved account details for hash {account_hash[:8]}...")
             return data
             
         except Exception as e:
-            logger.error(f"Failed to get account details for {account_number}: {str(e)}")
+            logger.error(f"Failed to get account details for hash {account_hash[:8]}...: {str(e)}")
             return {}
     
-    def get_account_balance(self, account_number: str) -> Dict[str, float]:
+    def get_account_balance(self, account_hash: str, account_number: str) -> Dict[str, float]:
         """
-        Get account balance information
+        Get account balance information using official Schwab Trader API
         
         Args:
-            account_number: Schwab account number
+            account_hash: Schwab account hash value (required for API calls)
+            account_number: Plain account number (for display purposes)
             
         Returns:
             Balance information dictionary
         """
         try:
-            account_data = self.get_account_details(account_number)
+            account_data = self.get_account_details(account_hash)
             
             if not account_data:
                 return {}
             
-            # Extract balance information
+            # Extract balance information from securities account
             securities_account = account_data.get('securitiesAccount', {})
             initial_balances = securities_account.get('initialBalances', {})
             current_balances = securities_account.get('currentBalances', {})
             
             balance_info = {
                 'account_number': account_number,
+                'account_hash': account_hash,
                 'account_value': current_balances.get('liquidationValue', 0.0),
                 'cash_balance': current_balances.get('cashBalance', 0.0),
                 'buying_power': current_balances.get('buyingPower', 0.0),
@@ -203,18 +205,19 @@ class SchwabAPIClient:
             logger.error(f"Failed to get user profile: {str(e)}")
             return {}
     
-    def get_positions(self, account_number: str) -> List[Dict[str, Any]]:
+    def get_positions(self, account_hash: str, account_number: str) -> List[Dict[str, Any]]:
         """
-        Get account positions
+        Get account positions using official Schwab Trader API
         
         Args:
-            account_number: Schwab account number
+            account_hash: Schwab account hash value (required for API calls)
+            account_number: Plain account number (for display purposes)
             
         Returns:
             List of position dictionaries
         """
         try:
-            account_data = self.get_account_details(account_number)
+            account_data = self.get_account_details(account_hash)
             
             if not account_data:
                 return []

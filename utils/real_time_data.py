@@ -73,7 +73,7 @@ class RealTimeDataFetcher:
             return {'success': False, 'error': str(e)}
     
     def get_live_schwab_balance(self, access_token: str) -> Dict[str, Any]:
-        """Get live balance from Schwab API"""
+        """Get live balance from Schwab API using official Trader API"""
         try:
             from utils.schwab_api import SchwabAPIClient
 
@@ -83,15 +83,15 @@ class RealTimeDataFetcher:
             account_details = []
 
             for account_ref in account_refs:
-                # Use the hashed value for API requests
+                # Use the hashed value for API requests with display number
                 hashed = account_ref.get('hash_value')
                 display_number = account_ref.get('account_number')
-                balance_info = client.get_account_balance(hashed)
+                balance_info = client.get_account_balance(hashed, display_number)
                 if balance_info:
-                    balance_info['account_number'] = display_number
                     total_balance += balance_info.get('account_value', 0)
                     account_details.append(balance_info)
 
+            logger.info(f"Successfully fetched Schwab balance: ${total_balance:.2f} from {len(account_details)} accounts")
             return {
                 'success': True,
                 'balance': total_balance,
@@ -187,7 +187,7 @@ class RealTimeDataFetcher:
             return {}
 
     def get_live_schwab_positions(self, access_token: str) -> Dict[str, Any]:
-        """Get live positions from Schwab accounts"""
+        """Get live positions from Schwab accounts using official Trader API"""
         try:
             from utils.schwab_api import SchwabAPIClient
 
@@ -198,12 +198,13 @@ class RealTimeDataFetcher:
             for acc_ref in account_refs:
                 hashed = acc_ref.get('hash_value')
                 display_number = acc_ref.get('account_number')
-                positions = client.get_positions(hashed)
+                positions = client.get_positions(hashed, display_number)
                 positions_data.append({
                     'account_number': display_number,
                     'positions': positions,
                 })
 
+            logger.info(f"Successfully fetched Schwab positions from {len(positions_data)} accounts")
             return {
                 'success': True,
                 'accounts': positions_data,
