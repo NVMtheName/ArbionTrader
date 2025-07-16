@@ -310,7 +310,7 @@ Changelog:
   - Added comprehensive security event logging for OAuth debugging and monitoring
 - July 13, 2025. Fixed all Codex deployment issues and finalized backend integration:
   - **DEPLOYMENT FIX**: Resolved all common Codex deployment problems with proper configuration
-  - Created comprehensive deployment configuration: codex.json, .python-version, runtime.txt, .codexsetup
+  - Created comprehensive deployment configuration: codex.json, .python-version, .codexsetup
   - Fixed Python version specification (3.11.10) and proper entry point configuration
   - Added startup scripts (scripts/setup.sh, scripts/start.sh) that exit with code 0
   - Enhanced main.py with proper WSGI deployment support and environment configuration
