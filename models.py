@@ -30,7 +30,7 @@ class User(UserMixin, db.Model):
 class APICredential(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    provider = db.Column(db.String(50), nullable=False)  # coinbase, schwab, openai
+    provider = db.Column(db.String(50), nullable=False)  # coinbase, schwab, openai, etrade
     encrypted_credentials = db.Column(LargeBinary, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -44,7 +44,7 @@ class APICredential(db.Model):
 class Trade(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    provider = db.Column(db.String(50), nullable=False)  # coinbase, schwab
+    provider = db.Column(db.String(50), nullable=False)  # coinbase, schwab, etrade
     symbol = db.Column(db.String(20), nullable=False)
     side = db.Column(db.String(10), nullable=False)  # buy, sell
     quantity = db.Column(db.Float, nullable=False)
@@ -97,7 +97,7 @@ class OAuthClientCredential(db.Model):
     """Store OAuth2 client credentials per-user for multi-user deployment"""
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    provider = db.Column(db.String(50), nullable=False)  # schwab, coinbase
+    provider = db.Column(db.String(50), nullable=False)  # schwab, coinbase, etrade
     client_id = db.Column(db.String(256), nullable=False)
     client_secret = db.Column(db.String(256), nullable=False)
     redirect_uri = db.Column(db.String(512), nullable=False)

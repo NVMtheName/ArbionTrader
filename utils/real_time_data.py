@@ -213,3 +213,67 @@ class RealTimeDataFetcher:
         except Exception as e:
             logger.error(f"Error fetching Schwab positions: {str(e)}")
             return {'success': False, 'error': str(e)}
+    
+    def get_live_etrade_balance(self, client_key: str, client_secret: str, 
+                               access_token: str, access_secret: str) -> Dict[str, Any]:
+        """Get live balance from E-trade API using OAuth 1.0a"""
+        try:
+            from utils.etrade_api import EtradeAPIClient
+
+            client = EtradeAPIClient(client_key, client_secret, access_token, access_secret)
+            accounts = client.get_account_list()
+            total_balance = 0
+            account_details = []
+
+            for account in accounts:
+                account_id_key = account.get('accountIdKey', '')
+                account_name = account.get('accountDesc', '')
+                balance_info = client.get_account_balance(account_id_key)
+                
+                if balance_info:
+                    balance_info['account_name'] = account_name
+                    total_balance += balance_info.get('account_value', 0)
+                    account_details.append(balance_info)
+
+            logger.info(f"Successfully fetched E-trade balance: ${total_balance:.2f} from {len(account_details)} accounts")
+            return {
+                'success': True,
+                'balance': total_balance,
+                'accounts': account_details,
+                'timestamp': datetime.utcnow().isoformat()
+            }
+
+        except Exception as e:
+            logger.error(f"Error fetching E-trade balance: {str(e)}")
+            return {'success': False, 'error': str(e)}
+    
+    def get_live_etrade_positions(self, client_key: str, client_secret: str, 
+                                 access_token: str, access_secret: str) -> Dict[str, Any]:
+        """Get live positions from E-trade accounts using OAuth 1.0a"""
+        try:
+            from utils.etrade_api import EtradeAPIClient
+
+            client = EtradeAPIClient(client_key, client_secret, access_token, access_secret)
+            accounts = client.get_account_list()
+            positions_data = []
+
+            for account in accounts:
+                account_id_key = account.get('accountIdKey', '')
+                account_name = account.get('accountDesc', '')
+                positions = client.get_portfolio(account_id_key)
+                positions_data.append({
+                    'account_id': account_id_key,
+                    'account_name': account_name,
+                    'positions': positions,
+                })
+
+            logger.info(f"Successfully fetched E-trade positions from {len(positions_data)} accounts")
+            return {
+                'success': True,
+                'accounts': positions_data,
+                'timestamp': datetime.utcnow().isoformat(),
+            }
+        except Exception as e:
+            logger.error(f"Error fetching E-trade positions: {str(e)}")
+            return {'success': False, 'error': str(e)}
+

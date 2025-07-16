@@ -563,6 +563,119 @@
                 </div>
             {% endif %}
         </div>
+        
+        <!-- E-trade API -->
+        <div class="card">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-yellow-500 bg-opacity-20 rounded-lg">
+                        <i data-feather="trending-up" class="w-6 h-6 text-yellow-400"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-white">E-trade</h3>
+                        <p class="text-sm text-gray-400">Stock & Options Trading</p>
+                    </div>
+                </div>
+                <div class="flex items-center">
+                    <span class="status-indicator {% if cred_status.get('etrade', {}).get('status') == 'success' %}status-success{% else %}status-error{% endif %}"></span>
+                    <span class="text-xs text-gray-400">
+                        {% if cred_status.get('etrade', {}).get('status') == 'success' %}
+                            Connected
+                        {% else %}
+                            Not Connected
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            
+            <div class="mb-4 p-4 bg-yellow-900 bg-opacity-30 rounded-lg border border-yellow-500">
+                <h4 class="font-medium text-yellow-300 mb-2">OAuth 1.0a Authentication</h4>
+                <p class="text-sm text-gray-300 mb-3">
+                    E-trade uses OAuth 1.0a authentication. You'll need to complete the OAuth flow to get your access tokens.
+                </p>
+                <div class="bg-blue-900 bg-opacity-50 rounded-lg p-3 mb-3">
+                    <p class="text-xs text-blue-300">
+                        <strong>Setup Instructions:</strong>
+                    </p>
+                    <ol class="text-xs text-gray-300 space-y-1 mt-2">
+                        <li>1. Apply for E-trade API access at developer.etrade.com</li>
+                        <li>2. Create an OAuth app and get your Client Key and Client Secret</li>
+                        <li>3. Complete the OAuth 1.0a flow to get Access Token and Access Secret</li>
+                        <li>4. Enter all four credentials below</li>
+                    </ol>
+                </div>
+            </div>
+            
+            <form method="POST" action="{{ url_for('main.api_settings') }}" class="space-y-4">
+                <input type="hidden" name="provider" value="etrade">
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Client Key</label>
+                    <input 
+                        type="text" 
+                        name="client_key" 
+                        class="input-field w-full" 
+                        placeholder="Enter your E-trade Client Key"
+                        required
+                    >
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Client Secret</label>
+                    <input 
+                        type="password" 
+                        name="client_secret" 
+                        class="input-field w-full" 
+                        placeholder="Enter your E-trade Client Secret"
+                        required
+                    >
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Access Token</label>
+                    <input 
+                        type="text" 
+                        name="access_token" 
+                        class="input-field w-full" 
+                        placeholder="Enter your E-trade Access Token"
+                        required
+                    >
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-1">Access Secret</label>
+                    <input 
+                        type="password" 
+                        name="access_secret" 
+                        class="input-field w-full" 
+                        placeholder="Enter your E-trade Access Secret"
+                        required
+                    >
+                </div>
+                
+                <div class="flex space-x-2">
+                    <button 
+                        type="submit" 
+                        class="btn-primary flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors"
+                    >
+                        Save Credentials
+                    </button>
+                    <button 
+                        type="button" 
+                        class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors"
+                        onclick="testConnection('etrade')"
+                    >
+                        Test
+                    </button>
+                </div>
+            </form>
+            
+            {% if cred_status.get('etrade', {}).get('last_tested') %}
+                <div class="mt-3 text-xs text-gray-500">
+                    Last tested: {{ cred_status.etrade.last_tested.strftime('%m/%d/%Y %H:%M') }}
+                </div>
+            {% endif %}
+        </div>
     </div>
     
     <!-- Security Information -->
@@ -647,6 +760,17 @@
                     <li>Create a new API key</li>
                     <li>Set up billing and usage limits</li>
                     <li>Keep your API key secure and never share it</li>
+                </ol>
+            </div>
+            
+            <div>
+                <h4 class="text-sm font-medium text-white mb-2">E-trade API</h4>
+                <ol class="text-sm text-gray-400 space-y-1 list-decimal list-inside">
+                    <li>Apply for E-trade API access at developer.etrade.com</li>
+                    <li>Complete the developer application and verification process</li>
+                    <li>Create an OAuth 1.0a application and get Client Key/Secret</li>
+                    <li>Complete the OAuth 1.0a flow to obtain Access Token/Secret</li>
+                    <li>Use paper trading environment for testing before live trading</li>
                 </ol>
             </div>
         </div>

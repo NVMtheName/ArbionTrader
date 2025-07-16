@@ -228,6 +228,43 @@ def get_account_balance():
                             cred.test_status = 'failed'
                             logging.error(f"Schwab OAuth error: {str(e)}")
                 
+                elif cred.provider == 'etrade':
+                    # Get LIVE E-trade balance using OAuth 1.0a
+                    required_fields = ['client_key', 'client_secret', 'access_token', 'access_secret']
+                    if all(field in decrypted_creds for field in required_fields):
+                        client_key = decrypted_creds['client_key']
+                        client_secret = decrypted_creds['client_secret']
+                        access_token = decrypted_creds['access_token']
+                        access_secret = decrypted_creds['access_secret']
+                        
+                        result = fetcher.get_live_etrade_balance(client_key, client_secret, access_token, access_secret)
+                        positions_result = fetcher.get_live_etrade_positions(client_key, client_secret, access_token, access_secret)
+                        
+                        if result.get('success'):
+                            account_info['balance'] = result['balance']
+                            account_info['status'] = 'connected'
+                            account_info['account_type'] = 'brokerage'
+                            account_info['accounts'] = result.get('accounts', [])
+                            if positions_result.get('success'):
+                                position_map = {p['account_id']: p.get('positions', []) for p in positions_result.get('accounts', [])}
+                                for acc in account_info['accounts']:
+                                    acc['positions'] = position_map.get(acc.get('account_id'), [])
+                            account_info['last_updated'] = result['timestamp']
+                            cred.test_status = 'success'
+                            logging.info(f"E-trade balance fetched: ${result['balance']:.2f}")
+                        else:
+                            account_info['status'] = 'error'
+                            error_msg = f"E-trade: {result.get('error', 'Unknown error')}"
+                            balance_data['errors'].append(error_msg)
+                            cred.test_status = 'failed'
+                            logging.error(f"E-trade error: {error_msg}")
+                    else:
+                        account_info['status'] = 'error'
+                        error_msg = 'E-trade: OAuth 1.0a credentials missing. Please configure E-trade OAuth credentials.'
+                        balance_data['errors'].append(error_msg)
+                        cred.test_status = 'failed'
+                        logging.warning(f"E-trade credentials incomplete for user {current_user.id}")
+                
                 # Add to accounts list and update totals
                 balance_data['accounts'].append(account_info)
                 if account_info['status'] == 'connected' and account_info['balance'] > 0:
@@ -523,6 +560,24 @@ def api_settings():
                 'api_key': api_key
             }
         
+        elif provider == 'etrade':
+            # E-trade OAuth 1.0a credentials
+            client_key = request.form.get('client_key')
+            client_secret = request.form.get('client_secret')
+            access_token = request.form.get('access_token')
+            access_secret = request.form.get('access_secret')
+            
+            if not all([client_key, client_secret, access_token, access_secret]):
+                flash('All E-trade OAuth 1.0a fields are required.', 'error')
+                return redirect(url_for('main.api_settings'))
+            
+            credentials = {
+                'client_key': client_key,
+                'client_secret': client_secret,
+                'access_token': access_token,
+                'access_secret': access_secret
+            }
+        
         else:
             flash('Invalid provider selected.', 'error')
             return redirect(url_for('main.api_settings'))
@@ -664,6 +719,17 @@ def test_api_connection():
         elif provider == 'openai':
             trader = OpenAITrader(api_key=credentials['api_key'])
             result = trader.test_connection()
+        
+        elif provider == 'etrade':
+            # Test E-trade OAuth 1.0a connection
+            from utils.etrade_api import EtradeAPIClient
+            client = EtradeAPIClient(
+                credentials['client_key'],
+                credentials['client_secret'],
+                credentials['access_token'],
+                credentials['access_secret']
+            )
+            result = client.test_connection()
         
         else:
             result = {'success': False, 'message': 'Invalid provider'}
@@ -1542,6 +1608,51 @@ def get_schwab_positions_api():
         return jsonify(result)
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
+
+@main_bp.route('/api/etrade-positions')
+@login_required
+def get_etrade_positions_api():
+    """API endpoint to fetch live E-trade positions"""
+    try:
+        from models import APICredential
+        from utils.encryption import decrypt_credentials
+        from utils.real_time_data import RealTimeDataFetcher
+        
+        # Find user's E-trade credentials
+        etrade_cred = APICredential.query.filter_by(
+            user_id=current_user.id,
+            provider='etrade',
+            is_active=True
+        ).first()
+        
+        if not etrade_cred:
+            return jsonify({
+                'success': False,
+                'error': 'E-trade credentials not found'
+            })
+        
+        # Get positions data
+        fetcher = RealTimeDataFetcher(current_user.id)
+        credentials = decrypt_credentials(etrade_cred.encrypted_credentials)
+        
+        required_fields = ['client_key', 'client_secret', 'access_token', 'access_secret']
+        if all(field in credentials for field in required_fields):
+            result = fetcher.get_live_etrade_positions(
+                credentials['client_key'],
+                credentials['client_secret'],
+                credentials['access_token'],
+                credentials['access_secret']
+            )
+        else:
+            result = {'success': False, 'error': 'E-trade OAuth 1.0a credentials incomplete'}
+        
+        return jsonify(result)
+    except Exception as e:
+        logging.error(f"Error fetching E-trade positions: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
 
 # Enhanced Market Data Endpoints
 @main_bp.route('/api/symbol-search')
