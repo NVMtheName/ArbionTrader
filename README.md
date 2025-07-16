@@ -119,9 +119,10 @@ print(result["output"])
 ## Deployment
 
 When deploying to Heroku (or any other production host) the application expects
-certain environment variables. Heroku also reads a `runtime.txt` file to
-determine the Python version. This project requires **Python 3.11**, so create a
-`runtime.txt` containing `python-3.11.9` (or your preferred 3.11 patch). The
+certain environment variables. When using the `uv` package manager you must
+specify the Python version with a `.python-version` file instead of
+`runtime.txt`. This project requires **Python 3.11**, so create a
+`.python-version` file containing `3.11`. The
 most important environment variables are:
 
 - `SECRET_KEY` – required for Flask's session management. The application will
@@ -199,7 +200,7 @@ Coinbase style APIs and that new contributions do not break existing
 functionality.
 
 The workflow now uses **Python 3.11** to match the production runtime
-specified in `runtime.txt`.
+specified in `.python-version`.
 
 ## Containerisation
 

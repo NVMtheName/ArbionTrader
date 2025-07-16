@@ -299,7 +299,6 @@ The system is configured for Codex deployment with:
 
 - **codex.json**: Main configuration file
 - **.python-version**: Python version specification
-- **runtime.txt**: Runtime configuration
 - **.codexsetup**: Codex-specific setup configuration
 - **Procfile**: Process configuration
 - **scripts/setup.sh**: Setup script
