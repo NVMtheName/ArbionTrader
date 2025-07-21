@@ -208,14 +208,23 @@ class SchwabAPIClient:
     # Account Information APIs
     def get_accounts(self) -> List[Dict[str, Any]]:
         """Get user's Schwab accounts using account hashes"""
-        # First fetch account references to obtain hash values
-        ref_resp = self._make_authenticated_request('GET', '/trader/v1/accounts/accountNumbers')
-        ref_resp.raise_for_status()
-        refs = ref_resp.json()
+        try:
+            # Preferred endpoint returning accountNumber/hashValue pairs
+            ref_resp = self._make_authenticated_request('GET', '/trader/v1/accounts/accountNumbers')
+            ref_resp.raise_for_status()
+            refs = ref_resp.json()
+        except requests.HTTPError as e:
+            # Some accounts do not have access to the accountNumbers endpoint
+            logger.warning(f"accountNumbers endpoint failed: {e}. Falling back to /accounts")
+            ref_resp = self._make_authenticated_request('GET', '/trader/v1/accounts')
+            ref_resp.raise_for_status()
+            refs = ref_resp.json()
+            if isinstance(refs, dict) and 'accounts' in refs:
+                refs = refs['accounts']
 
         accounts = []
         for ref in refs:
-            acc_hash = ref.get('hashValue')
+            acc_hash = ref.get('hashValue') or ref.get('accountId')
             acc_number = ref.get('accountNumber')
             if not acc_hash:
                 continue
@@ -223,7 +232,8 @@ class SchwabAPIClient:
             detail_resp = self._make_authenticated_request('GET', f'/trader/v1/accounts/{acc_hash}')
             if detail_resp.status_code == 200:
                 detail = detail_resp.json()
-                detail['accountNumber'] = acc_number
+                if acc_number:
+                    detail['accountNumber'] = acc_number
                 accounts.append(detail)
 
         return accounts

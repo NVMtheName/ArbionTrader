@@ -102,23 +102,34 @@ class SchwabAPIClient:
         try:
             response = self._make_request('GET', '/trader/v1/accounts/accountNumbers')
             data = response.json()
-
-            account_numbers = []
-            for account in data:
-                if 'accountNumber' in account and 'hashValue' in account:
-                    account_numbers.append({
-                        'account_number': account['accountNumber'],
-                        'hash_value': account['hashValue'],
-                    })
-
-            logger.info(
-                f"Retrieved {len(account_numbers)} Schwab account numbers"
-            )
-            return account_numbers
-            
+        except requests.HTTPError as e:
+            logger.warning(f"accountNumbers endpoint failed: {e}. Falling back to /accounts")
+            try:
+                response = self._make_request('GET', '/trader/v1/accounts')
+                data = response.json()
+                if isinstance(data, dict) and 'accounts' in data:
+                    data = data['accounts']
+            except Exception as e2:
+                logger.error(f"Fallback account list failed: {e2}")
+                return []
         except Exception as e:
             logger.error(f"Failed to get Schwab account numbers: {str(e)}")
             return []
+
+        account_numbers = []
+        for account in data:
+            number = account.get('accountNumber') or account.get('account_number')
+            hash_val = account.get('hashValue') or account.get('hash_value') or account.get('accountId')
+            if number and hash_val:
+                account_numbers.append({
+                    'account_number': number,
+                    'hash_value': hash_val,
+                })
+
+        logger.info(
+            f"Retrieved {len(account_numbers)} Schwab account numbers"
+        )
+        return account_numbers
     
     def get_account_details(self, account_hash: str) -> Dict[str, Any]:
         """
