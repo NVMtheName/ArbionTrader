@@ -19,7 +19,7 @@ class SchwabOAuth:
         
         self.client_id = os.environ.get('SCHWAB_CLIENT_ID')
         # Use development redirect URI for testing
-        self.redirect_uri = os.environ.get('SCHWAB_REDIRECT_URI', 'https://www.arbion.ai/oauth_callback/schwab')
+        self.redirect_uri = os.environ.get('SCHWAB_REDIRECT_URI', 'https://www.arbion.ai/oauth_callback/broker')
         self.auth_url = 'https://api.schwabapi.com/v1/oauth/authorize'
         self.token_url = 'https://api.schwabapi.com/v1/oauth/token'
         

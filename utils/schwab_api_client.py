@@ -206,11 +206,27 @@ class SchwabAPIClient:
             raise
     
     # Account Information APIs
-    def get_accounts(self) -> Dict[str, Any]:
-        """Get user's Schwab accounts"""
-        response = self._make_authenticated_request('GET', '/trader/v1/accounts')
-        response.raise_for_status()
-        return response.json()
+    def get_accounts(self) -> List[Dict[str, Any]]:
+        """Get user's Schwab accounts using account hashes"""
+        # First fetch account references to obtain hash values
+        ref_resp = self._make_authenticated_request('GET', '/trader/v1/accounts/accountNumbers')
+        ref_resp.raise_for_status()
+        refs = ref_resp.json()
+
+        accounts = []
+        for ref in refs:
+            acc_hash = ref.get('hashValue')
+            acc_number = ref.get('accountNumber')
+            if not acc_hash:
+                continue
+
+            detail_resp = self._make_authenticated_request('GET', f'/trader/v1/accounts/{acc_hash}')
+            if detail_resp.status_code == 200:
+                detail = detail_resp.json()
+                detail['accountNumber'] = acc_number
+                accounts.append(detail)
+
+        return accounts
     
     def get_account_details(self, account_id: str) -> Dict[str, Any]:
         """Get detailed information for a specific account"""
