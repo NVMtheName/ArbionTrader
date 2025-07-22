@@ -104,31 +104,28 @@ class RealTimeDataFetcher:
             return {'success': False, 'error': str(e)}
     
     def _get_crypto_price(self, currency: str) -> Optional[float]:
-        """Get current crypto price for conversion"""
+        """Get current crypto price for conversion.
+
+        The previous implementation only supported a limited set of coins which
+        caused the account balance calculation to return ``0`` when users held
+        assets like USDC or other altcoins. To support any currency returned by
+        Coinbase we now query Coinbase's public price endpoint directly.
+        """
         try:
-            coin_map = {
-                'BTC': 'bitcoin',
-                'ETH': 'ethereum',
-                'LTC': 'litecoin',
-                'BCH': 'bitcoin-cash'
-            }
-            
-            coin_id = coin_map.get(currency.upper())
-            if not coin_id:
-                return None
-                
             response = requests.get(
-                f'https://api.coingecko.com/api/v3/simple/price?ids={coin_id}&vs_currencies=usd',
-                timeout=5
+                f"https://api.coinbase.com/v2/prices/{currency}-USD/spot",
+                timeout=5,
             )
-            
+
             if response.status_code == 200:
                 data = response.json()
-                return data.get(coin_id, {}).get('usd')
-                
+                amount = data.get("data", {}).get("amount")
+                if amount is not None:
+                    return float(amount)
+
         except Exception as e:
             logger.error(f"Error getting crypto price for {currency}: {str(e)}")
-            
+
         return None
     
     def get_live_market_data(self, symbols: List[str]) -> Dict[str, Any]:
