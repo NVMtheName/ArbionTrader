@@ -115,7 +115,7 @@ class CoinbaseOAuth:
                 'client_id': self.client_id,
                 'redirect_uri': self.redirect_uri,
                 'state': state,
-                'scope': 'wallet:user:read wallet:accounts:read wallet:transactions:read'
+                'scope': 'wallet:user:read wallet:accounts:read wallet:addresses:read wallet:transactions:read'
             }
             
             auth_url = f"{self.auth_url}?{urlencode(auth_params)}"
@@ -424,3 +424,249 @@ class CoinbaseOAuth:
         except Exception as e:
             logger.error(f"Error getting Coinbase transactions: {str(e)}")
             return None
+    
+    def get_wallet_addresses(self, access_token, currencies=['BTC', 'ETH']):
+        """
+        Fetch wallet addresses for specified currencies using Coinbase OAuth2 API
+        
+        Args:
+            access_token (str): Valid OAuth2 access token
+            currencies (list): List of currencies to fetch addresses for (default: ['BTC', 'ETH'])
+            
+        Returns:
+            dict: Dictionary containing wallet addresses and account information
+            
+        Required OAuth2 Scopes:
+            - wallet:accounts:read: Required to list user accounts
+            - wallet:addresses:read: Required to fetch wallet addresses
+        """
+        try:
+            if not access_token:
+                raise ValueError("Access token is required")
+            
+            headers = {
+                'Authorization': f'Bearer {access_token}',
+                'Content-Type': 'application/json',
+                'User-Agent': 'Arbion Trading Platform/1.0'
+            }
+            
+            logger.info(f"Fetching wallet addresses for currencies: {currencies}")
+            
+            # Step 1: Get all user accounts
+            accounts_response = requests.get(
+                f'{self.api_base_url}/accounts',
+                headers=headers,
+                timeout=30
+            )
+            
+            if accounts_response.status_code != 200:
+                error_msg = f"Failed to fetch accounts: HTTP {accounts_response.status_code}"
+                logger.error(f"{error_msg} - Response: {accounts_response.text}")
+                return {
+                    'success': False,
+                    'error': error_msg,
+                    'status_code': accounts_response.status_code
+                }
+            
+            accounts_data = accounts_response.json()
+            logger.info(f"Successfully fetched {len(accounts_data.get('data', []))} accounts")
+            
+            # Step 2: Filter accounts by requested currencies
+            target_accounts = []
+            for account in accounts_data.get('data', []):
+                currency = account.get('currency', {}).get('code', '')
+                if currency in currencies:
+                    target_accounts.append({
+                        'id': account.get('id'),
+                        'name': account.get('name'),
+                        'currency': currency,
+                        'type': account.get('type'),
+                        'balance': account.get('balance', {}),
+                        'primary': account.get('primary', False)
+                    })
+            
+            if not target_accounts:
+                logger.warning(f"No accounts found for currencies: {currencies}")
+                return {
+                    'success': True,
+                    'wallet_addresses': {},
+                    'accounts': [],
+                    'message': f'No accounts found for currencies: {currencies}',
+                    'total_accounts': len(accounts_data.get('data', []))
+                }
+            
+            logger.info(f"Found {len(target_accounts)} accounts for target currencies")
+            
+            # Step 3: Fetch addresses for each target account
+            wallet_addresses = {}
+            successful_fetches = 0
+            
+            for account in target_accounts:
+                account_id = account['id']
+                currency = account['currency']
+                
+                try:
+                    # Get addresses for this account
+                    addresses_response = requests.get(
+                        f'{self.api_base_url}/accounts/{account_id}/addresses',
+                        headers=headers,
+                        timeout=30
+                    )
+                    
+                    if addresses_response.status_code == 200:
+                        addresses_data = addresses_response.json()
+                        addresses_list = addresses_data.get('data', [])
+                        
+                        if addresses_list:
+                            # Get the primary (first) address
+                            primary_address = addresses_list[0]
+                            
+                            wallet_addresses[currency] = {
+                                'address': primary_address.get('address'),
+                                'name': primary_address.get('name', f'{currency} Address'),
+                                'account_id': account_id,
+                                'account_name': account['name'],
+                                'account_type': account['type'],
+                                'balance': account['balance'],
+                                'primary_account': account['primary'],
+                                'network': primary_address.get('network'),
+                                'created_at': primary_address.get('created_at'),
+                                'total_addresses': len(addresses_list)
+                            }
+                            
+                            successful_fetches += 1
+                            logger.info(f"Successfully fetched {currency} address: {primary_address.get('address')}")
+                        else:
+                            logger.warning(f"No addresses found for {currency} account {account_id}")
+                            wallet_addresses[currency] = {
+                                'address': None,
+                                'error': 'No addresses found for this account',
+                                'account_id': account_id,
+                                'account_name': account['name'],
+                                'balance': account['balance']
+                            }
+                    
+                    elif addresses_response.status_code == 403:
+                        error_msg = f"Insufficient permissions to fetch {currency} addresses. Required scope: wallet:addresses:read"
+                        logger.error(error_msg)
+                        wallet_addresses[currency] = {
+                            'address': None,
+                            'error': error_msg,
+                            'account_id': account_id,
+                            'account_name': account['name'],
+                            'scope_required': 'wallet:addresses:read'
+                        }
+                    
+                    else:
+                        error_msg = f"Failed to fetch {currency} addresses: HTTP {addresses_response.status_code}"
+                        logger.error(f"{error_msg} - Response: {addresses_response.text}")
+                        wallet_addresses[currency] = {
+                            'address': None,
+                            'error': error_msg,
+                            'account_id': account_id,
+                            'account_name': account['name'],
+                            'status_code': addresses_response.status_code
+                        }
+                
+                except Exception as e:
+                    error_msg = f"Error fetching {currency} addresses: {str(e)}"
+                    logger.error(error_msg)
+                    wallet_addresses[currency] = {
+                        'address': None,
+                        'error': error_msg,
+                        'account_id': account_id,
+                        'account_name': account['name']
+                    }
+            
+            # Prepare summary result
+            result = {
+                'success': True,
+                'wallet_addresses': wallet_addresses,
+                'accounts': target_accounts,
+                'summary': {
+                    'requested_currencies': currencies,
+                    'accounts_found': len(target_accounts),
+                    'addresses_fetched': successful_fetches,
+                    'total_user_accounts': len(accounts_data.get('data', []))
+                },
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+            logger.info(f"Wallet address fetch complete: {successful_fetches}/{len(target_accounts)} successful")
+            return result
+            
+        except requests.exceptions.Timeout:
+            error_msg = "Request timed out while fetching wallet addresses"
+            logger.error(error_msg)
+            return {
+                'success': False,
+                'error': error_msg,
+                'wallet_addresses': {}
+            }
+        
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Network error while fetching wallet addresses: {str(e)}"
+            logger.error(error_msg)
+            return {
+                'success': False,
+                'error': error_msg,
+                'wallet_addresses': {}
+            }
+        
+        except Exception as e:
+            error_msg = f"Unexpected error while fetching wallet addresses: {str(e)}"
+            logger.error(error_msg)
+            return {
+                'success': False,
+                'error': error_msg,
+                'wallet_addresses': {}
+            }
+    
+    def get_primary_wallet_address(self, access_token, currency='BTC'):
+        """
+        Get the primary receiving address for a specific currency
+        
+        Args:
+            access_token (str): Valid OAuth2 access token
+            currency (str): Currency code (e.g., 'BTC', 'ETH')
+            
+        Returns:
+            dict: Primary wallet address information or error
+        """
+        try:
+            result = self.get_wallet_addresses(access_token, [currency])
+            
+            if result['success'] and currency in result['wallet_addresses']:
+                address_info = result['wallet_addresses'][currency]
+                
+                if address_info.get('address'):
+                    return {
+                        'success': True,
+                        'address': address_info['address'],
+                        'currency': currency,
+                        'account_id': address_info['account_id'],
+                        'account_name': address_info['account_name'],
+                        'balance': address_info.get('balance', {}),
+                        'network': address_info.get('network'),
+                        'primary_account': address_info.get('primary_account', False)
+                    }
+                else:
+                    return {
+                        'success': False,
+                        'error': address_info.get('error', f'No {currency} address found'),
+                        'currency': currency
+                    }
+            else:
+                return {
+                    'success': False,
+                    'error': result.get('error', f'Failed to fetch {currency} wallet address'),
+                    'currency': currency
+                }
+                
+        except Exception as e:
+            logger.error(f"Error getting primary {currency} address: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e),
+                'currency': currency
+            }

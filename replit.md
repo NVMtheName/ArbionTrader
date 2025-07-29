@@ -329,6 +329,17 @@ Changelog:
   - Created /api/etrade-positions endpoint for real-time E-trade position tracking
   - All three major brokers (Coinbase, Schwab, E-trade) now fully operational with live data
   - Multi-user architecture maintained across all broker integrations with encrypted credential storage
+- July 29, 2025. Enhanced Coinbase integration with comprehensive wallet address functionality:
+  - **WALLET ADDRESS FETCHING**: Added complete wallet address retrieval system using Coinbase OAuth2 API
+  - Implemented get_wallet_addresses() function to fetch addresses for multiple currencies (BTC, ETH, etc.)
+  - Created get_primary_wallet_address() function for single currency address retrieval
+  - Enhanced OAuth2 scopes to include wallet:addresses:read for address access permissions
+  - Added comprehensive error handling for scope validation and API permissions
+  - Created /api/coinbase-wallet-addresses and /api/coinbase-primary-address/<currency> endpoints
+  - Included detailed logging and validation for all wallet address operations
+  - Created comprehensive example script (coinbase_wallet_address_example.py) with usage demonstrations
+  - Full support for iterating through accounts, extracting addresses, and handling OAuth2 requirements
+  - Enhanced Coinbase OAuth integration maintains compatibility with existing balance and trading features
 
 ## User Preferences
 
