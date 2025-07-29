@@ -1845,6 +1845,204 @@ def get_all_coinbase_wallet_addresses():
             'error': str(e)
         })
 
+@main_bp.route('/oauth/schwab/initiate')
+@login_required
+def initiate_schwab_oauth():
+    """Initiate Schwab OAuth2 3-legged authentication flow"""
+    try:
+        from utils.schwab_trader_client import SchwabTraderClient
+        
+        schwab_client = SchwabTraderClient(user_id=current_user.id)
+        auth_url, state = schwab_client.generate_authorization_url()
+        
+        # Store state in session for validation
+        session['schwab_oauth_state'] = state
+        session['schwab_oauth_user_id'] = current_user.id
+        
+        return jsonify({
+            'success': True,
+            'authorization_url': auth_url,
+            'state': state,
+            'redirect_message': 'Redirecting to Schwab for authentication...'
+        })
+        
+    except Exception as e:
+        logging.error(f"Error initiating Schwab OAuth: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to initiate OAuth: {str(e)}'
+        }), 500
+
+@main_bp.route('/oauth_callback/broker')
+def schwab_oauth_callback():
+    """Handle Schwab OAuth2 callback with authorization code"""
+    try:
+        # Validate state parameter
+        received_state = request.args.get('state')
+        stored_state = session.get('schwab_oauth_state')
+        stored_user_id = session.get('schwab_oauth_user_id')
+        
+        if not received_state or received_state != stored_state:
+            logging.error("Invalid state parameter in Schwab OAuth callback")
+            return jsonify({'error': 'Invalid state parameter'}), 400
+        
+        # Get authorization code
+        authorization_code = request.args.get('code')
+        error = request.args.get('error')
+        
+        if error:
+            logging.error(f"Schwab OAuth error: {error}")
+            return jsonify({'error': f'OAuth error: {error}'}), 400
+        
+        if not authorization_code:
+            logging.error("No authorization code received from Schwab")
+            return jsonify({'error': 'No authorization code received'}), 400
+        
+        # Exchange code for tokens
+        from utils.schwab_trader_client import SchwabTraderClient
+        schwab_client = SchwabTraderClient(user_id=stored_user_id)
+        token_data = schwab_client.exchange_code_for_tokens(authorization_code)
+        
+        if not token_data:
+            return jsonify({'error': 'Failed to exchange code for tokens'}), 500
+        
+        # Store tokens in database
+        from models import APICredential
+        from utils.encryption import encrypt_credentials
+        
+        # Find or create Schwab credential record
+        schwab_cred = APICredential.query.filter_by(
+            user_id=stored_user_id,
+            provider='schwab',
+            is_active=True
+        ).first()
+        
+        if not schwab_cred:
+            schwab_cred = APICredential(
+                user_id=stored_user_id,
+                provider='schwab',
+                is_active=True
+            )
+            db.session.add(schwab_cred)
+        
+        # Encrypt and store token data
+        schwab_cred.encrypted_credentials = encrypt_credentials(token_data)
+        schwab_cred.test_status = 'success'
+        schwab_cred.last_updated = datetime.utcnow()
+        
+        db.session.commit()
+        
+        # Clean up session
+        session.pop('schwab_oauth_state', None)
+        session.pop('schwab_oauth_user_id', None)
+        
+        logging.info(f"Successfully stored Schwab OAuth tokens for user: {stored_user_id}")
+        
+        # Redirect to API settings page
+        return redirect('/api-settings?schwab_connected=true')
+        
+    except Exception as e:
+        logging.error(f"Error in Schwab OAuth callback: {str(e)}")
+        return jsonify({'error': 'Internal server error during authentication'}), 500
+
+@main_bp.route('/api/schwab-accounts')
+@login_required
+def get_schwab_accounts():
+    """API endpoint to fetch Schwab accounts"""
+    try:
+        from utils.schwab_trader_client import SchwabTraderClient
+        
+        schwab_client = SchwabTraderClient(user_id=current_user.id)
+        accounts_data = schwab_client.get_accounts()
+        
+        if accounts_data:
+            return jsonify({
+                'success': True,
+                'data': accounts_data,
+                'timestamp': datetime.utcnow().isoformat()
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to fetch accounts. Please re-authenticate with Schwab.',
+                'needs_auth': True
+            }), 401
+            
+    except Exception as e:
+        logging.error(f"Error fetching Schwab accounts: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@main_bp.route('/api/schwab-balances')
+@login_required
+def get_schwab_balances():
+    """API endpoint to fetch Schwab account balances"""
+    try:
+        from utils.schwab_trader_client import SchwabTraderClient
+        
+        account_hash = request.args.get('account_hash')
+        schwab_client = SchwabTraderClient(user_id=current_user.id)
+        balances_data = schwab_client.get_account_balances(account_hash)
+        
+        if balances_data:
+            return jsonify({
+                'success': True,
+                'data': balances_data,
+                'timestamp': datetime.utcnow().isoformat()
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to fetch balances. Please re-authenticate with Schwab.',
+                'needs_auth': True
+            }), 401
+            
+    except Exception as e:
+        logging.error(f"Error fetching Schwab balances: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@main_bp.route('/api/schwab-positions')
+@login_required
+def get_schwab_positions():
+    """API endpoint to fetch Schwab account positions"""
+    try:
+        from utils.schwab_trader_client import SchwabTraderClient
+        
+        account_hash = request.args.get('account_hash')
+        if not account_hash:
+            return jsonify({
+                'success': False,
+                'error': 'Account hash parameter required'
+            }), 400
+        
+        schwab_client = SchwabTraderClient(user_id=current_user.id)
+        positions_data = schwab_client.get_account_positions(account_hash)
+        
+        if positions_data:
+            return jsonify({
+                'success': True,
+                'data': positions_data,
+                'timestamp': datetime.utcnow().isoformat()
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to fetch positions. Please re-authenticate with Schwab.',
+                'needs_auth': True
+            }), 401
+            
+    except Exception as e:
+        logging.error(f"Error fetching Schwab positions: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 # Enhanced Market Data Endpoints
 @main_bp.route('/api/symbol-search')
 @login_required

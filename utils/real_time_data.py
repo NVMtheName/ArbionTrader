@@ -72,24 +72,41 @@ class RealTimeDataFetcher:
             logger.error(f"Error fetching Coinbase balance: {str(e)}")
             return {'success': False, 'error': str(e)}
     
-    def get_live_schwab_balance(self, access_token: str) -> Dict[str, Any]:
+    def get_live_schwab_balance(self, user_id: str) -> Dict[str, Any]:
         """Get live balance from Schwab API using official Trader API"""
         try:
-            from utils.schwab_api import SchwabAPIClient
+            from utils.schwab_trader_client import SchwabTraderClient
 
-            client = SchwabAPIClient(access_token)
-            account_refs = client.get_account_numbers()
+            client = SchwabTraderClient(user_id=user_id)
+            accounts_data = client.get_accounts()
+            
+            if not accounts_data:
+                return {'success': False, 'error': 'Failed to fetch accounts from Schwab API'}
+            
             total_balance = 0
             account_details = []
 
-            for account_ref in account_refs:
-                # Use the hashed value for API requests with display number
-                hashed = account_ref.get('hash_value')
-                display_number = account_ref.get('account_number')
-                balance_info = client.get_account_balance(hashed, display_number)
-                if balance_info:
-                    total_balance += balance_info.get('account_value', 0)
-                    account_details.append(balance_info)
+            # Handle both list and dict response formats
+            accounts = accounts_data if isinstance(accounts_data, list) else [accounts_data]
+            
+            for account in accounts:
+                # Get detailed balance information for each account
+                account_hash = account.get('hashValue')
+                if account_hash:
+                    balance_data = client.get_account_balances(account_hash)
+                    if balance_data:
+                        # Extract balance from account data
+                        current_balances = balance_data.get('securitiesAccount', {}).get('currentBalances', {})
+                        account_value = current_balances.get('totalCash', 0) + current_balances.get('longMarketValue', 0)
+                        
+                        total_balance += account_value
+                        account_details.append({
+                            'account_number': account.get('accountNumber', 'N/A'),
+                            'account_type': account.get('type', 'N/A'),
+                            'account_value': account_value,
+                            'cash': current_balances.get('totalCash', 0),
+                            'market_value': current_balances.get('longMarketValue', 0)
+                        })
 
             logger.info(f"Successfully fetched Schwab balance: ${total_balance:.2f} from {len(account_details)} accounts")
             return {
@@ -183,23 +200,31 @@ class RealTimeDataFetcher:
             logger.error(f"Error fetching market data: {str(e)}")
             return {}
 
-    def get_live_schwab_positions(self, access_token: str) -> Dict[str, Any]:
+    def get_live_schwab_positions(self, user_id: str) -> Dict[str, Any]:
         """Get live positions from Schwab accounts using official Trader API"""
         try:
-            from utils.schwab_api import SchwabAPIClient
+            from utils.schwab_trader_client import SchwabTraderClient
 
-            client = SchwabAPIClient(access_token)
-            account_refs = client.get_account_numbers()
+            client = SchwabTraderClient(user_id=user_id)
+            accounts_data = client.get_accounts()
+            
+            if not accounts_data:
+                return {'success': False, 'error': 'Failed to fetch accounts from Schwab API'}
+            
             positions_data = []
+            accounts = accounts_data if isinstance(accounts_data, list) else [accounts_data]
 
-            for acc_ref in account_refs:
-                hashed = acc_ref.get('hash_value')
-                display_number = acc_ref.get('account_number')
-                positions = client.get_positions(hashed, display_number)
-                positions_data.append({
-                    'account_number': display_number,
-                    'positions': positions,
-                })
+            for account in accounts:
+                account_hash = account.get('hashValue')
+                account_number = account.get('accountNumber')
+                
+                if account_hash:
+                    positions = client.get_account_positions(account_hash)
+                    positions_data.append({
+                        'account_number': account_number,
+                        'account_hash': account_hash,
+                        'positions': positions,
+                    })
 
             logger.info(f"Successfully fetched Schwab positions from {len(positions_data)} accounts")
             return {
