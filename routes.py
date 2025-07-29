@@ -1689,7 +1689,8 @@ def get_coinbase_wallet_addresses():
         # Get requested currencies from query parameters
         currencies = request.args.getlist('currencies')
         if not currencies:
-            currencies = ['BTC', 'ETH']  # Default currencies
+            # If no currencies specified, fetch ALL available currencies
+            currencies = None  # None means fetch all currencies
         
         # Fetch wallet addresses
         result = coinbase_oauth.get_wallet_addresses(access_token, currencies)
@@ -1712,11 +1713,11 @@ def get_coinbase_primary_address(currency):
         from utils.encryption import decrypt_credentials
         from utils.coinbase_oauth import CoinbaseOAuth
         
-        # Validate currency parameter
-        if not currency or currency.upper() not in ['BTC', 'ETH', 'LTC', 'BCH', 'XRP', 'ADA', 'DOT', 'LINK']:
+        # Validate currency parameter (basic validation, Coinbase API will validate supported currencies)
+        if not currency or len(currency) > 10:
             return jsonify({
                 'success': False,
-                'error': f'Invalid or unsupported currency: {currency}'
+                'error': f'Invalid currency format: {currency}'
             })
         
         currency = currency.upper()
@@ -1751,6 +1752,94 @@ def get_coinbase_primary_address(currency):
         
     except Exception as e:
         logging.error(f"Error fetching Coinbase primary {currency} address: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@main_bp.route('/api/coinbase-available-currencies')
+@login_required
+def get_coinbase_available_currencies():
+    """API endpoint to fetch all available currencies in user's Coinbase wallet"""
+    try:
+        from models import APICredential
+        from utils.encryption import decrypt_credentials
+        from utils.coinbase_oauth import CoinbaseOAuth
+        
+        # Find user's Coinbase credentials
+        coinbase_cred = APICredential.query.filter_by(
+            user_id=current_user.id,
+            provider='coinbase',
+            is_active=True
+        ).first()
+        
+        if not coinbase_cred:
+            return jsonify({
+                'success': False,
+                'error': 'Coinbase credentials not found. Please configure Coinbase OAuth2 first.'
+            })
+        
+        # Initialize Coinbase OAuth and get valid token
+        coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
+        access_token = coinbase_oauth.get_valid_token(coinbase_cred.encrypted_credentials)
+        
+        if not access_token:
+            return jsonify({
+                'success': False,
+                'error': 'No valid Coinbase access token. Please re-authenticate with Coinbase.'
+            })
+        
+        # Get all available currencies
+        result = coinbase_oauth.get_all_available_currencies(access_token)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logging.error(f"Error fetching Coinbase available currencies: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
+
+@main_bp.route('/api/coinbase-all-wallet-addresses')
+@login_required
+def get_all_coinbase_wallet_addresses():
+    """API endpoint to fetch wallet addresses for ALL currencies in user's wallet"""
+    try:
+        from models import APICredential
+        from utils.encryption import decrypt_credentials
+        from utils.coinbase_oauth import CoinbaseOAuth
+        
+        # Find user's Coinbase credentials
+        coinbase_cred = APICredential.query.filter_by(
+            user_id=current_user.id,
+            provider='coinbase',
+            is_active=True
+        ).first()
+        
+        if not coinbase_cred:
+            return jsonify({
+                'success': False,
+                'error': 'Coinbase credentials not found. Please configure Coinbase OAuth2 first.'
+            })
+        
+        # Initialize Coinbase OAuth and get valid token
+        coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
+        access_token = coinbase_oauth.get_valid_token(coinbase_cred.encrypted_credentials)
+        
+        if not access_token:
+            return jsonify({
+                'success': False,
+                'error': 'No valid Coinbase access token. Please re-authenticate with Coinbase.'
+            })
+        
+        # Get all wallet addresses
+        result = coinbase_oauth.get_all_wallet_addresses(access_token)
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logging.error(f"Error fetching all Coinbase wallet addresses: {str(e)}")
         return jsonify({
             'success': False,
             'error': str(e)

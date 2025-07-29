@@ -148,12 +148,12 @@ class CoinbaseWalletAddressFetcher:
                 'error': str(e)
             }
     
-    def get_wallet_addresses(self, currencies=['BTC', 'ETH']):
+    def get_wallet_addresses(self, currencies=None):
         """
         Fetch wallet addresses for specified currencies
         
         Args:
-            currencies (list): List of currency codes to fetch addresses for
+            currencies (list): List of currency codes to fetch addresses for. If None, fetches ALL available currencies
             
         Returns:
             dict: Wallet addresses and account information
@@ -167,6 +167,16 @@ class CoinbaseWalletAddressFetcher:
                 return accounts_result
             
             all_accounts = accounts_result['accounts']
+            
+            # If no currencies specified, get ALL currencies from user's accounts
+            if currencies is None:
+                available_currencies = []
+                for account in all_accounts:
+                    currency = account.get('currency', {}).get('code', '')
+                    if currency and currency not in available_currencies:
+                        available_currencies.append(currency)
+                currencies = available_currencies
+                logger.info(f"Auto-detected currencies from user accounts: {currencies}")
             
             # Step 2: Filter accounts by requested currencies
             target_accounts = []
@@ -345,6 +355,65 @@ class CoinbaseWalletAddressFetcher:
                 'error': str(e),
                 'currency': currency
             }
+    
+    def get_all_available_currencies(self):
+        """
+        Get list of all available currencies in user's Coinbase wallet
+        
+        Returns:
+            dict: List of all available currencies with account information
+        """
+        try:
+            accounts_result = self.get_all_accounts()
+            if not accounts_result['success']:
+                return accounts_result
+            
+            all_accounts = accounts_result['accounts']
+            
+            # Extract all unique currencies from accounts
+            currencies_info = {}
+            for account in all_accounts:
+                currency_info = account.get('currency', {})
+                currency_code = currency_info.get('code', '')
+                
+                if currency_code and currency_code not in currencies_info:
+                    balance = account.get('balance', {})
+                    currencies_info[currency_code] = {
+                        'currency_code': currency_code,
+                        'currency_name': currency_info.get('name', currency_code),
+                        'account_id': account.get('id'),
+                        'account_name': account.get('name'),
+                        'account_type': account.get('type'),
+                        'balance': {
+                            'amount': balance.get('amount', '0'),
+                            'currency': balance.get('currency', currency_code)
+                        },
+                        'primary': account.get('primary', False)
+                    }
+            
+            return {
+                'success': True,
+                'currencies': currencies_info,
+                'total_currencies': len(currencies_info),
+                'currency_list': list(currencies_info.keys()),
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting available currencies: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def get_all_wallet_addresses(self):
+        """
+        Convenience function to get wallet addresses for ALL currencies in user's wallet
+        
+        Returns:
+            dict: All wallet addresses for every currency in the user's wallet
+        """
+        return self.get_wallet_addresses(currencies=None)
 
 
 def example_usage():
@@ -390,9 +459,23 @@ def example_usage():
         print(f"❌ Failed to fetch accounts: {accounts_result['error']}")
         return
     
-    # Example 2: Get wallet addresses for BTC and ETH
-    print("\n🏠 Fetching wallet addresses for BTC and ETH...")
-    addresses_result = fetcher.get_wallet_addresses(['BTC', 'ETH'])
+    # Example 2: Get available currencies
+    print("\n💰 Fetching all available currencies...")
+    currencies_result = fetcher.get_all_available_currencies()
+    if currencies_result['success']:
+        print(f"✅ Found {currencies_result['total_currencies']} currencies:")
+        for currency_code, info in currencies_result['currencies'].items():
+            balance = info['balance']['amount']
+            print(f"  - {currency_code} ({info['currency_name']}): {balance} {currency_code}")
+        
+        available_currencies = currencies_result['currency_list']
+    else:
+        print(f"❌ Failed to fetch currencies: {currencies_result['error']}")
+        return
+    
+    # Example 3: Get wallet addresses for ALL currencies
+    print(f"\n🏠 Fetching wallet addresses for ALL {len(available_currencies)} currencies...")
+    addresses_result = fetcher.get_all_wallet_addresses()
     
     if addresses_result['success']:
         wallet_addresses = addresses_result['wallet_addresses']
@@ -416,16 +499,29 @@ def example_usage():
     else:
         print(f"❌ Failed to fetch addresses: {addresses_result['error']}")
     
-    # Example 3: Get primary BTC address only
-    print("\n₿ Fetching primary BTC address...")
-    btc_result = fetcher.get_primary_wallet_address('BTC')
+    # Example 4: Get specific currencies (BTC and ETH only)
+    print("\n🔗 Fetching wallet addresses for BTC and ETH specifically...")
+    specific_result = fetcher.get_wallet_addresses(['BTC', 'ETH'])
     
-    if btc_result['success']:
-        print(f"✅ Primary BTC Address: {btc_result['address']}")
-        print(f"  Account: {btc_result['account_name']}")
-        print(f"  Balance: {btc_result['balance'].get('amount', '0')} BTC")
-    else:
-        print(f"❌ Failed to get BTC address: {btc_result['error']}")
+    if specific_result['success']:
+        for currency, info in specific_result['wallet_addresses'].items():
+            if info.get('address'):
+                print(f"✅ {currency}: {info['address']}")
+            else:
+                print(f"❌ {currency}: {info.get('error', 'No address')}")
+    
+    # Example 5: Get primary address for first available currency
+    if available_currencies:
+        first_currency = available_currencies[0]
+        print(f"\n🎯 Fetching primary {first_currency} address...")
+        primary_result = fetcher.get_primary_wallet_address(first_currency)
+        
+        if primary_result['success']:
+            print(f"✅ Primary {first_currency} Address: {primary_result['address']}")
+            print(f"  Account: {primary_result['account_name']}")
+            print(f"  Balance: {primary_result['balance'].get('amount', '0')} {first_currency}")
+        else:
+            print(f"❌ Failed to get {first_currency} address: {primary_result['error']}")
 
 
 if __name__ == "__main__":

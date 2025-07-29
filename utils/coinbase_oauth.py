@@ -425,13 +425,13 @@ class CoinbaseOAuth:
             logger.error(f"Error getting Coinbase transactions: {str(e)}")
             return None
     
-    def get_wallet_addresses(self, access_token, currencies=['BTC', 'ETH']):
+    def get_wallet_addresses(self, access_token, currencies=None):
         """
         Fetch wallet addresses for specified currencies using Coinbase OAuth2 API
         
         Args:
             access_token (str): Valid OAuth2 access token
-            currencies (list): List of currencies to fetch addresses for (default: ['BTC', 'ETH'])
+            currencies (list): List of currencies to fetch addresses for. If None, fetches ALL available currencies
             
         Returns:
             dict: Dictionary containing wallet addresses and account information
@@ -469,11 +469,22 @@ class CoinbaseOAuth:
                 }
             
             accounts_data = accounts_response.json()
-            logger.info(f"Successfully fetched {len(accounts_data.get('data', []))} accounts")
+            all_accounts = accounts_data.get('data', [])
+            logger.info(f"Successfully fetched {len(all_accounts)} accounts")
+            
+            # If no currencies specified, get ALL currencies from user's accounts
+            if currencies is None:
+                available_currencies = []
+                for account in all_accounts:
+                    currency = account.get('currency', {}).get('code', '')
+                    if currency and currency not in available_currencies:
+                        available_currencies.append(currency)
+                currencies = available_currencies
+                logger.info(f"Auto-detected currencies from user accounts: {currencies}")
             
             # Step 2: Filter accounts by requested currencies
             target_accounts = []
-            for account in accounts_data.get('data', []):
+            for account in all_accounts:
                 currency = account.get('currency', {}).get('code', '')
                 if currency in currencies:
                     target_accounts.append({
@@ -492,7 +503,8 @@ class CoinbaseOAuth:
                     'wallet_addresses': {},
                     'accounts': [],
                     'message': f'No accounts found for currencies: {currencies}',
-                    'total_accounts': len(accounts_data.get('data', []))
+                    'total_accounts': len(all_accounts),
+                    'available_currencies': [acc.get('currency', {}).get('code') for acc in all_accounts if acc.get('currency', {}).get('code')]
                 }
             
             logger.info(f"Found {len(target_accounts)} accounts for target currencies")
@@ -587,7 +599,8 @@ class CoinbaseOAuth:
                     'requested_currencies': currencies,
                     'accounts_found': len(target_accounts),
                     'addresses_fetched': successful_fetches,
-                    'total_user_accounts': len(accounts_data.get('data', []))
+                    'total_user_accounts': len(all_accounts),
+                    'all_available_currencies': [acc.get('currency', {}).get('code') for acc in all_accounts if acc.get('currency', {}).get('code')]
                 },
                 'timestamp': datetime.utcnow().isoformat()
             }
@@ -670,3 +683,72 @@ class CoinbaseOAuth:
                 'error': str(e),
                 'currency': currency
             }
+    
+    def get_all_available_currencies(self, access_token):
+        """
+        Get list of all available currencies in user's Coinbase wallet
+        
+        Args:
+            access_token (str): Valid OAuth2 access token
+            
+        Returns:
+            dict: List of all available currencies with account information
+        """
+        try:
+            accounts_result = self.get_accounts(access_token)
+            
+            if accounts_result is None:
+                return {
+                    'success': False,
+                    'error': 'Failed to fetch accounts'
+                }
+            
+            # Extract all unique currencies from accounts
+            currencies_info = {}
+            for account in accounts_result.get('data', []):
+                currency_info = account.get('currency', {})
+                currency_code = currency_info.get('code', '')
+                
+                if currency_code and currency_code not in currencies_info:
+                    balance = account.get('balance', {})
+                    currencies_info[currency_code] = {
+                        'currency_code': currency_code,
+                        'currency_name': currency_info.get('name', currency_code),
+                        'account_id': account.get('id'),
+                        'account_name': account.get('name'),
+                        'account_type': account.get('type'),
+                        'balance': {
+                            'amount': balance.get('amount', '0'),
+                            'currency': balance.get('currency', currency_code)
+                        },
+                        'primary': account.get('primary', False),
+                        'created_at': account.get('created_at'),
+                        'updated_at': account.get('updated_at')
+                    }
+            
+            return {
+                'success': True,
+                'currencies': currencies_info,
+                'total_currencies': len(currencies_info),
+                'currency_list': list(currencies_info.keys()),
+                'timestamp': datetime.utcnow().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error getting available currencies: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+    
+    def get_all_wallet_addresses(self, access_token):
+        """
+        Convenience function to get wallet addresses for ALL currencies in user's wallet
+        
+        Args:
+            access_token (str): Valid OAuth2 access token
+            
+        Returns:
+            dict: All wallet addresses for every currency in the user's wallet
+        """
+        return self.get_wallet_addresses(access_token, currencies=None)
