@@ -30,6 +30,7 @@ Preferred communication style: Simple, everyday language.
 - **Comprehensive Market Coverage**: Integration with a ComprehensiveMarketDataProvider covering a vast range of stock symbols across major global exchanges and market sectors.
 - **OpenAI Codex Integration**: Backend integration for AI-powered code editing and analysis, with REST API and CLI access.
 - **Enhanced Coinbase v2 Integration**: Complete Wallet API v2 implementation with Smart Accounts (EIP-4337), transaction batching, gas sponsorship, multi-network support (Base, Ethereum, Arbitrum, Optimism, Polygon, BNB, Avalanche, Solana), token swaps, TEE-secured private key management, and advanced blockchain trading capabilities.
+- **Autonomous AI Trading Agents**: Revolutionary Agent Kit integration creating intelligent agents that autonomously analyze markets using OpenAI, execute trades through Smart Accounts, manage multi-network portfolios, and run sophisticated trading strategies with built-in risk management and 24/7 operation capabilities.
 
 ## External Dependencies
 
@@ -62,3 +63,14 @@ Preferred communication style: Simple, everyday language.
 - **Enhanced Security**: TEE-based private key management, rotatable wallet secrets, and single secret authentication
 - **Developer Features**: Comprehensive REST API, extensive documentation, and integration examples
 - **Production Ready**: Full backward compatibility with v1 OAuth2, automatic fallback mechanisms, and enterprise-grade security
+
+### Coinbase Agent Kit Integration (August 6, 2025)
+- **REVOLUTIONARY**: Autonomous AI trading agents using Coinbase Agent Kit concepts integrated with OpenAI
+- **AI-Powered Trading**: OpenAI GPT-4 integration for intelligent market analysis and autonomous trading decisions
+- **Smart Agent Architecture**: CoinbaseAgentKit class with multi-user support, wallet management, and strategy execution
+- **Autonomous Operations**: Agents can create wallets, analyze markets, execute trades, and manage portfolios without human intervention
+- **Advanced Blockchain Integration**: Built on v2 API with Smart Accounts, transaction batching, and multi-network support
+- **Specialized Agent Types**: General trader, DeFi farmer, arbitrage hunter, and risk manager agent configurations
+- **Comprehensive API**: Complete Flask endpoints for agent creation, market analysis, trade execution, and strategy management
+- **Risk Management**: Built-in confidence thresholds, position limits, stop-loss automation, and portfolio protection
+- **Production Ready**: Full integration example, documentation, and demo showcasing autonomous trading capabilities
