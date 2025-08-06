@@ -65,10 +65,12 @@ def create_app():
     from routes import main_bp
     from auth import auth_bp
     from github_routes import github_bp
+    from utils.coinbase_v2_routes import coinbase_v2_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(github_bp)
+    app.register_blueprint(coinbase_v2_bp)
     
     # Create tables and default admin user
     with app.app_context():

@@ -16,57 +16,121 @@ class RealTimeDataFetcher:
     def __init__(self, user_id: int):
         self.user_id = user_id
         
-    def get_live_coinbase_balance(self, access_token: str) -> Dict[str, Any]:
-        """Get live balance from Coinbase API"""
+    def get_live_coinbase_balance(self, access_token: str = None, user_id: str = None) -> Dict[str, Any]:
+        """Get live balance from Coinbase API with v2 API support"""
         try:
-            headers = {
-                'Authorization': f'Bearer {access_token}',
-                'Content-Type': 'application/json',
-                'User-Agent': 'Arbion-Trading-Platform/1.0'
-            }
-            
-            # Get accounts
-            response = requests.get(
-                'https://api.coinbase.com/v2/accounts',
-                headers=headers,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                total_balance = 0
-                holdings = []
-                
-                for account in data.get('data', []):
-                    balance = account.get('balance', {})
-                    amount = float(balance.get('amount', 0))
-                    currency = balance.get('currency', 'USD')
+            # Try v2 API first if user_id is provided
+            if user_id:
+                try:
+                    from utils.coinbase_v2_client import CoinbaseV2Client
                     
-                    if amount > 0:
-                        holdings.append({
-                            'currency': currency,
-                            'amount': amount,
-                            'name': account.get('name', currency)
-                        })
-                        
-                        # Convert to USD
-                        if currency == 'USD':
-                            total_balance += amount
-                        else:
-                            # Get current price for conversion
-                            price = self._get_crypto_price(currency)
-                            if price:
-                                total_balance += amount * price
-                
-                return {
-                    'success': True,
-                    'balance': total_balance,
-                    'holdings': holdings,
-                    'timestamp': datetime.utcnow().isoformat()
+                    v2_client = CoinbaseV2Client(user_id=user_id)
+                    accounts = v2_client.list_accounts()
+                    
+                    total_balance = 0
+                    holdings = []
+                    
+                    for account in accounts:
+                        # Get balance for each account across different networks
+                        networks = ['base-sepolia', 'base-mainnet', 'ethereum-mainnet', 'ethereum-sepolia']
+                        for network in networks:
+                            try:
+                                balance_result = v2_client.get_account_balance(account.get('address'), network)
+                                balance_data = balance_result.get('balance', {})
+                                
+                                if balance_data:
+                                    amount = float(balance_data.get('amount', 0))
+                                    currency = balance_data.get('currency', 'ETH')
+                                    
+                                    if amount > 0:
+                                        holdings.append({
+                                            'currency': currency,
+                                            'amount': amount,
+                                            'name': f"{currency} ({network})",
+                                            'network': network,
+                                            'address': account.get('address')
+                                        })
+                                        
+                                        # Convert to USD for total
+                                        if currency == 'USD':
+                                            total_balance += amount
+                                        else:
+                                            price = self._get_crypto_price(currency)
+                                            if price:
+                                                total_balance += amount * price
+                                                
+                            except Exception as network_error:
+                                # Skip this network if balance fetch fails
+                                logger.debug(f"Skipping network {network} for account {account.get('address')}: {network_error}")
+                                continue
+                    
+                    logger.info(f"Successfully fetched Coinbase v2 balance: ${total_balance:.2f} from {len(holdings)} holdings")
+                    return {
+                        'success': True,
+                        'balance': total_balance,
+                        'holdings': holdings,
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'api_version': 'v2'
+                    }
+                    
+                except Exception as v2_error:
+                    logger.warning(f"Coinbase v2 API failed, falling back to v1: {v2_error}")
+                    # Fall through to v1 API
+            
+            # Fall back to v1 API if v2 fails or access_token is provided
+            if access_token:
+                headers = {
+                    'Authorization': f'Bearer {access_token}',
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Arbion-Trading-Platform/1.0'
                 }
-            else:
-                logger.error(f"Coinbase API error: {response.status_code} - {response.text}")
-                return {'success': False, 'error': f'API error: {response.status_code}'}
+                
+                # Get accounts
+                response = requests.get(
+                    'https://api.coinbase.com/v2/accounts',
+                    headers=headers,
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    total_balance = 0
+                    holdings = []
+                    
+                    for account in data.get('data', []):
+                        balance = account.get('balance', {})
+                        amount = float(balance.get('amount', 0))
+                        currency = balance.get('currency', 'USD')
+                        
+                        if amount > 0:
+                            holdings.append({
+                                'currency': currency,
+                                'amount': amount,
+                                'name': account.get('name', currency),
+                                'api_version': 'v1'
+                            })
+                            
+                            # Convert to USD
+                            if currency == 'USD':
+                                total_balance += amount
+                            else:
+                                # Get current price for conversion
+                                price = self._get_crypto_price(currency)
+                                if price:
+                                    total_balance += amount * price
+                    
+                    return {
+                        'success': True,
+                        'balance': total_balance,
+                        'holdings': holdings,
+                        'timestamp': datetime.utcnow().isoformat(),
+                        'api_version': 'v1'
+                    }
+                else:
+                    logger.error(f"Coinbase API error: {response.status_code} - {response.text}")
+                    return {'success': False, 'error': f'API error: {response.status_code}'}
+            
+            return {'success': False, 'error': 'No valid credentials provided'}
                 
         except Exception as e:
             logger.error(f"Error fetching Coinbase balance: {str(e)}")
