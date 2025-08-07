@@ -8,11 +8,19 @@ from flask_login import login_required, current_user
 import logging
 import json
 
-from utils.github_codex_integration import GitHubCodexIntegration
-
 logger = logging.getLogger(__name__)
 
 github_bp = Blueprint('github', __name__, url_prefix='/github')
+
+
+def get_github_integration():
+    """Safely load GitHub integration."""
+    try:
+        from utils.github_codex_integration import GitHubCodexIntegration
+        return GitHubCodexIntegration(user_id=current_user.id)
+    except Exception as e:
+        logger.error(f"GitHub integration unavailable: {e}")
+        return None
 
 @github_bp.route('/setup', methods=['GET', 'POST'])
 @login_required
@@ -21,23 +29,24 @@ def github_setup():
     if request.method == 'POST':
         try:
             github_token = request.form.get('github_token')
-            
+
             if not github_token:
                 flash('GitHub token is required', 'error')
                 return redirect(url_for('github.github_setup'))
-            
-            # Initialize GitHub integration
-            github_integration = GitHubCodexIntegration(user_id=current_user.id)
-            
-            # Save credentials
+
+            github_integration = get_github_integration()
+            if not github_integration:
+                flash('GitHub integration is unavailable', 'error')
+                return redirect(url_for('github.github_setup'))
+
             success = github_integration.save_github_credentials(current_user.id, github_token)
-            
+
             if success:
                 flash('GitHub credentials saved successfully!', 'success')
                 return redirect(url_for('github.repositories'))
             else:
                 flash('Failed to save GitHub credentials', 'error')
-                
+
         except Exception as e:
             logger.error(f"GitHub setup error: {e}")
             flash(f'Setup failed: {str(e)}', 'error')
@@ -49,9 +58,13 @@ def github_setup():
 def repositories():
     """List user's GitHub repositories"""
     try:
-        github_integration = GitHubCodexIntegration(user_id=current_user.id)
+        github_integration = get_github_integration()
+        if not github_integration:
+            flash('GitHub integration is unavailable', 'error')
+            return redirect(url_for('github.github_setup'))
+
         repos = github_integration.list_repositories()
-        
+
         return render_template('github/repositories.html', repositories=repos)
         
     except Exception as e:
@@ -64,7 +77,11 @@ def repositories():
 def repository_details(owner, repo):
     """Show repository details and file structure"""
     try:
-        github_integration = GitHubCodexIntegration(user_id=current_user.id)
+        github_integration = get_github_integration()
+        if not github_integration:
+            flash('GitHub integration is unavailable', 'error')
+            return redirect(url_for('github.repositories'))
+
         structure = github_integration.get_repository_structure(owner, repo)
         
         return render_template('github/repository_details.html', 
@@ -81,9 +98,12 @@ def code_editor(owner, repo):
     """AI-powered code editor interface"""
     try:
         file_path = request.args.get('file', '')
-        
-        github_integration = GitHubCodexIntegration(user_id=current_user.id)
-        
+
+        github_integration = get_github_integration()
+        if not github_integration:
+            flash('GitHub integration is unavailable', 'error')
+            return redirect(url_for('github.repositories'))
+
         content = ""
         sha = ""
         
@@ -111,7 +131,10 @@ def analyze_code():
         if not code:
             return jsonify({'error': 'No code provided'}), 400
         
-        github_integration = GitHubCodexIntegration(user_id=current_user.id)
+        github_integration = get_github_integration()
+        if not github_integration:
+            return jsonify({'error': 'GitHub integration is unavailable'}), 500
+
         analysis = github_integration.analyze_code_with_codex(code, language)
         
         return jsonify(analysis)
@@ -133,7 +156,10 @@ def improve_code():
         if not code or not requirements:
             return jsonify({'error': 'Code and requirements are required'}), 400
         
-        github_integration = GitHubCodexIntegration(user_id=current_user.id)
+        github_integration = get_github_integration()
+        if not github_integration:
+            return jsonify({'error': 'GitHub integration is unavailable'}), 500
+
         improved_code = github_integration.generate_code_improvements(code, requirements, language)
         
         return jsonify({'improved_code': improved_code})
@@ -159,7 +185,10 @@ def commit_changes():
         if not all([owner, repo, file_path, content, sha]):
             return jsonify({'error': 'Missing required parameters'}), 400
         
-        github_integration = GitHubCodexIntegration(user_id=current_user.id)
+        github_integration = get_github_integration()
+        if not github_integration:
+            return jsonify({'error': 'GitHub integration is unavailable'}), 500
+
         success = github_integration.commit_file_changes(
             owner, repo, file_path, content, sha, commit_message, branch
         )
@@ -184,7 +213,10 @@ def intelligent_refactor():
         if not all([owner, repo, file_path, refactoring_goals]):
             return jsonify({'error': 'Missing required parameters'}), 400
         
-        github_integration = GitHubCodexIntegration(user_id=current_user.id)
+        github_integration = get_github_integration()
+        if not github_integration:
+            return jsonify({'error': 'GitHub integration is unavailable'}), 500
+
         result = github_integration.intelligent_refactoring(
             owner, repo, file_path, refactoring_goals
         )
@@ -200,7 +232,10 @@ def intelligent_refactor():
 def automated_code_review(owner, repo, pr_number):
     """API endpoint for automated code review"""
     try:
-        github_integration = GitHubCodexIntegration(user_id=current_user.id)
+        github_integration = get_github_integration()
+        if not github_integration:
+            return jsonify({'error': 'GitHub integration is unavailable'}), 500
+
         review_result = github_integration.automated_code_review(owner, repo, pr_number)
         
         return jsonify(review_result)
@@ -214,22 +249,25 @@ def automated_code_review(owner, repo, pr_number):
 def pull_requests(owner, repo):
     """List pull requests for a repository"""
     try:
-        github_integration = GitHubCodexIntegration(user_id=current_user.id)
-        
+        github_integration = get_github_integration()
+        if not github_integration:
+            flash('GitHub integration is unavailable', 'error')
+            return redirect(url_for('github.repository_details', owner=owner, repo=repo))
+
         # Get pull requests from GitHub API
         headers = {
             'Authorization': f'token {github_integration.github_token}',
             'Accept': 'application/vnd.github.v3+json'
         }
-        
+
         import requests
         url = f"https://api.github.com/repos/{owner}/{repo}/pulls"
         response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()
-        
+
         pull_requests = response.json()
-        
-        return render_template('github/pull_requests.html', 
+
+        return render_template('github/pull_requests.html',
                              owner=owner, repo=repo, pull_requests=pull_requests)
         
     except Exception as e:
