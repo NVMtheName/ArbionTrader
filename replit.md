@@ -122,4 +122,6 @@ Preferred communication style: Simple, everyday language.
 - **Performance Analytics**: Detailed tracking of trading performance, win rates, P&L, and strategy optimization metrics
 - **12 AI Trading Endpoints**: Complete REST API for bot control, signal generation, analysis, execution, and performance monitoring
 - **Advanced Configuration**: Customizable trading strategies, risk parameters, confidence thresholds, and execution settings
-- **Integration Architecture**: Seamless integration with OpenAI for intelligence and Schwab for execution in unified trading system
+- **Multi-Account Execution**: Unified strategy application across all connected broker accounts (Schwab, Coinbase, E-trade)
+- **Cross-Asset Intelligence**: Smart mapping between stocks and crypto with unified risk management across asset classes
+- **Integration Architecture**: Seamless integration with OpenAI for intelligence and multi-broker execution in unified trading system

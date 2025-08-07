@@ -207,7 +207,7 @@ def analyze_symbol_with_ai():
         
         bot = active_bots[user_id]
         
-        # Initialize connections if needed
+        # Initialize multi-broker connections if needed
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -215,7 +215,7 @@ def analyze_symbol_with_ai():
             if not init_result.get('success'):
                 return jsonify({
                     'success': False,
-                    'error': 'Failed to initialize bot connections',
+                    'error': 'Failed to initialize multi-broker connections',
                     'details': init_result
                 }), 500
             
@@ -474,15 +474,46 @@ def get_trading_history():
             'error': str(e)
         }), 500
 
+@ai_trading_bot_bp.route('/api/ai-trading-bot/accounts', methods=['GET'])
+@login_required
+def get_connected_accounts():
+    """Get all connected broker accounts"""
+    try:
+        user_id = str(current_user.id)
+        
+        # Create temporary bot to check connections
+        bot = create_ai_trading_bot(user_id)
+        
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            init_result = loop.run_until_complete(bot.initialize_connections())
+            
+            return jsonify({
+                'success': True,
+                'connected_accounts': init_result.get('connected_accounts', {}),
+                'total_accounts': init_result.get('total_accounts', 0),
+                'broker_connections': init_result.get('broker_connections', {})
+            })
+        finally:
+            loop.close()
+    
+    except Exception as e:
+        logger.error(f"Error getting connected accounts: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @ai_trading_bot_bp.route('/api/ai-trading-bot/demo', methods=['POST'])
 @login_required
 def demo_ai_trading_bot():
-    """Comprehensive demo of AI trading bot capabilities"""
+    """Comprehensive demo of multi-account AI trading bot capabilities"""
     try:
         user_id = str(current_user.id)
         demo_symbol = request.get_json().get('symbol', 'AAPL')
         
-        # Create demo bot
+        # Create demo bot with multi-account support
         demo_bot = create_ai_trading_bot(user_id, {'paper_trading': True})
         
         demo_results = []
@@ -490,11 +521,16 @@ def demo_ai_trading_bot():
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
-            # Test 1: Initialize connections
+            # Test 1: Initialize multi-broker connections
             init_result = loop.run_until_complete(demo_bot.initialize_connections())
             demo_results.append({
-                'test': 'connection_initialization',
-                'result': init_result
+                'test': 'multi_broker_connection_initialization',
+                'result': {
+                    'success': init_result.get('success'),
+                    'total_accounts': init_result.get('total_accounts', 0),
+                    'broker_connections': init_result.get('broker_connections', {}),
+                    'connected_accounts': init_result.get('connected_accounts', {})
+                }
             })
             
             if init_result.get('success'):
