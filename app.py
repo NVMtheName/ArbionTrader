@@ -68,6 +68,7 @@ def create_app():
     from utils.coinbase_v2_routes import coinbase_v2_bp
     from utils.agent_kit_routes import agent_kit_bp
     from utils.enhanced_openai_routes import enhanced_openai_bp
+    from utils.openai_auth_routes import openai_auth_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -75,6 +76,7 @@ def create_app():
     app.register_blueprint(coinbase_v2_bp)
     app.register_blueprint(agent_kit_bp)
     app.register_blueprint(enhanced_openai_bp)
+    app.register_blueprint(openai_auth_bp)
     
     # Create tables and default admin user
     with app.app_context():

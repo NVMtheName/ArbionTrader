@@ -22,6 +22,7 @@ from openai import OpenAI, AsyncOpenAI
 from openai.types.chat import ChatCompletion
 from dataclasses import dataclass
 import re
+from utils.openai_auth_manager import OpenAIAuthManager, create_auth_manager
 
 logger = logging.getLogger(__name__)
 
@@ -57,14 +58,13 @@ class EnhancedOpenAIClient:
     
     def __init__(self, user_id: str = None):
         self.user_id = user_id
-        self.api_key = os.environ.get("OPENAI_API_KEY")
         
-        if not self.api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is required")
+        # Initialize enhanced authentication manager
+        self.auth_manager = create_auth_manager(user_id)
         
-        # Initialize both sync and async clients
-        self.client = OpenAI(api_key=self.api_key)
-        self.async_client = AsyncOpenAI(api_key=self.api_key)
+        # Get authenticated clients
+        self.client = self.auth_manager.get_sync_client()
+        self.async_client = self.auth_manager.get_async_client()
         
         # Enhanced model selection
         self.models = {
@@ -370,7 +370,7 @@ class EnhancedOpenAIClient:
             Provide a comprehensive response with specific actionable recommendations.
             """
             
-            response = await self.async_client.chat.completions.create(
+            response = await self.auth_manager.make_chat_completion(
                 model=self.models["primary"],
                 messages=[
                     {"role": "system", "content": self._get_assistant_instructions("professional")},
@@ -524,7 +524,7 @@ class EnhancedOpenAIClient:
             Format response as structured JSON with detailed reasoning.
             """
             
-            analysis_response = await self.async_client.chat.completions.create(
+            analysis_response = await self.auth_manager.make_chat_completion(
                 model=self.models["analysis"],
                 messages=[
                     {"role": "system", "content": "You are an expert financial analyst providing detailed market analysis."},
@@ -600,7 +600,7 @@ class EnhancedOpenAIClient:
             Format as detailed JSON with quantitative scores and qualitative insights.
             """
             
-            response = await self.async_client.chat.completions.create(
+            response = await self.auth_manager.make_chat_completion(
                 model=self.models["analysis"],
                 messages=[
                     {"role": "system", "content": "You are an expert market sentiment analyst with deep understanding of market psychology and behavioral finance."},
@@ -662,7 +662,7 @@ class EnhancedOpenAIClient:
             Format as comprehensive JSON with implementation details.
             """
             
-            response = await self.async_client.chat.completions.create(
+            response = await self.auth_manager.make_chat_completion(
                 model=self.models["reasoning"] if "o1" in self.models["reasoning"] else self.models["primary"],
                 messages=[
                     {"role": "system", "content": "You are an expert quantitative strategist and portfolio manager with deep knowledge of algorithmic trading systems."},
@@ -710,7 +710,10 @@ class EnhancedOpenAIClient:
             
             messages.append({"role": "user", "content": message})
             
-            # Stream response
+            # Ensure connection before streaming
+            await self.auth_manager.ensure_connection()
+            
+            # Stream response using authenticated client
             stream = await self.async_client.chat.completions.create(
                 model=self.models["primary"],
                 messages=messages,
@@ -729,9 +732,13 @@ class EnhancedOpenAIClient:
             yield f"Error in conversation: {str(e)}"
     
     def get_client_status(self) -> Dict[str, Any]:
-        """Get comprehensive status of the OpenAI client"""
+        """Get comprehensive status of the OpenAI client including authentication"""
+        auth_info = self.auth_manager.get_connection_info()
+        
         return {
-            'client_initialized': bool(self.api_key),
+            'client_initialized': auth_info['credentials']['api_key_present'],
+            'connection_healthy': auth_info['connection_status']['is_connected'],
+            'authentication_status': auth_info,
             'user_id': self.user_id,
             'available_models': self.models,
             'trading_functions_count': len(self.trading_functions),
@@ -746,7 +753,8 @@ class EnhancedOpenAIClient:
                 'sentiment_analysis',
                 'strategy_generation',
                 'conversational_interface',
-                'streaming_responses'
+                'streaming_responses',
+                'enhanced_authentication'
             ],
             'supported_analysis_types': [
                 'technical_analysis',
@@ -756,6 +764,20 @@ class EnhancedOpenAIClient:
                 'portfolio_optimization'
             ]
         }
+    
+    async def test_connection(self) -> Dict[str, Any]:
+        """Test OpenAI connection and authentication"""
+        return await self.auth_manager.test_connection()
+    
+    async def refresh_connection(self) -> Dict[str, Any]:
+        """Refresh OpenAI connection"""
+        result = await self.auth_manager.refresh_connection()
+        
+        # Update clients after refresh
+        self.client = self.auth_manager.get_sync_client()
+        self.async_client = self.auth_manager.get_async_client()
+        
+        return result
 
 # Helper functions for easy integration
 async def create_enhanced_openai_client(user_id: str = None) -> EnhancedOpenAIClient:
