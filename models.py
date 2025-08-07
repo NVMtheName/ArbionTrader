@@ -38,6 +38,11 @@ class APICredential(db.Model):
     last_tested = db.Column(db.DateTime)
     test_status = db.Column(db.String(20))  # success, failed, pending
     
+    # Additional fields for OAuth tokens (Schwab, Coinbase)
+    access_token = db.Column(Text)
+    refresh_token = db.Column(Text)
+    token_expiry = db.Column(db.String(50))  # ISO format string
+    
     def __repr__(self):
         return f'<APICredential {self.provider} for user {self.user_id}>'
 
