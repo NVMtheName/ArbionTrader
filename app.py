@@ -70,6 +70,7 @@ def create_app():
     from utils.enhanced_openai_routes import enhanced_openai_bp
     from utils.openai_auth_routes import openai_auth_bp
     from utils.schwabdev_routes import schwabdev_bp
+    from utils.ai_trading_bot_routes import ai_trading_bot_bp
     
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -79,6 +80,7 @@ def create_app():
     app.register_blueprint(enhanced_openai_bp)
     app.register_blueprint(openai_auth_bp)
     app.register_blueprint(schwabdev_bp)
+    app.register_blueprint(ai_trading_bot_bp)
     
     # Create tables and default admin user
     with app.app_context():
