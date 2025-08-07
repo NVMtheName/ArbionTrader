@@ -64,21 +64,26 @@ def create_app():
     # Import and register blueprints
     from routes import main_bp
     from auth import auth_bp
-    from github_routes import github_bp
-    from utils.coinbase_v2_routes import coinbase_v2_bp
-    from utils.agent_kit_routes import agent_kit_bp
-    from utils.enhanced_openai_routes import enhanced_openai_bp
-    from utils.openai_auth_routes import openai_auth_bp
-    from utils.schwabdev_routes import schwabdev_bp
-    
+
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
-    app.register_blueprint(github_bp)
-    app.register_blueprint(coinbase_v2_bp)
-    app.register_blueprint(agent_kit_bp)
-    app.register_blueprint(enhanced_openai_bp)
-    app.register_blueprint(openai_auth_bp)
-    app.register_blueprint(schwabdev_bp)
+
+    optional_blueprints = [
+        ("github_routes", "github_bp"),
+        ("utils.coinbase_v2_routes", "coinbase_v2_bp"),
+        ("utils.agent_kit_routes", "agent_kit_bp"),
+        ("utils.enhanced_openai_routes", "enhanced_openai_bp"),
+        ("utils.openai_auth_routes", "openai_auth_bp"),
+        ("utils.schwabdev_routes", "schwabdev_bp"),
+    ]
+
+    for module_name, bp_name in optional_blueprints:
+        try:
+            module = __import__(module_name, fromlist=[bp_name])
+            bp = getattr(module, bp_name)
+            app.register_blueprint(bp)
+        except Exception as e:
+            logging.warning(f"Skipping optional blueprint {module_name}: {e}")
     
     # Create tables and default admin user
     with app.app_context():
