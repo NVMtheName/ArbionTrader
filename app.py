@@ -33,8 +33,11 @@ def create_app():
     app.config['PREFERRED_URL_SCHEME'] = 'https'
     
     # Fix DATABASE_URL for newer SQLAlchemy versions
-    database_url = os.environ.get("DATABASE_URL", "postgresql://localhost/arbion_db")
-    if database_url.startswith("postgres://"):
+    # Use SQLite by default to avoid requiring PostgreSQL during development or tests
+    database_url = os.environ.get("DATABASE_URL")
+    if not database_url:
+        database_url = "sqlite:///arbion.db"
+    elif database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
