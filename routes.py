@@ -737,7 +737,6 @@ def api_settings():
                                  oauth_credentials=oauth_credentials)
         except:
             return render_template('api_settings_simple.html')
-        from app import db
         
         provider = None  # Initialize provider variable
         
