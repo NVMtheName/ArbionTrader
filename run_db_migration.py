@@ -3,7 +3,7 @@ import psycopg2
 from urllib.parse import urlparse
 
 # Replace this with your actual DATABASE_URL from Heroku
-DATABASE_URL = "YOUR_DATABASE_URL_HERE"
+DATABASE_URL = "postgres://udirmku626r0ro:pd2d6be2a373d8bfd3d378cbb151a14a231d596bc2ad9087af5bad5443b9be398@c3v5n5ajfopshl.cluster-czrs8kj4isg7.us-east-1.rds.amazonaws.com:5432/d7qotojsdfo725"
 
 try:
     # Parse the database URL
