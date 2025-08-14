@@ -438,26 +438,27 @@ def natural_trade():
 @main_bp.route('/api_settings', methods=['GET', 'POST'])
 @login_required
 def api_settings():
-    from models import APICredential, OAuthClientCredential
-    from utils.encryption import encrypt_credentials
-    from app import db
-    
-    if request.method == 'POST':
-        # Enhanced debugging for form submission
-        logging.info("="*50)
-        logging.info("API SETTINGS FORM SUBMITTED")
-        logging.info("="*50)
-        logging.info(f"Form data: {dict(request.form)}")
-        logging.info(f"User: {current_user.id} ({current_user.username})")
-        logging.info(f"Request method: {request.method}")
-        logging.info(f"Content type: {request.content_type}")
+    try:
+        from models import APICredential, OAuthClientCredential
+        from utils.encryption import encrypt_credentials
+        from app import db
         
-        # Check for missing provider field
-        if not request.form.get('provider'):
-            logging.error("Missing provider field in form submission")
-            flash('Provider field is required', 'error')
-            return redirect(url_for('main.api_settings'))
-        provider = request.form.get('provider')
+        if request.method == 'POST':
+            # Enhanced debugging for form submission
+            logging.info("="*50)
+            logging.info("API SETTINGS FORM SUBMITTED")
+            logging.info("="*50)
+            logging.info(f"Form data: {dict(request.form)}")
+            logging.info(f"User: {current_user.id} ({current_user.username})")
+            logging.info(f"Request method: {request.method}")
+            logging.info(f"Content type: {request.content_type}")
+            
+            # Check for missing provider field
+            if not request.form.get('provider'):
+                logging.error("Missing provider field in form submission")
+                flash('Provider field is required', 'error')
+                return redirect(url_for('main.api_settings'))
+            provider = request.form.get('provider')
         
         if provider == 'coinbase':
             from utils.coinbase_oauth import CoinbaseOAuth
@@ -657,53 +658,66 @@ def api_settings():
             flash(f'Error saving credentials: {str(e)}', 'error')
             return redirect(url_for('main.api_settings'))
     
-    # Get existing credentials
-    credentials = APICredential.query.filter_by(user_id=current_user.id, is_active=True).all()
-    cred_status = {}
-    for cred in credentials:
-        cred_status[cred.provider] = {
-            'status': cred.test_status,
-            'last_tested': cred.last_tested
-        }
+        # Get existing credentials
+        credentials = APICredential.query.filter_by(user_id=current_user.id, is_active=True).all()
+        cred_status = {}
+        for cred in credentials:
+            cred_status[cred.provider] = {
+                'status': cred.test_status,
+                'last_tested': cred.last_tested
+            }
+        
+        # Check OAuth2 client credentials configuration for this user
+        schwab_oauth_configured = bool(
+            OAuthClientCredential.query.filter_by(
+                user_id=current_user.id,
+                provider='schwab',
+                is_active=True
+            ).first()
+        )
+        
+        coinbase_oauth_configured = bool(
+            OAuthClientCredential.query.filter_by(
+                user_id=current_user.id,
+                provider='coinbase',
+                is_active=True
+            ).first()
+        )
+        
+        # Get user's existing credentials for display
+        api_credentials = APICredential.query.filter_by(user_id=current_user.id).all()
+        oauth_credentials = OAuthClientCredential.query.filter_by(user_id=current_user.id).all()
+        
+        # Create OAuth dictionary for easy template access with existing credentials
+        oauth_dict = {}
+        for oauth_cred in oauth_credentials:
+            oauth_dict[oauth_cred.provider] = {
+                'client_id': oauth_cred.client_id,
+                'client_secret': oauth_cred.client_secret[:8] + '...' if oauth_cred.client_secret else None,  # Show first 8 chars for verification
+                'redirect_uri': oauth_cred.redirect_uri,
+                'is_active': oauth_cred.is_active,
+                'created_at': oauth_cred.created_at,
+                'updated_at': oauth_cred.updated_at
+            }
     
-    # Check OAuth2 client credentials configuration for this user
-    schwab_oauth_configured = bool(
-        OAuthClientCredential.query.filter_by(
-            user_id=current_user.id,
-            provider='schwab',
-            is_active=True
-        ).first()
-    )
+        return render_template('api_settings.html', 
+                             cred_status=cred_status, 
+                             schwab_oauth_configured=schwab_oauth_configured,
+                             coinbase_oauth_configured=coinbase_oauth_configured,
+                             oauth_dict=oauth_dict)
     
-    coinbase_oauth_configured = bool(
-        OAuthClientCredential.query.filter_by(
-            user_id=current_user.id,
-            provider='coinbase',
-            is_active=True
-        ).first()
-    )
-    
-    # Get user's existing credentials for display
-    api_credentials = APICredential.query.filter_by(user_id=current_user.id).all()
-    oauth_credentials = OAuthClientCredential.query.filter_by(user_id=current_user.id).all()
-    
-    # Create OAuth dictionary for easy template access with existing credentials
-    oauth_dict = {}
-    for oauth_cred in oauth_credentials:
-        oauth_dict[oauth_cred.provider] = {
-            'client_id': oauth_cred.client_id,
-            'client_secret': oauth_cred.client_secret[:8] + '...' if oauth_cred.client_secret else None,  # Show first 8 chars for verification
-            'redirect_uri': oauth_cred.redirect_uri,
-            'is_active': oauth_cred.is_active,
-            'created_at': oauth_cred.created_at,
-            'updated_at': oauth_cred.updated_at
-        }
-    
-    return render_template('api_settings.html', 
-                         cred_status=cred_status, 
-                         schwab_oauth_configured=schwab_oauth_configured,
-                         coinbase_oauth_configured=coinbase_oauth_configured,
-                         oauth_dict=oauth_dict)
+    except Exception as e:
+        logging.error(f"API settings error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Return a minimal settings page on error
+        flash(f'API settings temporarily limited due to maintenance. Some features may be unavailable.', 'warning')
+        return render_template('api_settings.html',
+                             cred_status={},
+                             schwab_oauth_configured=False,
+                             coinbase_oauth_configured=False,
+                             oauth_dict={})
 
 @main_bp.route('/test-api-connection', methods=['POST'])
 @login_required
