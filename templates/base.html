@@ -184,6 +184,11 @@
                     <span>Strategies</span>
                 </a>
                 
+                <a href="/analytics/dashboard" class="sidebar-item flex items-center space-x-3 p-3 rounded-lg transition-colors {% if request.endpoint == 'main.analytics_dashboard' %}active{% endif %}">
+                    <i data-feather="bar-chart-2" class="w-5 h-5"></i>
+                    <span>Trade Analytics</span>
+                </a>
+                
                 {% if current_user.is_superadmin() %}
                 <a href="{{ url_for('main.auto_trading') }}" class="sidebar-item flex items-center space-x-3 p-3 rounded-lg transition-colors {% if request.endpoint == 'main.auto_trading' %}active{% endif %}">
                     <i data-feather="zap" class="w-5 h-5"></i>

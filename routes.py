@@ -438,6 +438,15 @@ def natural_trade():
 @main_bp.route('/api_settings', methods=['GET', 'POST'])
 @login_required
 def api_settings():
+    """API Settings - temporarily simplified to avoid redirect loops"""
+    if request.method == 'GET':
+        # Return simplified settings page for now
+        return render_template('api_settings_simple.html')
+    
+    # Handle POST requests normally for API operations
+    return _handle_api_settings_post()
+
+def _handle_api_settings_post():
     try:
         from models import APICredential, OAuthClientCredential
         from utils.encryption import encrypt_credentials
@@ -459,7 +468,12 @@ def api_settings():
             if not request.form.get('provider'):
                 logging.error("Missing provider field in form submission")
                 flash('Provider field is required', 'error')
-                return redirect(url_for('main.api_settings'))
+                # Don't redirect, just render the template with error
+                user_credentials = APICredential.query.filter_by(user_id=current_user.id).all()
+                oauth_credentials = OAuthClientCredential.query.filter_by(user_id=current_user.id).all()
+                return render_template('api_settings.html', 
+                                     credentials=user_credentials, 
+                                     oauth_credentials=oauth_credentials)
             provider = request.form.get('provider')
             
             if provider == 'coinbase':
