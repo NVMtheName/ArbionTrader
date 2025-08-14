@@ -443,6 +443,8 @@ def api_settings():
         from utils.encryption import encrypt_credentials
         from app import db
         
+        provider = None  # Initialize provider variable
+        
         if request.method == 'POST':
             # Enhanced debugging for form submission
             logging.info("="*50)
@@ -459,9 +461,9 @@ def api_settings():
                 flash('Provider field is required', 'error')
                 return redirect(url_for('main.api_settings'))
             provider = request.form.get('provider')
-        
-        if provider == 'coinbase':
-            from utils.coinbase_oauth import CoinbaseOAuth
+            
+            if provider == 'coinbase':
+                from utils.coinbase_oauth import CoinbaseOAuth
             # Check if this is OAuth2 flow initiation
             oauth_flow = request.form.get('oauth_flow')
             
@@ -641,11 +643,10 @@ def api_settings():
             existing_cred.updated_at = datetime.utcnow()
             existing_cred.test_status = 'pending'
         else:
-            new_cred = APICredential(
-                user_id=current_user.id,
-                provider=provider,
-                encrypted_credentials=encrypted_creds
-            )
+            new_cred = APICredential()
+            new_cred.user_id = current_user.id
+            new_cred.provider = provider
+            new_cred.encrypted_credentials = encrypted_creds
             db.session.add(new_cred)
         
         try:
@@ -1145,12 +1146,11 @@ def create_user():
         flash('Username already exists.', 'error')
         return redirect(url_for('main.user_management'))
     
-    new_user = User(
-        username=username,
-        email=email,
-        password_hash=generate_password_hash(password),
-        role=role
-    )
+    new_user = User()
+    new_user.username = username
+    new_user.email = email
+    new_user.password_hash = generate_password_hash(password or '')
+    new_user.role = role
     
     db.session.add(new_user)
     db.session.commit()
@@ -1201,7 +1201,8 @@ def account():
 def get_market_data(symbol):
     """Get real-time market data for a symbol"""
     try:
-        market_data = MarketDataProvider()
+        from utils.enhanced_market_data import ComprehensiveMarketDataProvider
+        market_data = ComprehensiveMarketDataProvider()
         
         # Determine if it's crypto or stock
         if symbol.endswith('-USD') or symbol.upper() in ['BTC', 'ETH', 'LTC', 'BCH']:
@@ -1223,7 +1224,8 @@ def get_market_data(symbol):
 def get_technical_indicators(symbol):
     """Get technical indicators for a symbol"""
     try:
-        market_data = MarketDataProvider()
+        from utils.enhanced_market_data import ComprehensiveMarketDataProvider
+        market_data = ComprehensiveMarketDataProvider()
         indicators = market_data.calculate_technical_indicators(symbol)
         
         if indicators:
@@ -1240,7 +1242,8 @@ def get_technical_indicators(symbol):
 def get_option_chain(symbol):
     """Get option chain for a symbol"""
     try:
-        market_data = MarketDataProvider()
+        from utils.enhanced_market_data import ComprehensiveMarketDataProvider
+        market_data = ComprehensiveMarketDataProvider()
         expiration = request.args.get('expiration')
         
         option_chain = market_data.get_option_chain(symbol, expiration)
@@ -1259,6 +1262,7 @@ def get_option_chain(symbol):
 def get_portfolio_risk():
     """Get portfolio risk analysis"""
     try:
+        from utils.risk_manager import RiskManager
         risk_manager = RiskManager()
         risk_data = risk_manager.calculate_portfolio_risk(current_user.id)
         
@@ -1273,6 +1277,7 @@ def get_portfolio_risk():
 def get_risk_report():
     """Get comprehensive risk report"""
     try:
+        from utils.risk_manager import RiskManager
         risk_manager = RiskManager()
         report = risk_manager.generate_risk_report(current_user.id)
         
@@ -1291,6 +1296,7 @@ def validate_trade():
         symbol = data.get('symbol')
         amount = float(data.get('amount', 0))
         
+        from utils.risk_manager import RiskManager
         risk_manager = RiskManager()
         is_valid, message = risk_manager.validate_trade_limits(current_user.id, amount, symbol)
         
@@ -1311,6 +1317,7 @@ def calculate_position_size():
         entry_price = float(data.get('entry_price'))
         stop_loss = float(data.get('stop_loss'))
         
+        from utils.risk_manager import RiskManager
         risk_manager = RiskManager()
         position_size = risk_manager.calculate_position_size(
             account_balance, risk_percentage, entry_price, stop_loss
@@ -1332,7 +1339,8 @@ def calculate_position_size():
 def get_market_sentiment(symbol):
     """Get market sentiment analysis"""
     try:
-        market_data = MarketDataProvider()
+        from utils.enhanced_market_data import ComprehensiveMarketDataProvider
+        market_data = ComprehensiveMarketDataProvider()
         sentiment = market_data.get_market_sentiment(symbol)
         
         if sentiment:
@@ -1349,7 +1357,8 @@ def get_market_sentiment(symbol):
 def get_historical_data(symbol):
     """Get historical price data"""
     try:
-        market_data = MarketDataProvider()
+        from utils.enhanced_market_data import ComprehensiveMarketDataProvider
+        market_data = ComprehensiveMarketDataProvider()
         period = request.args.get('period', '1mo')
         
         historical_data = market_data.get_historical_data(symbol, period)
