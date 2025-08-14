@@ -597,18 +597,146 @@ def natural_trade():
 @main_bp.route('/api_settings', methods=['GET', 'POST'])
 @login_required
 def api_settings():
-    """API Settings - temporarily simplified to avoid redirect loops"""
-    if request.method == 'GET':
-        # Return simplified settings page for now
-        return render_template('api_settings_simple.html')
-    
-    # Handle POST requests normally for API operations
-    return _handle_api_settings_post()
-
-def _handle_api_settings_post():
+    """API Settings with full functionality"""
     try:
         from models import APICredential, OAuthClientCredential
         from utils.encryption import encrypt_credentials
+        from app import db
+        
+        if request.method == 'GET':
+            # Load existing credentials to display
+            user_credentials = APICredential.query.filter_by(user_id=current_user.id).all()
+            oauth_credentials = OAuthClientCredential.query.filter_by(user_id=current_user.id).all()
+            
+            return render_template('api_settings.html', 
+                                 credentials=user_credentials, 
+                                 oauth_credentials=oauth_credentials)
+        
+        # Handle POST requests for credential management
+        provider = request.form.get('provider')
+        
+        if not provider:
+            flash('Provider field is required', 'error')
+            user_credentials = APICredential.query.filter_by(user_id=current_user.id).all()
+            oauth_credentials = OAuthClientCredential.query.filter_by(user_id=current_user.id).all()
+            return render_template('api_settings.html', 
+                                 credentials=user_credentials, 
+                                 oauth_credentials=oauth_credentials)
+        
+        # Handle different providers
+        if provider == 'openai':
+            api_key = request.form.get('openai_api_key')
+            if not api_key:
+                flash('OpenAI API Key is required', 'error')
+            else:
+                # Save OpenAI credentials
+                credentials_data = {'api_key': api_key}
+                encrypted_creds = encrypt_credentials(credentials_data)
+                
+                # Check if credential exists
+                existing_cred = APICredential.query.filter_by(
+                    user_id=current_user.id, 
+                    provider='openai'
+                ).first()
+                
+                if existing_cred:
+                    existing_cred.encrypted_credentials = encrypted_creds
+                    existing_cred.updated_at = datetime.utcnow()
+                else:
+                    new_cred = APICredential(
+                        user_id=current_user.id,
+                        provider='openai',
+                        encrypted_credentials=encrypted_creds
+                    )
+                    db.session.add(new_cred)
+                
+                db.session.commit()
+                flash('OpenAI API credentials saved successfully!', 'success')
+        
+        elif provider == 'schwab':
+            # Handle Schwab OAuth or direct credentials
+            oauth_flow = request.form.get('oauth_flow')
+            if oauth_flow == 'true':
+                # Initiate OAuth flow
+                from utils.schwab_oauth import SchwabOAuth
+                schwab_oauth = SchwabOAuth(user_id=current_user.id)
+                auth_url = schwab_oauth.get_authorization_url()
+                return redirect(auth_url)
+            else:
+                # Handle direct API key method (if supported)
+                api_key = request.form.get('schwab_api_key')
+                secret = request.form.get('schwab_secret')
+                if api_key and secret:
+                    credentials_data = {'api_key': api_key, 'secret': secret}
+                    encrypted_creds = encrypt_credentials(credentials_data)
+                    
+                    existing_cred = APICredential.query.filter_by(
+                        user_id=current_user.id, 
+                        provider='schwab'
+                    ).first()
+                    
+                    if existing_cred:
+                        existing_cred.encrypted_credentials = encrypted_creds
+                        existing_cred.updated_at = datetime.utcnow()
+                    else:
+                        new_cred = APICredential(
+                            user_id=current_user.id,
+                            provider='schwab',
+                            encrypted_credentials=encrypted_creds
+                        )
+                        db.session.add(new_cred)
+                    
+                    db.session.commit()
+                    flash('Schwab API credentials saved successfully!', 'success')
+        
+        elif provider == 'coinbase':
+            # Handle Coinbase OAuth setup
+            oauth_setup = request.form.get('oauth_setup')
+            if oauth_setup == 'true':
+                client_id = request.form.get('client_id')
+                client_secret = request.form.get('client_secret')
+                redirect_uri = request.form.get('redirect_uri') or f"https://{request.host}/oauth_callback/crypto"
+                
+                if client_id and client_secret:
+                    from utils.coinbase_oauth import CoinbaseOAuth
+                    coinbase_oauth = CoinbaseOAuth()
+                    success = coinbase_oauth.save_client_credentials(
+                        user_id=current_user.id,
+                        client_id=client_id,
+                        client_secret=client_secret,
+                        redirect_uri=redirect_uri
+                    )
+                    
+                    if success:
+                        flash('Coinbase OAuth client credentials saved successfully!', 'success')
+                    else:
+                        flash('Failed to save Coinbase OAuth credentials', 'error')
+                else:
+                    flash('Client ID and Client Secret are required', 'error')
+            else:
+                # Start OAuth flow
+                oauth_flow = request.form.get('oauth_flow')
+                if oauth_flow == 'true':
+                    from utils.coinbase_oauth import CoinbaseOAuth
+                    coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
+                    auth_url = coinbase_oauth.get_authorization_url()
+                    return redirect(auth_url)
+        
+        # Redirect back to settings page after processing
+        return redirect(url_for('main.api_settings'))
+        
+    except Exception as e:
+        logging.error(f"API settings error: {e}")
+        flash('An error occurred while processing your request. Please try again.', 'error')
+        # Return basic settings page on error
+        try:
+            user_credentials = APICredential.query.filter_by(user_id=current_user.id).all()
+            oauth_credentials = OAuthClientCredential.query.filter_by(user_id=current_user.id).all()
+            return render_template('api_settings.html', 
+                                 credentials=user_credentials, 
+                                 oauth_credentials=oauth_credentials)
+        except:
+            return render_template('api_settings_simple.html')
         from app import db
         
         provider = None  # Initialize provider variable

@@ -1,978 +1,291 @@
 {% extends "base.html" %}
 
-{% block page_title %}API Settings{% endblock %}
+{% block title %}API Settings - Arbion{% endblock %}
 
 {% block content %}
-<!-- Success/Error Messages -->
-{% with messages = get_flashed_messages(with_categories=true) %}
-    {% if messages %}
-        <div class="mb-6 space-y-2">
-            {% for category, message in messages %}
-                <div class="alert alert-{{ 'success' if category == 'success' else 'error' }} p-4 rounded-lg border">
-                    <div class="flex items-center">
-                        <i data-feather="{% if category == 'success' %}check-circle{% else %}alert-circle{% endif %}" class="w-5 h-5 mr-3"></i>
-                        <span class="font-medium">{{ message }}</span>
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-2xl font-bold text-white mb-6">API Settings</h1>
+        
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'success' if category == 'success' else 'error' if category == 'error' else 'warning' }} mb-4 p-4 rounded-lg border {{ 'bg-emerald-900/20 border-emerald-700 text-emerald-300' if category == 'success' else 'bg-red-900/20 border-red-700 text-red-300' if category == 'error' else 'bg-yellow-900/20 border-yellow-700 text-yellow-300' }}">
+                        {{ message }}
                     </div>
-                </div>
-            {% endfor %}
-        </div>
-    {% endif %}
-{% endwith %}
-<div class="space-y-6">
-    <!-- Page Header -->
-    <div class="card">
-        <div class="flex items-center justify-between">
-            <div>
-                <h1 class="text-2xl font-bold text-white">API Settings</h1>
-                <p class="text-gray-400 mt-1">Configure your trading platform API credentials</p>
-            </div>
-            <div class="flex items-center space-x-2">
-                <i data-feather="shield" class="w-5 h-5 text-coinbase-green"></i>
-                <span class="text-sm text-coinbase-green">Encrypted Storage</span>
-            </div>
-        </div>
-    </div>
-    
-    <!-- API Provider Cards -->
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Coinbase API -->
-        <div class="card">
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center space-x-3">
-                    <div class="p-2 bg-blue-500 bg-opacity-20 rounded-lg">
-                        <i data-feather="dollar-sign" class="w-6 h-6 text-blue-400"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-semibold text-white">Coinbase Pro</h3>
-                        <p class="text-sm text-gray-400">Cryptocurrency Trading</p>
-                    </div>
-                </div>
-                <div class="flex items-center">
-                    <span class="status-indicator {% if cred_status.get('coinbase', {}).get('status') == 'success' %}status-success{% else %}status-error{% endif %}"></span>
-                    <span class="text-xs text-gray-400">
-                        {% if cred_status.get('coinbase', {}).get('status') == 'success' %}
-                            Connected
-                        {% else %}
-                            Not Connected
-                        {% endif %}
-                    </span>
-                </div>
-            </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        
+        <!-- API Credentials Management -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
-            <!-- OAuth2 Method (Recommended) -->
-            <div class="mb-4 p-4 bg-blue-900 bg-opacity-30 rounded-lg border border-blue-500">
-                <div class="flex items-center justify-between mb-2">
-                    <h4 class="font-medium text-blue-300">OAuth2 Authentication (Recommended)</h4>
-                    <button type="button" onclick="showCoinbaseInfo()" class="text-blue-400 hover:text-blue-300">
-                        <i data-feather="info" class="w-4 h-4"></i>
-                    </button>
-                </div>
-                <p class="text-sm text-gray-300 mb-3">
-                    Secure OAuth2 authentication for production-ready Coinbase integration.
-                </p>
-                <div class="mb-3 p-3 bg-yellow-900 bg-opacity-30 rounded-lg border border-yellow-500">
-                    <p class="text-xs text-yellow-300">
-                        <strong>🔧 Setup Required:</strong> Configure your Coinbase OAuth app with redirect URI: 
-                        <code class="bg-gray-700 px-1 py-0.5 rounded text-xs">{{ url_for('main.oauth_callback_coinbase', _external=True) }}</code>
-                    </p>
-                </div>
-                {% if coinbase_oauth_configured %}
-                    <div class="space-y-3">
-                        <form method="POST">
-                            <input type="hidden" name="provider" value="coinbase">
-                            <input type="hidden" name="oauth_flow" value="true">
-                            <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
-                                <i data-feather="shield" class="w-4 h-4 inline mr-2"></i>
-                                Authenticate with Coinbase OAuth2
-                            </button>
-                        </form>
-                        
-                        <button 
-                            type="button" 
-                            onclick="toggleCoinbaseOAuthSetup()" 
-                            class="btn-secondary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors"
-                        >
-                            <i data-feather="settings" class="w-4 h-4 inline mr-2"></i>
-                            Reconfigure OAuth2 Client Credentials
-                        </button>
-                        
-                        <!-- OAuth2 Client Credentials Setup Form -->
-                        <div id="coinbase-oauth-setup" class="hidden mt-4 p-4 bg-gray-700 rounded-lg">
-                            <h5 class="text-sm font-semibold text-white mb-3">OAuth2 Client Credentials</h5>
-                            <p class="text-xs text-gray-400 mb-4">Enter your OAuth2 client credentials from Coinbase Developer Portal</p>
-                            
-                            <form method="POST" class="space-y-3">
-                                <input type="hidden" name="provider" value="coinbase">
-                                <input type="hidden" name="oauth_setup" value="true">
-                                
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-300 mb-1">Client ID</label>
-                                    <input 
-                                        type="text" 
-                                        name="client_id" 
-                                        class="input-field w-full text-sm" 
-                                        placeholder="Enter your Coinbase Client ID"
-                                        required
-                                    >
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-300 mb-1">Client Secret</label>
-                                    <input 
-                                        type="password" 
-                                        name="client_secret" 
-                                        class="input-field w-full text-sm" 
-                                        placeholder="Enter your Coinbase Client Secret"
-                                        required
-                                    >
-                                </div>
-                                
-                                <div>
-                                    <label class="block text-xs font-medium text-gray-300 mb-1">Redirect URI</label>
-                                    <input 
-                                        type="text" 
-                                        name="redirect_uri" 
-                                        class="input-field w-full text-sm" 
-                                        placeholder="{{ url_for('main.oauth_callback_coinbase', _external=True) }}"
-                                        value="{{ url_for('main.oauth_callback_coinbase', _external=True) }}"
-                                    >
-                                    <div class="mt-2 p-3 bg-blue-900 bg-opacity-30 rounded-lg border border-blue-500">
-                                        <p class="text-xs text-blue-300">
-                                            <strong>💡 TIP:</strong> You can edit this redirect URI to match your OAuth app configuration. 
-                                            Common options: <code>https://arbion.ai/oauth_callback/crypto</code> or <code>https://www.arbion.ai/oauth_callback/crypto</code>
-                                        </p>
-                                    </div>
-                                </div>
-                                
-                                <button 
-                                    type="submit" 
-                                    class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors"
-                                >
-                                    Save OAuth2 Credentials
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                {% else %}
-                    <button 
-                        type="button" 
-                        onclick="toggleCoinbaseOAuthSetup()" 
-                        class="btn-secondary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors"
-                    >
-                        <i data-feather="settings" class="w-4 h-4 inline mr-2"></i>
-                        Configure OAuth2 Credentials
-                    </button>
+            <!-- OpenAI API Configuration -->
+            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
+                    <i data-feather="zap" class="w-5 h-5 mr-2 text-blue-400"></i>
+                    OpenAI API
+                </h2>
+                <p class="text-slate-400 text-sm mb-4">Required for AI trading features and natural language processing</p>
+                
+                <form method="POST" action="{{ url_for('main.api_settings') }}">
+                    <input type="hidden" name="provider" value="openai">
                     
-                    <!-- OAuth2 Client Credentials Setup Form -->
-                    <div id="coinbase-oauth-setup" class="hidden mt-4 p-4 bg-gray-700 rounded-lg">
-                        <h5 class="text-sm font-semibold text-white mb-3">OAuth2 Client Credentials</h5>
-                        <p class="text-xs text-gray-400 mb-4">Enter your OAuth2 client credentials from Coinbase Developer Portal</p>
-                        
-                        <!-- Show existing credentials if they exist -->
-                        {% if oauth_dict.get('coinbase') %}
-                        <div class="mb-4 p-3 bg-gray-800 rounded-lg">
-                            <h6 class="text-sm font-medium text-white mb-2">Current Credentials</h6>
-                            <div class="space-y-2 text-xs text-gray-300">
-                                <div>
-                                    <span class="font-medium">Client ID:</span> 
-                                    <span class="text-blue-400">{{ oauth_dict.coinbase.client_id }}</span>
-                                </div>
-                                <div>
-                                    <span class="font-medium">Client Secret:</span> 
-                                    <span class="text-blue-400">{{ oauth_dict.coinbase.client_secret }}</span>
-                                </div>
-                                <div>
-                                    <span class="font-medium">Redirect URI:</span> 
-                                    <span class="text-blue-400">{{ oauth_dict.coinbase.redirect_uri }}</span>
-                                </div>
-                                <div>
-                                    <span class="font-medium">Status:</span> 
-                                    <span class="text-green-400">{{ 'Active' if oauth_dict.coinbase.is_active else 'Inactive' }}</span>
-                                </div>
-                                <div>
-                                    <span class="font-medium">Last Updated:</span> 
-                                    <span class="text-gray-400">{{ oauth_dict.coinbase.updated_at.strftime('%Y-%m-%d %H:%M') if oauth_dict.coinbase.updated_at else 'N/A' }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        {% endif %}
-                        
-                        <form method="POST" class="space-y-3">
-                            <input type="hidden" name="provider" value="coinbase">
-                            <input type="hidden" name="oauth_setup" value="true">
-                            
-                            <div>
-                                <label class="block text-xs font-medium text-gray-300 mb-1">Client ID</label>
-                                <input 
-                                    type="text" 
-                                    name="client_id" 
-                                    class="input-field w-full text-sm" 
-                                    placeholder="Enter your Coinbase Client ID"
-                                    value="{{ oauth_dict.coinbase.client_id if oauth_dict.get('coinbase') else '' }}"
-                                    required
-                                >
-                            </div>
-                            
-                            <div>
-                                <label class="block text-xs font-medium text-gray-300 mb-1">Client Secret</label>
-                                <input 
-                                    type="password" 
-                                    name="client_secret" 
-                                    class="input-field w-full text-sm" 
-                                    placeholder="Enter your Coinbase Client Secret"
-                                    required
-                                >
-                                {% if oauth_dict.get('coinbase') %}
-                                <p class="text-xs text-gray-400 mt-1">
-                                    Current secret: {{ oauth_dict.coinbase.client_secret }} (enter new secret to update)
-                                </p>
-                                {% endif %}
-                            </div>
-                            
-                            <div>
-                                <label class="block text-xs font-medium text-gray-300 mb-1">Redirect URI</label>
-                                <input 
-                                    type="text" 
-                                    name="redirect_uri" 
-                                    class="input-field w-full text-sm" 
-                                    value="{{ oauth_dict.coinbase.redirect_uri if oauth_dict.get('coinbase') else request.scheme + '://' + request.host + '/oauth_callback/crypto' }}"
-                                    placeholder="https://arbion.ai/oauth_callback/crypto"
-                                    style="background-color: #374151; color: white; border: 2px solid #10b981;"
-                                >
-                                <p class="text-xs text-green-400 mt-1">
-                                    ✏️ EDITABLE: This redirect URI can be customized to match your Coinbase OAuth app
-                                </p>
-                            </div>
-                            
-                            <button 
-                                type="submit" 
-                                class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors"
-                            >
-                                {% if oauth_dict.get('coinbase') %}
-                                    Update OAuth2 Credentials
-                                {% else %}
-                                    Save OAuth2 Credentials
-                                {% endif %}
-                            </button>
-                        </form>
-                    </div>
-                {% endif %}
-            </div>
-
-            <!-- Legacy API Key Method -->
-            <div class="mb-4 p-4 bg-yellow-900 bg-opacity-30 rounded-lg border border-yellow-500">
-                <h4 class="font-medium text-yellow-300 mb-2">Legacy API Key Method</h4>
-                <p class="text-sm text-gray-300 mb-3">
-                    Direct API key authentication (deprecated, use OAuth2 instead).
-                </p>
-                <form method="POST" action="{{ url_for('main.api_settings') }}" class="space-y-4">
-                    <input type="hidden" name="provider" value="coinbase">
-                    <input type="hidden" name="oauth_flow" value="false">
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-1">API Key</label>
-                        <input 
-                            type="text" 
-                            name="coinbase_api_key" 
-                            class="input-field w-full" 
-                            placeholder="Enter your Coinbase API key"
-                        >
-                    </div>
-                    
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-1">Secret</label>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-slate-300 mb-2">API Key</label>
                         <input 
                             type="password" 
-                            name="coinbase_secret" 
-                            class="input-field w-full" 
-                            placeholder="Enter your Coinbase secret"
-                        >
+                            name="openai_api_key" 
+                            placeholder="sk-..." 
+                            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            required>
                     </div>
                     
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-1">Passphrase</label>
-                        <input 
-                            type="password" 
-                            name="coinbase_passphrase" 
-                            class="input-field w-full" 
-                            placeholder="Enter your Coinbase passphrase"
-                        >
-                    </div>
-                    
-                    <button type="submit" class="btn-secondary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
-                        Save Legacy Credentials
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors">
+                        Save OpenAI Credentials
                     </button>
                 </form>
-            </div>
-
-            <!-- Test Connection -->
-            <div class="flex justify-end">
-                <button 
-                    type="button" 
-                    class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors"
-                    onclick="testConnection('coinbase')"
-                >
-                    Test Connection
-                </button>
-            </div>
-            
-            {% if cred_status.get('coinbase', {}).get('last_tested') %}
-                <div class="mt-3 text-xs text-gray-500">
-                    Last tested: {{ cred_status.coinbase.last_tested.strftime('%m/%d/%Y %H:%M') }}
-                </div>
-            {% endif %}
-        </div>
-        
-        <!-- Include Coinbase OAuth2 Info Modal -->
-        {% include 'coinbase_oauth_info.html' %}
-        
-        <!-- Schwab API -->
-        <div class="card">
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center space-x-3">
-                    <div class="p-2 bg-green-500 bg-opacity-20 rounded-lg">
-                        <i data-feather="trending-up" class="w-6 h-6 text-green-400"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-semibold text-white">Charles Schwab</h3>
-                        <p class="text-sm text-gray-400">Stock & Options Trading</p>
-                    </div>
-                </div>
-                <div class="flex items-center">
-                    <span class="status-indicator {% if cred_status.get('schwab', {}).get('status') == 'success' %}status-success{% else %}status-error{% endif %}"></span>
-                    <span class="text-xs text-gray-400">
-                        {% if cred_status.get('schwab', {}).get('status') == 'success' %}
-                            Connected
-                        {% else %}
-                            Not Connected
-                        {% endif %}
-                    </span>
-                </div>
-            </div>
-            
-            <!-- OAuth2 Method (Recommended) -->
-            <div class="mb-4 p-4 bg-blue-900 bg-opacity-30 rounded-lg border border-blue-500">
-                <div class="flex items-center justify-between mb-2">
-                    <h4 class="font-medium text-blue-300">OAuth2 Authentication (Recommended)</h4>
-                    <button type="button" onclick="showSchwabInfo()" class="text-blue-400 hover:text-blue-300">
-                        <i data-feather="info" class="w-4 h-4"></i>
-                    </button>
-                </div>
-                <p class="text-sm text-gray-300 mb-3">
-                    Secure OAuth2 authentication with PKCE for production use.
-                </p>
                 
-                {% if schwab_oauth_configured %}
-                    <div class="space-y-3">
-                        <form method="POST" action="{{ url_for('main.schwab_oauth_setup') }}">
-                            <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
-                                <i data-feather="shield" class="w-4 h-4 inline mr-2"></i>
-                                Authenticate with Schwab OAuth2
-                            </button>
-                        </form>
+                {% if credentials %}
+                    {% for cred in credentials %}
+                        {% if cred.provider == 'openai' %}
+                            <div class="mt-3 text-sm text-emerald-400">
+                                ✓ OpenAI credentials configured
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            </div>
+            
+            <!-- Schwab API Configuration -->
+            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
+                    <i data-feather="trending-up" class="w-5 h-5 mr-2 text-emerald-400"></i>
+                    Charles Schwab API
+                </h2>
+                <p class="text-slate-400 text-sm mb-4">For stock and options trading</p>
+                
+                <div class="space-y-3">
+                    <!-- OAuth Flow (Recommended) -->
+                    <form method="POST" action="{{ url_for('main.api_settings') }}">
+                        <input type="hidden" name="provider" value="schwab">
+                        <input type="hidden" name="oauth_flow" value="true">
                         
-                        <button 
-                            type="button" 
-                            onclick="toggleSchwabOAuthSetup()" 
-                            class="btn-secondary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors"
-                        >
-                            <i data-feather="settings" class="w-4 h-4 inline mr-2"></i>
-                            Reconfigure OAuth2 Client Credentials
+                        <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center justify-center">
+                            <i data-feather="lock" class="w-4 h-4 mr-2"></i>
+                            Connect via OAuth (Recommended)
                         </button>
-                        
-                        <!-- OAuth2 Client Credentials Setup Form -->
-                        <div id="schwab-oauth-setup" class="hidden mt-4 p-4 bg-gray-700 rounded-lg">
-                            <h5 class="text-sm font-semibold text-white mb-3">OAuth2 Client Credentials</h5>
-                            <p class="text-xs text-gray-400 mb-4">Enter your OAuth2 client credentials from Schwab Developer Portal</p>
-                            
-                            <form method="POST" action="{{ url_for('main.api_settings') }}">
-                                <input type="hidden" name="provider" value="schwab">
-                                <input type="hidden" name="oauth_setup" value="true">
-                                
-                                <div class="mb-4">
-                                    <label class="block text-xs font-medium text-gray-300 mb-1">Client ID</label>
-                                    <input type="text" name="client_id" class="input-field w-full text-sm" placeholder="Your Schwab OAuth2 Client ID" required>
-                                </div>
-                                
-                                <div class="mb-4">
-                                    <label class="block text-xs font-medium text-gray-300 mb-1">Client Secret</label>
-                                    <input type="password" name="client_secret" class="input-field w-full text-sm" placeholder="Your Schwab OAuth2 Client Secret" required>
-                                </div>
-                                
-                                <div class="mb-4">
-                                    <label class="block text-xs font-medium text-gray-300 mb-1">Redirect URI</label>
-                                    <input type="url" name="redirect_uri" value="{{ url_for('main.oauth_callback_schwab', _external=True) }}" class="input-field w-full text-sm" style="background-color: #374151; color: white;">
-                                    <p class="text-xs text-gray-400 mt-1">✏️ Edit this to match your Schwab OAuth2 app redirect URI exactly</p>
-                                </div>
-                                
-                                <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
-                                    Save OAuth2 Client Credentials
-                                </button>
-                            </form>
-                        </div>
-                    </div>
-                {% else %}
-                    <div class="bg-amber-900/20 border border-amber-500 rounded-lg p-3 mb-3">
-                        <div class="flex items-center">
-                            <i data-feather="alert-triangle" class="text-amber-500 mr-2 w-4 h-4"></i>
-                            <span class="text-amber-300 text-sm">OAuth2 client credentials not configured</span>
-                        </div>
-                    </div>
-                    
-                    <button 
-                        type="button" 
-                        onclick="toggleSchwabOAuthSetup()" 
-                        class="btn-secondary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors"
-                    >
-                        <i data-feather="settings" class="w-4 h-4 inline mr-2"></i>
-                        Configure OAuth2 Credentials
-                    </button>
-                    
-                    <!-- OAuth2 Client Credentials Setup Form -->
-                    <div id="schwab-oauth-setup" class="hidden mt-4 p-4 bg-gray-700 rounded-lg">
-                        <h5 class="text-sm font-semibold text-white mb-3">OAuth2 Client Credentials</h5>
-                        <p class="text-xs text-gray-400 mb-4">Enter your OAuth2 client credentials from Schwab Developer Portal</p>
-                        
-                        <form method="POST" action="{{ url_for('main.api_settings') }}">
-                            <input type="hidden" name="provider" value="schwab">
-                            <input type="hidden" name="oauth_setup" value="true">
-                            
-                            <div class="mb-4">
-                                <label class="block text-xs font-medium text-gray-300 mb-1">Client ID</label>
-                                <input type="text" name="client_id" class="input-field w-full text-sm" placeholder="Your Schwab OAuth2 Client ID" required>
-                            </div>
-                            
-                            <div class="mb-4">
-                                <label class="block text-xs font-medium text-gray-300 mb-1">Client Secret</label>
-                                <input type="password" name="client_secret" class="input-field w-full text-sm" placeholder="Your Schwab OAuth2 Client Secret" required>
-                            </div>
-                            
-                            <div class="mb-4">
-                                <label class="block text-xs font-medium text-gray-300 mb-1">Redirect URI</label>
-                                <input type="url" name="redirect_uri" value="https://www.arbion.ai/oauth_callback/broker" class="input-field w-full text-sm" style="background-color: #374151; color: white;">
-                                <p class="text-xs text-gray-400 mt-1">✏️ Edit this to match your Schwab OAuth2 app redirect URI exactly</p>
-                            </div>
-                            
-                            <button type="submit" class="btn-primary w-full py-2 px-4 rounded-md text-sm font-medium transition-colors">
-                                Save OAuth2 Client Credentials
-                            </button>
                     </form>
                     
-                    <div class="mt-4 p-3 bg-blue-900 bg-opacity-50 rounded-lg">
-                        <h5 class="text-sm font-semibold mb-2">Setup Instructions:</h5>
-                        <ol class="text-xs text-gray-300 space-y-1">
-                            <li>1. Go to Schwab Developer Portal</li>
-                            <li>2. Create a new OAuth2 application</li>
-                            <li>3. Set the redirect URI to match the one above (editable)</li>
-                            <li>4. Copy the Client ID and Client Secret here</li>
-                            <li>5. Ensure the redirect URI matches exactly</li>
-                            <li>6. Save the credentials and then authenticate</li>
-                        </ol>
-                    </div>
-                </div>
-                {% endif %}
-
-
-
-
-            <!-- Test Connection -->
-            <div class="flex justify-end">
-                <button 
-                    type="button" 
-                    class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors"
-                    onclick="testConnection('schwab')"
-                >
-                    Test Connection
-                </button>
-            </div>
-            
-            {% if cred_status.get('schwab', {}).get('last_tested') %}
-                <div class="mt-3 text-xs text-gray-500">
-                    Last tested: {{ cred_status.schwab.last_tested.strftime('%m/%d/%Y %H:%M') }}
-                </div>
-            {% endif %}
-        </div>
-        
-        <!-- Include Schwab OAuth2 Info Modal -->
-        {% include 'schwab_oauth_info.html' %}
-        
-        <!-- OpenAI API -->
-        <div class="card">
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center space-x-3">
-                    <div class="p-2 bg-purple-500 bg-opacity-20 rounded-lg">
-                        <i data-feather="cpu" class="w-6 h-6 text-purple-400"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-semibold text-white">OpenAI</h3>
-                        <p class="text-sm text-gray-400">AI Natural Language Processing</p>
-                    </div>
-                </div>
-                <div class="flex items-center">
-                    <span class="status-indicator {% if cred_status.get('openai', {}).get('status') == 'success' %}status-success{% else %}status-error{% endif %}"></span>
-                    <span class="text-xs text-gray-400">
-                        {% if cred_status.get('openai', {}).get('status') == 'success' %}
-                            Connected
-                        {% else %}
-                            Not Connected
-                        {% endif %}
-                    </span>
-                </div>
-            </div>
-            
-            <form method="POST" action="{{ url_for('main.api_settings') }}" class="space-y-4">
-                <input type="hidden" name="provider" value="openai">
-                
-                <div>
-                    <div class="flex items-center justify-between mb-1">
-                        <label class="block text-sm font-medium text-gray-300">API Key</label>
-                        <button type="button" onclick="showOpenAIHelp()" class="text-blue-400 hover:text-blue-300 text-sm">
-                            <i data-feather="help-circle" class="w-4 h-4 inline mr-1"></i>
-                            Need help?
-                        </button>
-                    </div>
-                    <input 
-                        type="password" 
-                        name="openai_api_key" 
-                        class="input-field w-full" 
-                        placeholder="Enter your OpenAI API key"
-                        required
-                    >
-                </div>
-                
-                <div class="flex space-x-2">
-                    <button 
-                        type="submit" 
-                        class="btn-primary flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors"
-                    >
-                        Save Credentials
-                    </button>
-                    <button 
-                        type="button" 
-                        class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors"
-                        onclick="testConnection('openai')"
-                    >
-                        Test
-                    </button>
-                </div>
-            </form>
-            
-            {% if cred_status.get('openai', {}).get('last_tested') %}
-                <div class="mt-3 text-xs text-gray-500">
-                    Last tested: {{ cred_status.openai.last_tested.strftime('%m/%d/%Y %H:%M') }}
-                </div>
-            {% endif %}
-        </div>
-        
-        <!-- E-trade API -->
-        <div class="card">
-            <div class="flex items-center justify-between mb-4">
-                <div class="flex items-center space-x-3">
-                    <div class="p-2 bg-yellow-500 bg-opacity-20 rounded-lg">
-                        <i data-feather="trending-up" class="w-6 h-6 text-yellow-400"></i>
-                    </div>
-                    <div>
-                        <h3 class="text-lg font-semibold text-white">E-trade</h3>
-                        <p class="text-sm text-gray-400">Stock & Options Trading</p>
-                    </div>
-                </div>
-                <div class="flex items-center">
-                    <span class="status-indicator {% if cred_status.get('etrade', {}).get('status') == 'success' %}status-success{% else %}status-error{% endif %}"></span>
-                    <span class="text-xs text-gray-400">
-                        {% if cred_status.get('etrade', {}).get('status') == 'success' %}
-                            Connected
-                        {% else %}
-                            Not Connected
-                        {% endif %}
-                    </span>
-                </div>
-            </div>
-            
-            <div class="mb-4 p-4 bg-yellow-900 bg-opacity-30 rounded-lg border border-yellow-500">
-                <h4 class="font-medium text-yellow-300 mb-2">OAuth 1.0a Authentication</h4>
-                <p class="text-sm text-gray-300 mb-3">
-                    E-trade uses OAuth 1.0a authentication. You'll need to complete the OAuth flow to get your access tokens.
-                </p>
-                <div class="bg-blue-900 bg-opacity-50 rounded-lg p-3 mb-3">
-                    <p class="text-xs text-blue-300">
-                        <strong>Setup Instructions:</strong>
-                    </p>
-                    <ol class="text-xs text-gray-300 space-y-1 mt-2">
-                        <li>1. Apply for E-trade API access at developer.etrade.com</li>
-                        <li>2. Create an OAuth app and get your Client Key and Client Secret</li>
-                        <li>3. Complete the OAuth 1.0a flow to get Access Token and Access Secret</li>
-                        <li>4. Enter all four credentials below</li>
-                    </ol>
-                </div>
-            </div>
-            
-            <form method="POST" action="{{ url_for('main.api_settings') }}" class="space-y-4">
-                <input type="hidden" name="provider" value="etrade">
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Client Key</label>
-                    <input 
-                        type="text" 
-                        name="client_key" 
-                        class="input-field w-full" 
-                        placeholder="Enter your E-trade Client Key"
-                        required
-                    >
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Client Secret</label>
-                    <input 
-                        type="password" 
-                        name="client_secret" 
-                        class="input-field w-full" 
-                        placeholder="Enter your E-trade Client Secret"
-                        required
-                    >
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Access Token</label>
-                    <input 
-                        type="text" 
-                        name="access_token" 
-                        class="input-field w-full" 
-                        placeholder="Enter your E-trade Access Token"
-                        required
-                    >
-                </div>
-                
-                <div>
-                    <label class="block text-sm font-medium text-gray-300 mb-1">Access Secret</label>
-                    <input 
-                        type="password" 
-                        name="access_secret" 
-                        class="input-field w-full" 
-                        placeholder="Enter your E-trade Access Secret"
-                        required
-                    >
-                </div>
-                
-                <div class="flex space-x-2">
-                    <button 
-                        type="submit" 
-                        class="btn-primary flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors"
-                    >
-                        Save Credentials
-                    </button>
-                    <button 
-                        type="button" 
-                        class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors"
-                        onclick="testConnection('etrade')"
-                    >
-                        Test
-                    </button>
-                </div>
-            </form>
-            
-            {% if cred_status.get('etrade', {}).get('last_tested') %}
-                <div class="mt-3 text-xs text-gray-500">
-                    Last tested: {{ cred_status.etrade.last_tested.strftime('%m/%d/%Y %H:%M') }}
-                </div>
-            {% endif %}
-        </div>
-    </div>
-    
-    <!-- Security Information -->
-    <div class="card">
-        <div class="flex items-center space-x-3 mb-4">
-            <div class="p-2 bg-coinbase-green bg-opacity-20 rounded-lg">
-                <i data-feather="shield" class="w-6 h-6 text-coinbase-green"></i>
-            </div>
-            <div>
-                <h3 class="text-lg font-semibold text-white">Security & Encryption</h3>
-                <p class="text-sm text-gray-400">Your API credentials are encrypted and stored securely</p>
-            </div>
-        </div>
-        
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-            <div class="flex items-center space-x-3">
-                <i data-feather="lock" class="w-5 h-5 text-coinbase-green"></i>
-                <div>
-                    <p class="text-sm font-medium text-white">AES-256 Encryption</p>
-                    <p class="text-xs text-gray-400">Industry-standard encryption for all stored credentials</p>
-                </div>
-            </div>
-            
-            <div class="flex items-center space-x-3">
-                <i data-feather="key" class="w-5 h-5 text-coinbase-green"></i>
-                <div>
-                    <p class="text-sm font-medium text-white">Secure Key Management</p>
-                    <p class="text-xs text-gray-400">Keys are derived from your session secret</p>
-                </div>
-            </div>
-            
-            <div class="flex items-center space-x-3">
-                <i data-feather="eye-off" class="w-5 h-5 text-coinbase-green"></i>
-                <div>
-                    <p class="text-sm font-medium text-white">Zero-Knowledge Storage</p>
-                    <p class="text-xs text-gray-400">Your credentials are never stored in plain text</p>
-                </div>
-            </div>
-            
-            <div class="flex items-center space-x-3">
-                <i data-feather="refresh-cw" class="w-5 h-5 text-coinbase-green"></i>
-                <div>
-                    <p class="text-sm font-medium text-white">Regular Testing</p>
-                    <p class="text-xs text-gray-400">Connections are tested periodically for validation</p>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- API Usage Guidelines -->
-    <div class="card">
-        <h3 class="text-lg font-semibold text-white mb-4">API Setup Guidelines</h3>
-        
-        <div class="space-y-4">
-            <div>
-                <h4 class="text-sm font-medium text-white mb-2">Coinbase Pro API</h4>
-                <ol class="text-sm text-gray-400 space-y-1 list-decimal list-inside">
-                    <li>Log in to your Coinbase Pro account</li>
-                    <li>Navigate to Settings → API</li>
-                    <li>Create a new API key with trading permissions</li>
-                    <li>Copy the API key, secret, and passphrase</li>
-                    <li>Ensure your IP address is whitelisted</li>
-                </ol>
-            </div>
-            
-            <div>
-                <h4 class="text-sm font-medium text-white mb-2">Charles Schwab API</h4>
-                <ol class="text-sm text-gray-400 space-y-1 list-decimal list-inside">
-                    <li>Apply for Schwab API access through their developer portal</li>
-                    <li>Complete the application process and verification</li>
-                    <li>Receive your API key and secret</li>
-                    <li>Set up OAuth2 authentication as required</li>
-                    <li>Test with paper trading before live trading</li>
-                </ol>
-            </div>
-            
-            <div>
-                <h4 class="text-sm font-medium text-white mb-2">OpenAI API</h4>
-                <ol class="text-sm text-gray-400 space-y-1 list-decimal list-inside">
-                    <li>Create an account at platform.openai.com</li>
-                    <li>Navigate to API keys in your account settings</li>
-                    <li>Create a new API key</li>
-                    <li>Set up billing and usage limits</li>
-                    <li>Keep your API key secure and never share it</li>
-                </ol>
-            </div>
-            
-            <div>
-                <h4 class="text-sm font-medium text-white mb-2">E-trade API</h4>
-                <ol class="text-sm text-gray-400 space-y-1 list-decimal list-inside">
-                    <li>Apply for E-trade API access at developer.etrade.com</li>
-                    <li>Complete the developer application and verification process</li>
-                    <li>Create an OAuth 1.0a application and get Client Key/Secret</li>
-                    <li>Complete the OAuth 1.0a flow to obtain Access Token/Secret</li>
-                    <li>Use paper trading environment for testing before live trading</li>
-                </ol>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Connection Test Modal -->
-<div id="testModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
-    <div class="bg-dark-surface p-6 rounded-lg max-w-md w-full mx-4">
-        <div class="flex items-center space-x-3 mb-4">
-            <div class="p-2 bg-coinbase-blue bg-opacity-20 rounded-lg">
-                <i data-feather="wifi" class="w-6 h-6 text-coinbase-blue"></i>
-            </div>
-            <div>
-                <h3 class="text-lg font-semibold text-white">Testing Connection</h3>
-                <p class="text-sm text-gray-400">Please wait while we verify your credentials</p>
-            </div>
-        </div>
-        
-        <div class="flex items-center justify-center py-4">
-            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-coinbase-blue"></div>
-        </div>
-        
-        <div id="testResult" class="mt-4 hidden">
-            <div class="p-3 rounded-lg">
-                <p id="testMessage" class="text-sm"></p>
-            </div>
-        </div>
-        
-        <div class="flex justify-end mt-4">
-            <button onclick="closeTestModal()" class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors">
-                Close
-            </button>
-        </div>
-    </div>
-</div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    // Initialize Feather icons
-    feather.replace();
-    
-    function testConnection(provider) {
-        const modal = document.getElementById('testModal');
-        const testResult = document.getElementById('testResult');
-        const testMessage = document.getElementById('testMessage');
-        
-        // Show modal
-        modal.classList.remove('hidden');
-        modal.classList.add('flex');
-        
-        // Hide previous results
-        testResult.classList.add('hidden');
-        
-        // Create form data
-        const formData = new FormData();
-        formData.append('provider', provider);
-        
-        // Send test request
-        fetch('{{ url_for("main.test_api_connection") }}', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            testResult.classList.remove('hidden');
-            testMessage.textContent = data.message;
-            
-            if (data.success) {
-                testResult.className = 'mt-4 p-3 rounded-lg bg-coinbase-green bg-opacity-20 border border-coinbase-green border-opacity-30';
-                testMessage.className = 'text-sm text-coinbase-green';
-                
-                // Update status indicator
-                location.reload();
-            } else {
-                testResult.className = 'mt-4 p-3 rounded-lg bg-coinbase-red bg-opacity-20 border border-coinbase-red border-opacity-30';
-                testMessage.className = 'text-sm text-coinbase-red';
-                
-                // Show OpenAI help for authentication errors
-                if (provider === 'openai' && (data.message.includes('401') || data.message.includes('permission'))) {
-                    const helpButton = document.createElement('button');
-                    helpButton.innerHTML = '<i data-feather="help-circle" class="w-4 h-4 inline mr-1"></i> Get Help';
-                    helpButton.className = 'mt-2 text-blue-400 hover:text-blue-300 text-sm';
-                    helpButton.onclick = () => {
-                        closeTestModal();
-                        showOpenAIHelp();
-                    };
-                    testResult.appendChild(helpButton);
-                    feather.replace();
-                }
-            }
-        })
-        .catch(error => {
-            testResult.classList.remove('hidden');
-            testResult.className = 'mt-4 p-3 rounded-lg bg-coinbase-red bg-opacity-20 border border-coinbase-red border-opacity-30';
-            testMessage.className = 'text-sm text-coinbase-red';
-            testMessage.textContent = 'Connection test failed: ' + error.message;
-        });
-    }
-    
-    function closeTestModal() {
-        const modal = document.getElementById('testModal');
-        modal.classList.add('hidden');
-        modal.classList.remove('flex');
-    }
-    
-    function showOpenAIHelp() {
-        const modal = document.getElementById('openai-help-modal');
-        if (modal) {
-            modal.classList.remove('hidden');
-        } else {
-            // Create and show help modal
-            const modalHTML = `
-                <div id="openai-help-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div class="bg-gray-800 rounded-lg p-6 max-w-4xl max-h-[90vh] overflow-y-auto">
-                        <div class="flex items-center justify-between mb-4">
-                            <h2 class="text-2xl font-bold text-white">OpenAI API Key Setup Help</h2>
-                            <button onclick="closeOpenAIHelp()" class="text-gray-400 hover:text-white">
-                                <i data-feather="x" class="w-6 h-6"></i>
-                            </button>
-                        </div>
-                        
-                        <div class="bg-red-900/20 border border-red-500 rounded-lg p-4 mb-6">
-                            <div class="flex items-center mb-2">
-                                <i data-feather="alert-circle" class="text-red-500 mr-2"></i>
-                                <h3 class="text-red-400 font-semibold">Common Error: Missing Permissions</h3>
-                            </div>
-                            <p class="text-red-300 text-sm">
-                                Error 401: "You have insufficient permissions for this operation. Missing scopes: model.request"
-                            </p>
-                            <p class="text-gray-300 text-sm mt-2">
-                                This means your API key doesn't have the required permissions to use OpenAI's models.
-                            </p>
-                        </div>
-                        
-                        <div class="space-y-4">
-                            <div class="bg-gray-700 rounded-lg p-4">
-                                <h3 class="text-lg font-semibold text-white mb-3">How to Fix This:</h3>
-                                <ol class="text-gray-300 space-y-2">
-                                    <li>1. Go to <a href="https://platform.openai.com/api-keys" target="_blank" class="text-blue-400 hover:text-blue-300">OpenAI API Keys</a></li>
-                                    <li>2. Click "Create new secret key"</li>
-                                    <li>3. Give it a name (e.g., "Arbion Trading Bot")</li>
-                                    <li>4. Select permissions: <strong class="text-yellow-400">All</strong> (recommended for full access)</li>
-                                    <li>5. If using projects, ensure key is created in the correct project</li>
-                                    <li>6. Click "Create secret key"</li>
-                                    <li>7. Copy the key immediately (it won't be shown again)</li>
-                                    <li>8. Paste it into the OpenAI API Key field above</li>
-                                </ol>
+                    <!-- Direct API Key Method -->
+                    <div class="border-t border-slate-600 pt-3">
+                        <p class="text-slate-500 text-xs mb-3">Or use direct API credentials:</p>
+                        <form method="POST" action="{{ url_for('main.api_settings') }}">
+                            <input type="hidden" name="provider" value="schwab">
+                            
+                            <div class="mb-3">
+                                <input 
+                                    type="text" 
+                                    name="schwab_api_key" 
+                                    placeholder="API Key" 
+                                    class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
                             </div>
                             
-                            <div class="bg-blue-900/20 border border-blue-500 rounded-lg p-4">
-                                <div class="flex items-center mb-2">
-                                    <i data-feather="info" class="text-blue-400 mr-2"></i>
-                                    <h3 class="text-blue-400 font-semibold">Important Notes</h3>
-                                </div>
-                                <ul class="text-blue-300 text-sm space-y-1">
-                                    <li>• API keys created before recent updates may lack required scopes</li>
-                                    <li>• Always use the latest API key format from platform.openai.com</li>
-                                    <li>• Ensure your organization role is Owner or Writer</li>
-                                    <li>• Add a payment method if you haven't already</li>
-                                    <li>• If using multiple organizations, verify you're in the correct one</li>
-                                    <li>• For project-based keys, ensure the key is created in the right project</li>
-                                </ul>
+                            <div class="mb-3">
+                                <input 
+                                    type="password" 
+                                    name="schwab_secret" 
+                                    placeholder="Secret" 
+                                    class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm">
                             </div>
-                        </div>
-                        
-                        <div class="mt-6 flex space-x-4">
-                            <a href="https://platform.openai.com/api-keys" target="_blank" 
-                               class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
-                                Create New API Key
-                            </a>
-                            <button onclick="closeOpenAIHelp()" 
-                                    class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors">
-                                Close
+                            
+                            <button type="submit" class="w-full bg-slate-600 hover:bg-slate-700 text-white py-2 px-3 rounded-lg transition-colors text-sm">
+                                Save Direct Credentials
                             </button>
-                        </div>
+                        </form>
                     </div>
                 </div>
-            `;
-            document.body.insertAdjacentHTML('beforeend', modalHTML);
-            feather.replace();
-        }
-    }
-    
-    function closeOpenAIHelp() {
-        const modal = document.getElementById('openai-help-modal');
-        if (modal) {
-            modal.remove();
-        }
-    }
-    
-    // Toggle Coinbase OAuth2 setup form
-    function toggleCoinbaseOAuthSetup() {
-        const setupForm = document.getElementById('coinbase-oauth-setup');
-        setupForm.classList.toggle('hidden');
-    }
-    
-    // Toggle Schwab OAuth2 setup form
-    function toggleSchwabOAuthSetup() {
-        const setupForm = document.getElementById('schwab-oauth-setup');
-        setupForm.classList.toggle('hidden');
-    }
-</script>
+                
+                {% if oauth_credentials %}
+                    {% for oauth_cred in oauth_credentials %}
+                        {% if oauth_cred.provider == 'schwab' %}
+                            <div class="mt-3 text-sm text-emerald-400">
+                                ✓ Schwab OAuth configured
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            </div>
+            
+            <!-- Coinbase API Configuration -->
+            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
+                    <i data-feather="dollar-sign" class="w-5 h-5 mr-2 text-orange-400"></i>
+                    Coinbase API
+                </h2>
+                <p class="text-slate-400 text-sm mb-4">For cryptocurrency trading</p>
+                
+                <!-- OAuth Client Setup -->
+                <form method="POST" action="{{ url_for('main.api_settings') }}">
+                    <input type="hidden" name="provider" value="coinbase">
+                    <input type="hidden" name="oauth_setup" value="true">
+                    
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Client ID</label>
+                        <input 
+                            type="text" 
+                            name="client_id" 
+                            placeholder="Your Coinbase Client ID" 
+                            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Client Secret</label>
+                        <input 
+                            type="password" 
+                            name="client_secret" 
+                            placeholder="Your Coinbase Client Secret" 
+                            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-orange-500 text-sm">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Redirect URI</label>
+                        <input 
+                            type="text" 
+                            name="redirect_uri" 
+                            value="https://{{ request.host }}/oauth_callback/crypto" 
+                            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white text-sm"
+                            readonly>
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-orange-600 hover:bg-orange-700 text-white py-2 px-4 rounded-lg transition-colors">
+                        Save OAuth Credentials
+                    </button>
+                </form>
+                
+                {% if oauth_credentials %}
+                    {% for oauth_cred in oauth_credentials %}
+                        {% if oauth_cred.provider == 'coinbase' and oauth_cred.is_active %}
+                            <div class="mt-4 p-3 bg-slate-700 rounded-lg">
+                                <div class="text-sm text-emerald-400 mb-2">✓ OAuth configured</div>
+                                <form method="POST" action="{{ url_for('main.api_settings') }}" class="inline">
+                                    <input type="hidden" name="provider" value="coinbase">
+                                    <input type="hidden" name="oauth_flow" value="true">
+                                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded transition-colors text-sm">
+                                        Authorize Trading Access
+                                    </button>
+                                </form>
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            </div>
+            
+            <!-- E-trade API Configuration -->
+            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
+                    <i data-feather="bar-chart" class="w-5 h-5 mr-2 text-purple-400"></i>
+                    E*TRADE API
+                </h2>
+                <p class="text-slate-400 text-sm mb-4">For stock and options trading</p>
+                
+                <form method="POST" action="{{ url_for('main.api_settings') }}">
+                    <input type="hidden" name="provider" value="etrade">
+                    
+                    <div class="mb-3">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Consumer Key</label>
+                        <input 
+                            type="text" 
+                            name="etrade_consumer_key" 
+                            placeholder="Your E*TRADE Consumer Key" 
+                            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-slate-300 mb-1">Consumer Secret</label>
+                        <input 
+                            type="password" 
+                            name="etrade_consumer_secret" 
+                            placeholder="Your E*TRADE Consumer Secret" 
+                            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm">
+                    </div>
+                    
+                    <button type="submit" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg transition-colors">
+                        Connect E*TRADE Account
+                    </button>
+                </form>
+                
+                {% if credentials %}
+                    {% for cred in credentials %}
+                        {% if cred.provider == 'etrade' %}
+                            <div class="mt-3 text-sm text-emerald-400">
+                                ✓ E*TRADE credentials configured
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+        
+        <!-- Connection Status -->
+        <div class="mt-8 bg-slate-800 rounded-lg p-6 border border-slate-700">
+            <h3 class="text-lg font-semibold text-white mb-4">Connection Status</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {% set providers = [
+                    ('openai', 'OpenAI', 'zap', 'blue'),
+                    ('schwab', 'Schwab', 'trending-up', 'emerald'), 
+                    ('coinbase', 'Coinbase', 'dollar-sign', 'orange'),
+                    ('etrade', 'E*TRADE', 'bar-chart', 'purple')
+                ] %}
+                
+                {% for provider_id, provider_name, icon, color in providers %}
+                    <div class="flex items-center justify-between p-4 bg-slate-700 rounded-lg">
+                        <div class="flex items-center space-x-3">
+                            <i data-feather="{{ icon }}" class="w-5 h-5 text-{{ color }}-400"></i>
+                            <div>
+                                <h4 class="text-white font-medium">{{ provider_name }}</h4>
+                                <p class="text-slate-400 text-sm">
+                                    {% set has_creds = false %}
+                                    {% if credentials %}
+                                        {% for cred in credentials %}
+                                            {% if cred.provider == provider_id %}
+                                                {% set has_creds = true %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                    {% if oauth_credentials %}
+                                        {% for oauth_cred in oauth_credentials %}
+                                            {% if oauth_cred.provider == provider_id and oauth_cred.is_active %}
+                                                {% set has_creds = true %}
+                                            {% endif %}
+                                        {% endfor %}
+                                    {% endif %}
+                                    {% if has_creds %}Connected{% else %}Not connected{% endif %}
+                                </p>
+                            </div>
+                        </div>
+                        <div class="text-{{ 'emerald' if has_creds else 'red' }}-400">
+                            <i data-feather="{{ 'check-circle' if has_creds else 'x-circle' }}" class="w-5 h-5"></i>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+        <!-- Help Section -->
+        <div class="mt-6 bg-blue-900/20 border border-blue-700 rounded-lg p-4">
+            <div class="flex items-start space-x-3">
+                <i data-feather="help-circle" class="w-5 h-5 text-blue-400 mt-0.5"></i>
+                <div>
+                    <h4 class="text-blue-400 font-medium">Need Help?</h4>
+                    <p class="text-slate-300 text-sm mt-1">
+                        Ensure you have valid API credentials from each provider. OAuth methods are recommended for enhanced security. 
+                        All credentials are encrypted and stored securely.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
