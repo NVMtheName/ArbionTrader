@@ -1,0 +1,302 @@
+{% extends "base.html" %}
+
+{% block title %}Risk Analysis{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+.risk-card {
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid #374151;
+}
+
+.risk-metric {
+    background: #374151;
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+}
+
+.risk-high { border-left: 4px solid #ef4444; }
+.risk-medium { border-left: 4px solid #f59e0b; }
+.risk-low { border-left: 4px solid #10b981; }
+
+.position-item {
+    background: #374151;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    justify-content: between;
+    align-items: center;
+}
+
+.sector-bar {
+    height: 20px;
+    border-radius: 10px;
+    margin: 0.5rem 0;
+    position: relative;
+    overflow: hidden;
+}
+
+.sector-label {
+    position: absolute;
+    left: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: white;
+    z-index: 2;
+}
+
+.chart-container {
+    position: relative;
+    height: 300px;
+    margin: 1rem 0;
+}
+
+.risk-score-display {
+    font-size: 3rem;
+    font-weight: bold;
+    text-align: center;
+    margin: 1rem 0;
+}
+
+.risk-recommendation {
+    background: #1e40af;
+    border-left: 4px solid #3b82f6;
+    padding: 1rem;
+    margin: 0.5rem 0;
+    border-radius: 0 8px 8px 0;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-white">Risk Analysis</h1>
+            <p class="text-gray-400 mt-2">Portfolio risk metrics and exposure analysis</p>
+        </div>
+        <a href="{{ url_for('portfolio.dashboard') }}" 
+           class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors">
+            Back to Dashboard
+        </a>
+    </div>
+
+    {% if risk_metrics.error %}
+    <div class="risk-card text-center py-8">
+        <p class="text-red-400">{{ risk_metrics.error }}</p>
+        <p class="text-gray-400 mt-2">Execute some trades to generate risk analysis</p>
+    </div>
+    {% else %}
+
+    <!-- Risk Overview -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="risk-metric">
+            <div class="text-2xl font-bold text-white mb-2">{{ risk_metrics.total_positions }}</div>
+            <div class="text-sm text-gray-400">Active Positions</div>
+        </div>
+        
+        <div class="risk-metric">
+            <div class="text-2xl font-bold text-white mb-2">${{ "%.0f"|format(risk_metrics.total_exposure) }}</div>
+            <div class="text-sm text-gray-400">Total Exposure</div>
+        </div>
+        
+        <div class="risk-metric">
+            <div class="text-2xl font-bold {% if risk_metrics.concentration_risk > 30 %}text-red-400{% elif risk_metrics.concentration_risk > 20 %}text-yellow-400{% else %}text-green-400{% endif %} mb-2">
+                {{ risk_metrics.concentration_risk }}%
+            </div>
+            <div class="text-sm text-gray-400">Concentration Risk</div>
+        </div>
+        
+        <div class="risk-metric">
+            <div class="text-2xl font-bold {% if risk_metrics.var_5_percent < -100 %}text-red-400{% elif risk_metrics.var_5_percent < -50 %}text-yellow-400{% else %}text-green-400{% endif %} mb-2">
+                ${{ "%.0f"|format(risk_metrics.var_5_percent) }}
+            </div>
+            <div class="text-sm text-gray-400">5% VaR</div>
+        </div>
+    </div>
+
+    <!-- Risk Score and Recommendations -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+        <!-- Overall Risk Assessment -->
+        <div class="risk-card">
+            <h2 class="text-xl font-semibold text-white mb-4">Risk Assessment</h2>
+            
+            {% set overall_risk_score = (risk_metrics.concentration_risk * 0.4 + (risk_metrics.total_positions < 3) * 30 + (risk_metrics.var_5_percent < -100) * 30) %}
+            
+            <div class="risk-score-display {% if overall_risk_score > 70 %}text-red-400{% elif overall_risk_score > 40 %}text-yellow-400{% else %}text-green-400{% endif %}">
+                {{ "%.0f"|format(overall_risk_score) }}
+            </div>
+            
+            <div class="text-center text-gray-400 mb-4">
+                {% if overall_risk_score > 70 %}
+                    High Risk Portfolio
+                {% elif overall_risk_score > 40 %}
+                    Medium Risk Portfolio
+                {% else %}
+                    Low Risk Portfolio
+                {% endif %}
+            </div>
+            
+            <!-- Risk Recommendations -->
+            <div class="space-y-2">
+                {% if risk_metrics.concentration_risk > 30 %}
+                <div class="risk-recommendation">
+                    <strong>High Concentration Risk:</strong> Consider diversifying your largest position ({{ "%.1f"|format(risk_metrics.concentration_risk) }}% of portfolio)
+                </div>
+                {% endif %}
+                
+                {% if risk_metrics.total_positions < 3 %}
+                <div class="risk-recommendation">
+                    <strong>Low Diversification:</strong> Increase the number of positions to reduce single-stock risk
+                </div>
+                {% endif %}
+                
+                {% if risk_metrics.var_5_percent < -100 %}
+                <div class="risk-recommendation">
+                    <strong>High Daily Risk:</strong> Your worst 5% of days show significant losses. Consider position sizing
+                </div>
+                {% endif %}
+                
+                {% if overall_risk_score <= 40 %}
+                <div class="risk-recommendation">
+                    <strong>Well Balanced:</strong> Your portfolio shows good risk management across key metrics
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Sector Exposure -->
+        <div class="risk-card">
+            <h2 class="text-xl font-semibold text-white mb-4">Sector Exposure</h2>
+            
+            {% if risk_metrics.sector_exposure %}
+                {% for sector, percentage in risk_metrics.sector_exposure.items() %}
+                    {% if percentage > 0 %}
+                    <div class="mb-3">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-white">{{ sector }}</span>
+                            <span class="text-gray-400">{{ percentage }}%</span>
+                        </div>
+                        <div class="sector-bar bg-gray-700">
+                            <div class="h-full {% if sector == 'Technology' %}bg-blue-500{% elif sector == 'Financial' %}bg-green-500{% elif sector == 'Healthcare' %}bg-red-500{% elif sector == 'Consumer Discretionary' %}bg-purple-500{% elif sector == 'ETF' %}bg-yellow-500{% elif sector == 'Cryptocurrency' %}bg-orange-500{% else %}bg-gray-500{% endif %} transition-all duration-300"
+                                 style="width: {{ percentage }}%"></div>
+                        </div>
+                    </div>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <p class="text-gray-400">No sector exposure data available</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Position Details -->
+    {% if risk_metrics.positions %}
+    <div class="risk-card">
+        <h2 class="text-xl font-semibold text-white mb-4">Current Positions</h2>
+        
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-gray-600">
+                        <th class="text-left py-2 text-gray-400">Symbol</th>
+                        <th class="text-right py-2 text-gray-400">Quantity</th>
+                        <th class="text-right py-2 text-gray-400">Exposure</th>
+                        <th class="text-right py-2 text-gray-400">% of Portfolio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for symbol, position in risk_metrics.positions.items() %}
+                    <tr class="border-b border-gray-700">
+                        <td class="py-2 text-white font-medium">{{ symbol }}</td>
+                        <td class="py-2 text-right {% if position.quantity > 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                            {{ "%.2f"|format(position.quantity) }}
+                        </td>
+                        <td class="py-2 text-right {% if position.exposure > 0 %}text-green-400{% else %}text-red-400{% endif %}">
+                            ${{ "%.2f"|format(position.exposure) }}
+                        </td>
+                        <td class="py-2 text-right text-gray-400">
+                            {{ "%.1f"|format((position.exposure / risk_metrics.total_exposure * 100) if risk_metrics.total_exposure > 0 else 0) }}%
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Risk Metrics Chart -->
+    <div class="risk-card">
+        <h2 class="text-xl font-semibold text-white mb-4">Risk Metrics Visualization</h2>
+        <div class="chart-container">
+            <canvas id="riskMetricsChart"></canvas>
+        </div>
+    </div>
+
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    {% if not risk_metrics.error and risk_metrics.sector_exposure %}
+    // Risk metrics radar chart
+    const ctx = document.getElementById('riskMetricsChart').getContext('2d');
+    
+    // Prepare sector exposure data
+    const sectorLabels = {{ risk_metrics.sector_exposure.keys() | list | tojson }};
+    const sectorData = {{ risk_metrics.sector_exposure.values() | list | tojson }};
+    
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: sectorLabels,
+            datasets: [{
+                data: sectorData,
+                backgroundColor: [
+                    '#3b82f6', // Technology
+                    '#10b981', // Financial
+                    '#ef4444', // Healthcare
+                    '#8b5cf6', // Consumer Discretionary
+                    '#f59e0b', // ETF
+                    '#f97316', // Cryptocurrency
+                    '#6b7280'  // Other
+                ],
+                borderColor: '#1f2937',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        color: '#ffffff',
+                        padding: 20,
+                        usePointStyle: true
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return context.label + ': ' + context.parsed + '%';
+                        }
+                    }
+                }
+            }
+        }
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}

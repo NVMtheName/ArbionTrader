@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+
+{% block title %}Performance Analysis{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<style>
+.performance-card {
+    background: #1f2937;
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border: 1px solid #374151;
+}
+
+.strategy-comparison-card {
+    background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+    border-left: 4px solid;
+}
+
+.strategy-wheel { border-left-color: #3b82f6; }
+.strategy-collar { border-left-color: #10b981; }
+.strategy-ai { border-left-color: #8b5cf6; }
+.strategy-manual { border-left-color: #f59e0b; }
+
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.metric-item {
+    text-align: center;
+    padding: 1rem;
+    background: #374151;
+    border-radius: 8px;
+}
+
+.metric-item .value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.metric-item .label {
+    font-size: 0.875rem;
+    color: #9ca3af;
+}
+
+.positive { color: #10b981; }
+.negative { color: #ef4444; }
+.neutral { color: #6b7280; }
+
+.chart-container {
+    position: relative;
+    height: 400px;
+    margin: 1rem 0;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="flex justify-between items-center mb-8">
+        <div>
+            <h1 class="text-3xl font-bold text-white">Performance Analysis</h1>
+            <p class="text-gray-400 mt-2">Detailed strategy comparison and performance metrics</p>
+        </div>
+        <a href="{{ url_for('portfolio.dashboard') }}" 
+           class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg transition-colors">
+            Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Strategy Comparison Overview -->
+    {% if strategy_comparison.strategies %}
+    <div class="performance-card mb-8">
+        <h2 class="text-xl font-semibold text-white mb-4">Strategy Comparison ({{ strategy_comparison.period_days }} days)</h2>
+        <div class="chart-container">
+            <canvas id="strategyComparisonChart"></canvas>
+        </div>
+    </div>
+
+    <!-- Individual Strategy Details -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {% for strategy_name, data in strategy_comparison.strategies.items() %}
+        <div class="strategy-comparison-card strategy-{{ strategy_name }}">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-lg font-semibold text-white capitalize">{{ strategy_name.replace('_', ' ') }} Strategy</h3>
+                <span class="text-lg font-bold {% if data.total_pnl >= 0 %}positive{% else %}negative{% endif %}">
+                    ${{ "%.2f"|format(data.total_pnl) }}
+                </span>
+            </div>
+            
+            <div class="metric-grid">
+                <div class="metric-item">
+                    <div class="value text-white">{{ data.total_trades }}</div>
+                    <div class="label">Total Trades</div>
+                </div>
+                
+                <div class="metric-item">
+                    <div class="value {% if data.win_rate >= 50 %}positive{% else %}negative{% endif %}">
+                        {{ data.win_rate }}%
+                    </div>
+                    <div class="label">Win Rate</div>
+                </div>
+                
+                <div class="metric-item">
+                    <div class="value {% if data.avg_trade >= 0 %}positive{% else %}negative{% endif %}">
+                        ${{ "%.2f"|format(data.avg_trade) }}
+                    </div>
+                    <div class="label">Avg Trade</div>
+                </div>
+                
+                <div class="metric-item">
+                    <div class="value neutral">
+                        {{ "%.2f"|format(data.volatility) }}
+                    </div>
+                    <div class="label">Volatility</div>
+                </div>
+                
+                <div class="metric-item">
+                    <div class="value positive">
+                        ${{ "%.2f"|format(data.best_trade) }}
+                    </div>
+                    <div class="label">Best Trade</div>
+                </div>
+                
+                <div class="metric-item">
+                    <div class="value negative">
+                        ${{ "%.2f"|format(data.worst_trade) }}
+                    </div>
+                    <div class="label">Worst Trade</div>
+                </div>
+            </div>
+            
+            <!-- Win/Loss Distribution -->
+            <div class="mt-4 pt-4 border-t border-gray-600">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-400">Winning Trades: 
+                        <span class="positive">{{ data.winning_trades }}</span>
+                    </span>
+                    <span class="text-gray-400">Losing Trades: 
+                        <span class="negative">{{ data.losing_trades }}</span>
+                    </span>
+                </div>
+                
+                <!-- Win/Loss Bar -->
+                <div class="mt-2 h-2 bg-gray-700 rounded-full overflow-hidden">
+                    {% set win_percentage = (data.winning_trades / data.total_trades * 100) if data.total_trades > 0 else 0 %}
+                    <div class="h-full bg-green-500 transition-all duration-300" 
+                         style="width: {{ win_percentage }}%"></div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="performance-card text-center py-8">
+        <p class="text-gray-400">No strategy performance data available. Start trading to see analytics!</p>
+    </div>
+    {% endif %}
+
+    <!-- Performance Insights -->
+    {% if strategy_comparison.strategies %}
+    <div class="performance-card">
+        <h2 class="text-xl font-semibold text-white mb-4">Performance Insights</h2>
+        
+        <!-- Calculate best performing strategy -->
+        {% set best_strategy = strategy_comparison.strategies.items() | list | sort(attribute='1.total_pnl', reverse=true) | first %}
+        {% set most_active = strategy_comparison.strategies.items() | list | sort(attribute='1.total_trades', reverse=true) | first %}
+        
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div class="bg-green-900/20 border border-green-500/20 rounded-lg p-4">
+                <h3 class="text-green-400 font-semibold mb-2">Best Performing Strategy</h3>
+                <p class="text-white text-lg capitalize">{{ best_strategy[0].replace('_', ' ') }}</p>
+                <p class="text-green-400">${{ "%.2f"|format(best_strategy[1].total_pnl) }} total P&L</p>
+            </div>
+            
+            <div class="bg-blue-900/20 border border-blue-500/20 rounded-lg p-4">
+                <h3 class="text-blue-400 font-semibold mb-2">Most Active Strategy</h3>
+                <p class="text-white text-lg capitalize">{{ most_active[0].replace('_', ' ') }}</p>
+                <p class="text-blue-400">{{ most_active[1].total_trades }} trades executed</p>
+            </div>
+            
+            <div class="bg-purple-900/20 border border-purple-500/20 rounded-lg p-4">
+                <h3 class="text-purple-400 font-semibold mb-2">Total Strategies</h3>
+                <p class="text-white text-lg">{{ strategy_comparison.strategies | length }}</p>
+                <p class="text-purple-400">Active trading strategies</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+
+<script>
+// Strategy comparison chart
+document.addEventListener('DOMContentLoaded', function() {
+    {% if strategy_comparison.strategies %}
+    const strategyData = {{ strategy_comparison.strategies | tojson }};
+    
+    // Prepare data for chart
+    const labels = Object.keys(strategyData).map(s => s.replace('_', ' ').charAt(0).toUpperCase() + s.replace('_', ' ').slice(1));
+    const pnlData = Object.values(strategyData).map(d => d.total_pnl);
+    const tradeData = Object.values(strategyData).map(d => d.total_trades);
+    const winRateData = Object.values(strategyData).map(d => d.win_rate);
+    
+    const ctx = document.getElementById('strategyComparisonChart').getContext('2d');
+    
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Total P&L ($)',
+                data: pnlData,
+                backgroundColor: pnlData.map(val => val >= 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)'),
+                borderColor: pnlData.map(val => val >= 0 ? '#10b981' : '#ef4444'),
+                borderWidth: 2,
+                yAxisID: 'y'
+            }, {
+                label: 'Win Rate (%)',
+                data: winRateData,
+                type: 'line',
+                borderColor: '#8b5cf6',
+                backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                borderWidth: 3,
+                fill: false,
+                yAxisID: 'y1',
+                tension: 0.3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    labels: {
+                        color: '#ffffff'
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.dataset.label === 'Total P&L ($)') {
+                                label += '$' + context.parsed.y.toFixed(2);
+                            } else {
+                                label += context.parsed.y.toFixed(1) + '%';
+                            }
+                            return label;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: {
+                        color: '#9ca3af'
+                    },
+                    grid: {
+                        color: '#374151'
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    ticks: {
+                        color: '#9ca3af',
+                        callback: function(value) {
+                            return '$' + value.toFixed(0);
+                        }
+                    },
+                    grid: {
+                        color: '#374151'
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    ticks: {
+                        color: '#9ca3af',
+                        callback: function(value) {
+                            return value.toFixed(0) + '%';
+                        }
+                    },
+                    grid: {
+                        drawOnChartArea: false,
+                    }
+                }
+            }
+        }
+    });
+    {% endif %}
+});
+</script>
+{% endblock %}
