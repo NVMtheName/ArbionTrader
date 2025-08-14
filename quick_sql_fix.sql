@@ -1,0 +1,17 @@
+-- Copy these SQL commands and run them in your Heroku PostgreSQL console
+-- Go to your Heroku app dashboard > PostgreSQL add-on > Console/Query
+
+ALTER TABLE trade ADD COLUMN IF NOT EXISTS is_simulation BOOLEAN DEFAULT false;
+ALTER TABLE trade ADD COLUMN IF NOT EXISTS fees DECIMAL(15,8) DEFAULT 0.0;
+ALTER TABLE trade ADD COLUMN IF NOT EXISTS commission DECIMAL(15,8) DEFAULT 0.0;
+ALTER TABLE trade ADD COLUMN IF NOT EXISTS realized_pnl DECIMAL(15,8);
+ALTER TABLE trade ADD COLUMN IF NOT EXISTS unrealized_pnl DECIMAL(15,8);
+ALTER TABLE trade ADD COLUMN IF NOT EXISTS market_value DECIMAL(15,8);
+ALTER TABLE trade ADD COLUMN IF NOT EXISTS cost_basis DECIMAL(15,8);
+ALTER TABLE trade ADD COLUMN IF NOT EXISTS portfolio_percentage DECIMAL(15,8);
+ALTER TABLE trade ADD COLUMN IF NOT EXISTS risk_score DECIMAL(15,8);
+ALTER TABLE trade ADD COLUMN IF NOT EXISTS confidence_score DECIMAL(15,8);
+ALTER TABLE trade ADD COLUMN IF NOT EXISTS exit_price DECIMAL(15,8);
+ALTER TABLE trade ADD COLUMN IF NOT EXISTS exit_date TIMESTAMP;
+ALTER TABLE trade ADD COLUMN IF NOT EXISTS holding_period_days INTEGER;
+ALTER TABLE trade ADD COLUMN IF NOT EXISTS trade_notes TEXT;

@@ -1,0 +1,31 @@
+Here are the exact commands to fix your Heroku database.
+
+Replace "your-app-name" with your actual Heroku app name and run these one by one:
+
+heroku pg:psql --app your-app-name -c "ALTER TABLE trade ADD COLUMN IF NOT EXISTS is_simulation BOOLEAN DEFAULT false;"
+
+heroku pg:psql --app your-app-name -c "ALTER TABLE trade ADD COLUMN IF NOT EXISTS fees DECIMAL(15,8) DEFAULT 0.0;"
+
+heroku pg:psql --app your-app-name -c "ALTER TABLE trade ADD COLUMN IF NOT EXISTS commission DECIMAL(15,8) DEFAULT 0.0;"
+
+heroku pg:psql --app your-app-name -c "ALTER TABLE trade ADD COLUMN IF NOT EXISTS realized_pnl DECIMAL(15,8);"
+
+heroku pg:psql --app your-app-name -c "ALTER TABLE trade ADD COLUMN IF NOT EXISTS unrealized_pnl DECIMAL(15,8);"
+
+heroku pg:psql --app your-app-name -c "ALTER TABLE trade ADD COLUMN IF NOT EXISTS market_value DECIMAL(15,8);"
+
+heroku pg:psql --app your-app-name -c "ALTER TABLE trade ADD COLUMN IF NOT EXISTS cost_basis DECIMAL(15,8);"
+
+heroku pg:psql --app your-app-name -c "ALTER TABLE trade ADD COLUMN IF NOT EXISTS portfolio_percentage DECIMAL(15,8);"
+
+heroku pg:psql --app your-app-name -c "ALTER TABLE trade ADD COLUMN IF NOT EXISTS risk_score DECIMAL(15,8);"
+
+heroku pg:psql --app your-app-name -c "ALTER TABLE trade ADD COLUMN IF NOT EXISTS confidence_score DECIMAL(15,8);"
+
+heroku pg:psql --app your-app-name -c "ALTER TABLE trade ADD COLUMN IF NOT EXISTS exit_price DECIMAL(15,8);"
+
+heroku pg:psql --app your-app-name -c "ALTER TABLE trade ADD COLUMN IF NOT EXISTS exit_date TIMESTAMP;"
+
+heroku pg:psql --app your-app-name -c "ALTER TABLE trade ADD COLUMN IF NOT EXISTS holding_period_days INTEGER;"
+
+heroku pg:psql --app your-app-name -c "ALTER TABLE trade ADD COLUMN IF NOT EXISTS trade_notes TEXT;"
