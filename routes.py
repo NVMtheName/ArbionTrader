@@ -399,9 +399,6 @@ def natural_trade():
 def api_settings():
     from models import APICredential, OAuthClientCredential
     from utils.encryption import encrypt_credentials
-    from utils.coinbase_oauth import CoinbaseOAuth
-    from utils.schwab_oauth import SchwabOAuth
-    from utils.multi_user_config import multi_user_config
     from app import db
     
     if request.method == 'POST':
@@ -422,6 +419,7 @@ def api_settings():
         provider = request.form.get('provider')
         
         if provider == 'coinbase':
+            from utils.coinbase_oauth import CoinbaseOAuth
             # Check if this is OAuth2 flow initiation
             oauth_flow = request.form.get('oauth_flow')
             
@@ -498,6 +496,7 @@ def api_settings():
                 }
         
         elif provider == 'schwab':
+            from utils.schwab_oauth import SchwabOAuth
             # Check if this is OAuth2 flow initiation
             oauth_flow = request.form.get('oauth_flow')
             

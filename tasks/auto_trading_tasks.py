@@ -20,44 +20,48 @@ class AutoTradingEngine:
     def log_system_event(self, level, message, module='auto_trading', user_id=None):
         """Log system events to database"""
         try:
-            log_entry = SystemLog(
-                level=level,
-                message=message,
-                module=module,
-                user_id=user_id
-            )
-            db.session.add(log_entry)
-            db.session.commit()
+            from app import app
+            with app.app_context():
+                log_entry = SystemLog(
+                    level=level,
+                    message=message,
+                    module=module,
+                    user_id=user_id
+                )
+                db.session.add(log_entry)
+                db.session.commit()
         except Exception as e:
             self.logger.error(f"Failed to log system event: {str(e)}")
     
     def run_auto_trading_cycle(self):
         """Main auto-trading cycle"""
         try:
-            self.log_system_event('info', 'Starting auto-trading cycle')
-            
-            # Get auto-trading settings
-            settings = AutoTradingSettings.get_settings()
-            
-            if not settings.is_enabled:
-                self.log_system_event('info', 'Auto-trading is disabled')
-                return
-            
-            # Run enabled strategies
-            if settings.wheel_enabled:
-                self.run_wheel_strategy(settings.simulation_mode)
-            
-            if settings.collar_enabled:
-                self.run_collar_strategy(settings.simulation_mode)
-            
-            if settings.ai_enabled:
-                self.run_ai_strategy(settings.simulation_mode)
-            
-            # Update last run time
-            settings.last_run = datetime.utcnow()
-            db.session.commit()
-            
-            self.log_system_event('info', 'Auto-trading cycle completed')
+            from app import app
+            with app.app_context():
+                self.log_system_event('info', 'Starting auto-trading cycle')
+                
+                # Get auto-trading settings
+                settings = AutoTradingSettings.get_settings()
+                
+                if not settings.is_enabled:
+                    self.log_system_event('info', 'Auto-trading is disabled')
+                    return
+                
+                # Run enabled strategies
+                if settings.wheel_enabled:
+                    self.run_wheel_strategy(settings.simulation_mode)
+                
+                if settings.collar_enabled:
+                    self.run_collar_strategy(settings.simulation_mode)
+                
+                if settings.ai_enabled:
+                    self.run_ai_strategy(settings.simulation_mode)
+                
+                # Update last run time
+                settings.last_run = datetime.utcnow()
+                db.session.commit()
+                
+                self.log_system_event('info', 'Auto-trading cycle completed')
         
         except Exception as e:
             self.logger.error(f"Error in auto-trading cycle: {str(e)}")

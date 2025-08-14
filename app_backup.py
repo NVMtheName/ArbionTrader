@@ -1,19 +1,22 @@
 import os
 import logging
 from flask import Flask
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
 
 class Base(DeclarativeBase):
     pass
 
-# Initialize extensions
 db = SQLAlchemy(model_class=Base)
 login_manager = LoginManager()
 migrate = Migrate()
@@ -24,7 +27,12 @@ def create_app():
     # Configuration
     app.secret_key = os.environ.get("SESSION_SECRET", "dev-secret-key-change-in-production")
     
-    # Database configuration
+    # Configure proper URL generation for OAuth redirects
+    # Allow flexible domain handling for OAuth callbacks (both arbion.ai and www.arbion.ai)
+    app.config['SERVER_NAME'] = None  # Enable flexible domain handling
+    app.config['PREFERRED_URL_SCHEME'] = 'https'
+    
+    # Fix DATABASE_URL for newer SQLAlchemy versions
     database_url = os.environ.get("DATABASE_URL", "postgresql://localhost/arbion_db")
     if database_url.startswith("postgres://"):
         database_url = database_url.replace("postgres://", "postgresql://", 1)
@@ -56,6 +64,7 @@ def create_app():
     # Import and register blueprints
     from routes import main_bp
     from auth import auth_bp
+<<<<<<< HEAD
     from github_routes import github_bp
     from utils.coinbase_v2_routes import coinbase_v2_bp
     from utils.agent_kit_routes import agent_kit_bp
@@ -73,6 +82,28 @@ def create_app():
     app.register_blueprint(openai_auth_bp)
     app.register_blueprint(schwabdev_bp)
     app.register_blueprint(ai_trading_bot_bp)
+=======
+
+    app.register_blueprint(main_bp)
+    app.register_blueprint(auth_bp, url_prefix='/auth')
+
+    optional_blueprints = [
+        ("github_routes", "github_bp"),
+        ("utils.coinbase_v2_routes", "coinbase_v2_bp"),
+        ("utils.agent_kit_routes", "agent_kit_bp"),
+        ("utils.enhanced_openai_routes", "enhanced_openai_bp"),
+        ("utils.openai_auth_routes", "openai_auth_bp"),
+        ("utils.schwabdev_routes", "schwabdev_bp"),
+    ]
+
+    for module_name, bp_name in optional_blueprints:
+        try:
+            module = __import__(module_name, fromlist=[bp_name])
+            bp = getattr(module, bp_name)
+            app.register_blueprint(bp)
+        except Exception as e:
+            logging.warning(f"Skipping optional blueprint {module_name}: {e}")
+>>>>>>> 1b1a1c8b7f33d16546f0725b94916eaf5fb05ebe
     
     # Create tables and default admin user
     with app.app_context():
