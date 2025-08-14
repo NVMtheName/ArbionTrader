@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}AI Trading Bot - Arbion{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-2xl font-bold text-white mb-6">AI Trading Bot</h1>
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Bot Status Card -->
+            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-slate-400 text-sm font-medium">Bot Status</h3>
+                        <p class="text-xl font-bold text-red-400 mt-1">Stopped</p>
+                    </div>
+                    <div class="bg-red-500/10 p-3 rounded-lg">
+                        <i data-feather="pause-circle" class="w-6 h-6 text-red-400"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Signals Today Card -->
+            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-slate-400 text-sm font-medium">Signals Today</h3>
+                        <p class="text-xl font-bold text-white mt-1">0</p>
+                    </div>
+                    <div class="bg-blue-500/10 p-3 rounded-lg">
+                        <i data-feather="zap" class="w-6 h-6 text-blue-400"></i>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Performance Card -->
+            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-slate-400 text-sm font-medium">Bot Performance</h3>
+                        <p class="text-xl font-bold text-white mt-1">+0.00%</p>
+                    </div>
+                    <div class="bg-emerald-500/10 p-3 rounded-lg">
+                        <i data-feather="trending-up" class="w-6 h-6 text-emerald-400"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Bot Controls -->
+        <div class="bg-slate-800 rounded-lg p-6 border border-slate-700 mb-6">
+            <h3 class="text-lg font-semibold text-white mb-4">Bot Controls</h3>
+            <div class="flex space-x-4">
+                <button class="bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center space-x-2">
+                    <i data-feather="play" class="w-4 h-4"></i>
+                    <span>Start Bot</span>
+                </button>
+                <button class="bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center space-x-2">
+                    <i data-feather="stop-circle" class="w-4 h-4"></i>
+                    <span>Stop Bot</span>
+                </button>
+                <button class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center space-x-2">
+                    <i data-feather="settings" class="w-4 h-4"></i>
+                    <span>Configure</span>
+                </button>
+            </div>
+        </div>
+        
+        <!-- Recent Activity -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                <h3 class="text-lg font-semibold text-white mb-4">Recent Signals</h3>
+                <div class="space-y-4">
+                    <div class="text-center py-8">
+                        <i data-feather="activity" class="w-12 h-12 text-slate-400 mx-auto mb-3"></i>
+                        <p class="text-slate-400">No signals yet</p>
+                        <p class="text-slate-500 text-sm mt-1">Start the bot to begin generating trading signals</p>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                <h3 class="text-lg font-semibold text-white mb-4">Market Analysis</h3>
+                <div class="space-y-4">
+                    <div class="text-center py-8">
+                        <i data-feather="bar-chart-2" class="w-12 h-12 text-slate-400 mx-auto mb-3"></i>
+                        <p class="text-slate-400">No analysis available</p>
+                        <p class="text-slate-500 text-sm mt-1">AI market analysis will appear here</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Information Panel -->
+        <div class="mt-6 bg-blue-900/20 border border-blue-700 rounded-lg p-4">
+            <div class="flex items-start space-x-3">
+                <i data-feather="info" class="w-5 h-5 text-blue-400 mt-0.5"></i>
+                <div>
+                    <h4 class="text-blue-400 font-medium">AI Trading Bot</h4>
+                    <p class="text-slate-300 text-sm mt-1">
+                        The AI trading bot uses advanced machine learning to analyze market conditions and generate trading signals. 
+                        Configure your risk parameters and connect your trading accounts to get started.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

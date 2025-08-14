@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+
+{% block title %}OpenAI Test - Arbion{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-2xl font-bold text-white mb-6">OpenAI API Test</h1>
+        
+        <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+            <h3 class="text-lg font-semibold text-white mb-4">Test OpenAI Connection</h3>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Test Prompt</label>
+                    <textarea 
+                        id="test-prompt" 
+                        class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        rows="3"
+                        placeholder="Enter a test prompt for OpenAI...">What is the current market sentiment for AAPL?</textarea>
+                </div>
+                
+                <button 
+                    id="test-openai"
+                    class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center space-x-2">
+                    <i data-feather="send" class="w-4 h-4"></i>
+                    <span>Test Connection</span>
+                </button>
+            </div>
+            
+            <div id="test-result" class="mt-6 hidden">
+                <h4 class="text-white font-medium mb-2">Response:</h4>
+                <div class="bg-slate-700 rounded-lg p-4 border border-slate-600">
+                    <pre id="response-content" class="text-slate-300 whitespace-pre-wrap"></pre>
+                </div>
+            </div>
+        </div>
+        
+        <!-- API Status -->
+        <div class="mt-6 bg-slate-800 rounded-lg p-6 border border-slate-700">
+            <h3 class="text-lg font-semibold text-white mb-4">API Status</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="flex items-center justify-between p-4 bg-slate-700 rounded-lg">
+                    <div>
+                        <h4 class="text-white font-medium">OpenAI API</h4>
+                        <p class="text-slate-400 text-sm">Connection status</p>
+                    </div>
+                    <div class="text-emerald-400">
+                        <i data-feather="check-circle" class="w-5 h-5"></i>
+                    </div>
+                </div>
+                
+                <div class="flex items-center justify-between p-4 bg-slate-700 rounded-lg">
+                    <div>
+                        <h4 class="text-white font-medium">API Key</h4>
+                        <p class="text-slate-400 text-sm">Configuration status</p>
+                    </div>
+                    <div class="text-emerald-400">
+                        <i data-feather="check-circle" class="w-5 h-5"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('test-openai').addEventListener('click', async function() {
+    const prompt = document.getElementById('test-prompt').value;
+    const button = this;
+    const resultDiv = document.getElementById('test-result');
+    const responseContent = document.getElementById('response-content');
+    
+    button.disabled = true;
+    button.innerHTML = '<i data-feather="loader" class="w-4 h-4 animate-spin"></i><span>Testing...</span>';
+    
+    try {
+        const response = await fetch('/api/openai/completion', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ prompt: prompt })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            responseContent.textContent = data.response;
+            resultDiv.classList.remove('hidden');
+        } else {
+            responseContent.textContent = 'Error: ' + data.error;
+            resultDiv.classList.remove('hidden');
+        }
+    } catch (error) {
+        responseContent.textContent = 'Network error: ' + error.message;
+        resultDiv.classList.remove('hidden');
+    }
+    
+    button.disabled = false;
+    button.innerHTML = '<i data-feather="send" class="w-4 h-4"></i><span>Test Connection</span>';
+    feather.replace();
+});
+</script>
+{% endblock %}

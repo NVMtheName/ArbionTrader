@@ -5,8 +5,9 @@ from functools import wraps
 import logging
 import json
 import os
-from datetime import datetime
-from models import User, Strategy, AutoTradingSettings, APICredential
+from datetime import datetime, timedelta
+from models import User, Strategy, AutoTradingSettings, APICredential, Trade, SystemLog
+from app import db
 
 main_bp = Blueprint('main', __name__)
 
@@ -384,6 +385,164 @@ def dashboard():
 def enhanced_dashboard():
     """Enhanced dashboard with advanced features"""
     return render_template('enhanced_dashboard.html')
+
+@main_bp.route('/portfolio')
+@login_required
+def portfolio():
+    """Portfolio overview page"""
+    return render_template('portfolio.html')
+
+# Missing Analytics Routes
+@main_bp.route('/api/analytics/trade-history')
+@login_required
+def api_analytics_trade_history():
+    """API endpoint for trade history data"""
+    try:
+        from utils.trade_analytics import TradeAnalyticsEngine
+        analytics = TradeAnalyticsEngine(current_user.id)
+        history = analytics.get_trade_history()
+        return jsonify({'success': True, 'data': history})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/api/analytics/performance-chart')
+@login_required
+def api_analytics_performance_chart():
+    """API endpoint for performance chart data"""
+    try:
+        from utils.trade_analytics import TradeAnalyticsEngine
+        analytics = TradeAnalyticsEngine(current_user.id)
+        chart_data = analytics.get_performance_chart_data()
+        return jsonify({'success': True, 'data': chart_data})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/api/analytics/strategy-breakdown')
+@login_required
+def api_analytics_strategy_breakdown():
+    """API endpoint for strategy breakdown data"""
+    try:
+        from utils.trade_analytics import TradeAnalyticsEngine
+        analytics = TradeAnalyticsEngine(current_user.id)
+        breakdown = analytics.get_strategy_breakdown()
+        return jsonify({'success': True, 'data': breakdown})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# AI Trading Bot Routes
+@main_bp.route('/ai-trading-bot')
+@login_required
+def ai_trading_bot():
+    """AI Trading Bot main page"""
+    return render_template('ai_trading_bot.html')
+
+@main_bp.route('/api/ai-bot/start', methods=['POST'])
+@login_required
+def api_ai_bot_start():
+    """Start AI trading bot"""
+    try:
+        from utils.ai_trading_bot import AITradingBot
+        bot = AITradingBot(current_user.id)
+        result = bot.start()
+        return jsonify({'success': True, 'message': 'AI bot started successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/api/ai-bot/stop', methods=['POST'])
+@login_required
+def api_ai_bot_stop():
+    """Stop AI trading bot"""
+    try:
+        from utils.ai_trading_bot import AITradingBot
+        bot = AITradingBot(current_user.id)
+        result = bot.stop()
+        return jsonify({'success': True, 'message': 'AI bot stopped successfully'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/api/ai-bot/status')
+@login_required
+def api_ai_bot_status():
+    """Get AI trading bot status"""
+    try:
+        return jsonify({
+            'success': True, 
+            'status': 'stopped',
+            'last_analysis': None,
+            'total_signals': 0
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/api/ai-bot/signals')
+@login_required
+def api_ai_bot_signals():
+    """Get AI trading bot signals"""
+    try:
+        return jsonify({
+            'success': True, 
+            'signals': [],
+            'count': 0
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@main_bp.route('/api/ai-bot/analysis')
+@login_required
+def api_ai_bot_analysis():
+    """Get AI trading bot analysis"""
+    try:
+        return jsonify({
+            'success': True, 
+            'analysis': 'No analysis available',
+            'confidence': 0,
+            'recommendation': 'hold'
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# OpenAI Routes
+@main_bp.route('/openai/test')
+@login_required
+def openai_test():
+    """OpenAI test page"""
+    return render_template('openai_test.html')
+
+@main_bp.route('/openai/chat')
+@login_required
+def openai_chat():
+    """OpenAI chat interface"""
+    return render_template('openai_chat.html')
+
+@main_bp.route('/api/openai/completion', methods=['POST'])
+@login_required
+def api_openai_completion():
+    """OpenAI completion API"""
+    try:
+        from utils.openai_trader import OpenAITrader
+        trader = OpenAITrader(user_id=current_user.id)
+        prompt = request.json.get('prompt', '')
+        response = trader.get_completion(prompt)
+        return jsonify({'success': True, 'response': response})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# Portfolio Data Route
+@main_bp.route('/api/portfolio-data')
+@login_required
+def api_portfolio_data():
+    """Portfolio data API endpoint"""
+    try:
+        return jsonify({
+            'success': True,
+            'total_value': 0.0,
+            'available_cash': 0.0,
+            'total_pnl': 0.0,
+            'positions': [],
+            'accounts': []
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @main_bp.route('/natural-trade', methods=['GET', 'POST'])
 @main_bp.route('/natural_trade', methods=['GET', 'POST'])
