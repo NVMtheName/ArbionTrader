@@ -73,13 +73,12 @@ class CoinbaseOAuth:
                 existing_cred.updated_at = datetime.utcnow()
                 existing_cred.is_active = True
             else:
-                new_cred = OAuthClientCredential(
-                    user_id=user_id,
-                    provider='coinbase',
-                    client_id=client_id,
-                    client_secret=client_secret,
-                    redirect_uri=redirect_uri
-                )
+                new_cred = OAuthClientCredential()
+                new_cred.user_id = user_id
+                new_cred.provider = 'coinbase'
+                new_cred.client_id = client_id
+                new_cred.client_secret = client_secret
+                new_cred.redirect_uri = redirect_uri
                 db.session.add(new_cred)
             
             db.session.commit()
