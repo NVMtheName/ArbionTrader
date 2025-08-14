@@ -68,7 +68,13 @@ def login():
                 login_user(user)
                 logging.info(f"User {user.email} logged in successfully")
                 next_page = request.args.get('next')
-                return redirect(next_page) if next_page else redirect(url_for('main.dashboard'))
+                try:
+                    return redirect(next_page) if next_page else redirect(url_for('main.dashboard'))
+                except Exception as redirect_error:
+                    logging.error(f"Dashboard redirect error: {redirect_error}")
+                    # Fallback to a simple success page or redirect to root
+                    flash(f'Login successful! Welcome {user.username}', 'success')
+                    return redirect('/')
             else:
                 flash('Your account has been deactivated. Please contact an administrator.', 'error')
         else:

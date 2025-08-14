@@ -309,34 +309,75 @@ def get_account_balance():
 @main_bp.route('/dashboard')
 @login_required
 def dashboard():
-    from models import Trade, APICredential, AutoTradingSettings
-    
-    # Get user's recent trades
-    recent_trades = Trade.query.filter_by(user_id=current_user.id).order_by(Trade.created_at.desc()).limit(10).all()
-    
-    # Get API connection status
-    api_credentials = APICredential.query.filter_by(user_id=current_user.id, is_active=True).all()
-    api_status = {}
-    for cred in api_credentials:
-        api_status[cred.provider] = cred.test_status
-    
-    # Get auto-trading settings (superadmin only)
-    auto_trading_settings = None
-    if current_user.is_superadmin():
-        auto_trading_settings = AutoTradingSettings.get_settings()
-    
-    # Get real-time market data
-    market_data = get_dashboard_market_data()
-    
-    # Get account balance if APIs are connected
-    account_balance = get_account_balance()
-    
-    return render_template('dashboard.html', 
-                         recent_trades=recent_trades,
-                         api_status=api_status,
-                         auto_trading_settings=auto_trading_settings,
-                         market_data=market_data,
-                         account_balance=account_balance)
+    try:
+        from models import Trade, APICredential, AutoTradingSettings
+        
+        # Get user's recent trades
+        recent_trades = Trade.query.filter_by(user_id=current_user.id).order_by(Trade.created_at.desc()).limit(10).all()
+        
+        # Get API connection status
+        api_credentials = APICredential.query.filter_by(user_id=current_user.id, is_active=True).all()
+        api_status = {}
+        for cred in api_credentials:
+            api_status[cred.provider] = cred.test_status or 'unknown'
+        
+        # Get auto-trading settings (superadmin only)
+        auto_trading_settings = None
+        if current_user.is_superadmin():
+            try:
+                auto_trading_settings = AutoTradingSettings.get_settings()
+            except Exception as e:
+                logging.error(f"Error loading auto-trading settings: {e}")
+                auto_trading_settings = None
+        
+        # Get market data with error handling
+        market_data = {}
+        try:
+            market_data = get_dashboard_market_data()
+        except Exception as e:
+            logging.error(f"Error loading market data: {e}")
+            market_data = {}
+        
+        # Get account balance with error handling
+        account_balance = {
+            'total': 0,
+            'breakdown': {},
+            'accounts': [],
+            'last_updated': datetime.utcnow().isoformat(),
+            'errors': []
+        }
+        try:
+            account_balance = get_account_balance()
+        except Exception as e:
+            logging.error(f"Error loading account balance: {e}")
+            account_balance['errors'].append(f'Balance loading error: {str(e)}')
+        
+        return render_template('dashboard.html', 
+                             recent_trades=recent_trades,
+                             api_status=api_status,
+                             auto_trading_settings=auto_trading_settings,
+                             market_data=market_data,
+                             account_balance=account_balance)
+                             
+    except Exception as e:
+        logging.error(f"Dashboard error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # Return a minimal dashboard on error
+        flash(f'Dashboard loading temporarily limited due to maintenance. Welcome {current_user.username}!', 'info')
+        return render_template('dashboard.html',
+                             recent_trades=[],
+                             api_status={},
+                             auto_trading_settings=None,
+                             market_data={},
+                             account_balance={
+                                'total': 0,
+                                'breakdown': {},
+                                'accounts': [],
+                                'last_updated': datetime.utcnow().isoformat(),
+                                'errors': ['Dashboard temporarily in maintenance mode']
+                             })
 
 @main_bp.route('/enhanced-dashboard')
 @login_required
