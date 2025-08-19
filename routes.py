@@ -653,12 +653,11 @@ def api_settings():
                         existing_cred.is_active = True
                         logging.info(f"Updated existing OpenAI credentials for user {current_user.id}")
                     else:
-                        new_cred = APICredential(
-                            user_id=current_user.id,
-                            provider='openai',
-                            encrypted_credentials=encrypted_creds,
-                            is_active=True
-                        )
+                        new_cred = APICredential()
+                        new_cred.user_id = current_user.id
+                        new_cred.provider = 'openai'
+                        new_cred.encrypted_credentials = encrypted_creds
+                        new_cred.is_active = True
                         db.session.add(new_cred)
                         logging.info(f"Created new OpenAI credentials for user {current_user.id}")
                     
@@ -698,11 +697,11 @@ def api_settings():
                         existing_cred.encrypted_credentials = encrypted_creds
                         existing_cred.updated_at = datetime.utcnow()
                     else:
-                        new_cred = APICredential(
-                            user_id=current_user.id,
-                            provider='schwab',
-                            encrypted_credentials=encrypted_creds
-                        )
+                        new_cred = APICredential()
+                        new_cred.user_id = current_user.id
+                        new_cred.provider = 'schwab'
+                        new_cred.encrypted_credentials = encrypted_creds
+                        new_cred.is_active = True
                         db.session.add(new_cred)
                     
                     db.session.commit()
