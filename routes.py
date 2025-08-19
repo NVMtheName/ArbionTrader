@@ -634,30 +634,43 @@ def api_settings():
             api_key = request.form.get('openai_api_key')
             if not api_key:
                 flash('OpenAI API Key is required', 'error')
+                logging.error("OpenAI API key not provided in form")
             else:
-                # Save OpenAI credentials
-                credentials_data = {'api_key': api_key}
-                encrypted_creds = encrypt_credentials(credentials_data)
-                
-                # Check if credential exists
-                existing_cred = APICredential.query.filter_by(
-                    user_id=current_user.id, 
-                    provider='openai'
-                ).first()
-                
-                if existing_cred:
-                    existing_cred.encrypted_credentials = encrypted_creds
-                    existing_cred.updated_at = datetime.utcnow()
-                else:
-                    new_cred = APICredential(
-                        user_id=current_user.id,
-                        provider='openai',
-                        encrypted_credentials=encrypted_creds
-                    )
-                    db.session.add(new_cred)
-                
-                db.session.commit()
-                flash('OpenAI API credentials saved successfully!', 'success')
+                try:
+                    # Save OpenAI credentials
+                    credentials_data = {'api_key': api_key.strip()}
+                    encrypted_creds = encrypt_credentials(credentials_data)
+                    
+                    # Check if credential exists
+                    existing_cred = APICredential.query.filter_by(
+                        user_id=current_user.id, 
+                        provider='openai'
+                    ).first()
+                    
+                    if existing_cred:
+                        existing_cred.encrypted_credentials = encrypted_creds
+                        existing_cred.updated_at = datetime.utcnow()
+                        existing_cred.is_active = True
+                        logging.info(f"Updated existing OpenAI credentials for user {current_user.id}")
+                    else:
+                        new_cred = APICredential(
+                            user_id=current_user.id,
+                            provider='openai',
+                            encrypted_credentials=encrypted_creds,
+                            is_active=True
+                        )
+                        db.session.add(new_cred)
+                        logging.info(f"Created new OpenAI credentials for user {current_user.id}")
+                    
+                    db.session.commit()
+                    flash('OpenAI API credentials saved successfully!', 'success')
+                    logging.info(f"OpenAI credentials committed to database for user {current_user.id}")
+                    
+                except Exception as e:
+                    db.session.rollback()
+                    error_msg = f"Error saving OpenAI credentials: {str(e)}"
+                    flash(error_msg, 'error')
+                    logging.error(f"OpenAI credential save error for user {current_user.id}: {e}")
         
         elif provider == 'schwab':
             # Handle Schwab OAuth or direct credentials
@@ -741,52 +754,11 @@ def api_settings():
             return render_template('api_settings.html', 
                                  credentials=user_credentials, 
                                  oauth_credentials=oauth_credentials)
-        except:
-            # If all else fails, render basic template
+        except Exception as final_error:
+            logging.error(f"Critical error in api_settings: {final_error}")
             return render_template('api_settings.html', 
                                  credentials=[], 
                                  oauth_credentials=[])
-            client_key = request.form.get('client_key')
-            client_secret = request.form.get('client_secret')
-            access_token = request.form.get('access_token')
-            access_secret = request.form.get('access_secret')
-            
-            if not all([client_key, client_secret, access_token, access_secret]):
-                flash('All E-trade OAuth 1.0a fields are required.', 'error')
-                return redirect(url_for('main.api_settings'))
-            
-            credentials = {
-                'client_key': client_key,
-                'client_secret': client_secret,
-                'access_token': access_token,
-                'access_secret': access_secret
-            }
-        
-        else:
-            flash('Invalid provider selected.', 'error')
-            return redirect(url_for('main.api_settings'))
-        
-        # Encrypt and save credentials
-        encrypted_creds = encrypt_credentials(credentials)
-        
-        # Check if credentials already exist
-        existing_cred = APICredential.query.filter_by(
-            user_id=current_user.id,
-            provider=provider
-        ).first()
-        
-        if existing_cred:
-            existing_cred.encrypted_credentials = encrypted_creds
-            existing_cred.updated_at = datetime.utcnow()
-            existing_cred.test_status = 'pending'
-        else:
-            new_cred = APICredential()
-            new_cred.user_id = current_user.id
-            new_cred.provider = provider
-            new_cred.encrypted_credentials = encrypted_creds
-            db.session.add(new_cred)
-        
-        try:
             db.session.commit()
             flash(f'{provider.title()} credentials saved successfully!', 'success')
             logging.info(f"✓ API credentials saved for user {current_user.id}, provider: {provider}")
