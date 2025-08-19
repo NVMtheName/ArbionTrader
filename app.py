@@ -76,6 +76,10 @@ def create_app():
     app.register_blueprint(ai_trading_bot_bp)
     app.register_blueprint(portfolio_bp)
     
+    # Register simple OpenAI integration routes
+    from utils.simple_openai_routes import simple_openai_bp
+    app.register_blueprint(simple_openai_bp)
+    
     # Create tables and default admin user
     with app.app_context():
         # Import models to ensure they're registered

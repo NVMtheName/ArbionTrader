@@ -1,0 +1,730 @@
+{% extends "base.html" %}
+
+{% block title %}OpenAI Trading Integration - Arbion{% endblock %}
+
+{% block content %}
+<div class="container mx-auto px-4 py-8">
+    <div class="max-w-6xl mx-auto">
+        <h1 class="text-3xl font-bold text-white mb-8">🤖 OpenAI Trading Integration</h1>
+        
+        <!-- Connection Status -->
+        <div class="bg-slate-800 rounded-lg p-6 border border-slate-700 mb-8">
+            <h2 class="text-xl font-semibold text-white mb-4 flex items-center">
+                <i data-feather="zap" class="w-6 h-6 mr-2 text-blue-400"></i>
+                OpenAI Connection Status
+            </h2>
+            
+            <div id="connection-status" class="flex items-center space-x-3 mb-4">
+                <div class="w-3 h-3 bg-gray-400 rounded-full"></div>
+                <span class="text-slate-400">Checking connection...</span>
+            </div>
+            
+            <button id="test-connection" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition-colors">
+                Test Connection
+            </button>
+        </div>
+        
+        <!-- Natural Language Trading -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                    <i data-feather="message-circle" class="w-5 h-5 mr-2 text-emerald-400"></i>
+                    Natural Language Trading
+                </h3>
+                
+                <div class="mb-4">
+                    <textarea 
+                        id="trading-command" 
+                        placeholder="Example: Buy $500 worth of BTC if it drops below $60,000"
+                        class="w-full h-24 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 resize-none"
+                    ></textarea>
+                </div>
+                
+                <div class="flex space-x-2 mb-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="simulation-mode" checked class="mr-2">
+                        <span class="text-slate-300 text-sm">Simulation Mode</span>
+                    </label>
+                </div>
+                
+                <button id="process-command" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 px-4 rounded-lg transition-colors">
+                    Process Trading Command
+                </button>
+                
+                <div id="command-result" class="mt-4 hidden"></div>
+            </div>
+            
+            <!-- AI Trading Assistant -->
+            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                    <i data-feather="cpu" class="w-5 h-5 mr-2 text-purple-400"></i>
+                    AI Trading Assistant
+                </h3>
+                
+                <div id="chat-messages" class="h-48 bg-slate-700 rounded-lg p-3 mb-4 overflow-y-auto text-sm">
+                    <div class="text-slate-400 text-center">Start a conversation with your AI trading assistant...</div>
+                </div>
+                
+                <div class="flex space-x-2">
+                    <input 
+                        type="text" 
+                        id="assistant-message" 
+                        placeholder="Ask about market conditions, strategies, or request analysis..."
+                        class="flex-1 px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400"
+                    >
+                    <button id="send-message" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors">
+                        Send
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Market Insights & Trading Signals -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Market Insights -->
+            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                    <i data-feather="trending-up" class="w-5 h-5 mr-2 text-blue-400"></i>
+                    AI Market Insights
+                </h3>
+                
+                <div class="mb-4">
+                    <input 
+                        type="text" 
+                        id="insights-symbols" 
+                        placeholder="Enter symbols (e.g., BTC-USD, AAPL, TSLA)"
+                        class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400"
+                    >
+                </div>
+                
+                <button id="generate-insights" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors mb-4">
+                    Generate Market Insights
+                </button>
+                
+                <div id="market-insights" class="space-y-3"></div>
+            </div>
+            
+            <!-- Trading Signals -->
+            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                    <i data-feather="activity" class="w-5 h-5 mr-2 text-orange-400"></i>
+                    AI Trading Signals
+                </h3>
+                
+                <div class="mb-4">
+                    <input 
+                        type="text" 
+                        id="signals-symbols" 
+                        placeholder="Enter symbols for signal generation"
+                        class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400"
+                    >
+                </div>
+                
+                <button id="generate-signals" class="w-full bg-orange-600 hover:bg-orange-700 text-white py-2 px-4 rounded-lg transition-colors mb-4">
+                    Generate Trading Signals
+                </button>
+                
+                <div id="trading-signals" class="space-y-3"></div>
+            </div>
+        </div>
+        
+        <!-- Portfolio Optimization -->
+        <div class="bg-slate-800 rounded-lg p-6 border border-slate-700 mb-8">
+            <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                <i data-feather="pie-chart" class="w-5 h-5 mr-2 text-green-400"></i>
+                AI Portfolio Optimization
+            </h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                    <button id="optimize-portfolio" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg transition-colors mb-4">
+                        Optimize My Portfolio
+                    </button>
+                    
+                    <div id="optimization-results" class="text-sm"></div>
+                </div>
+                
+                <div>
+                    <button id="analyze-performance" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white py-2 px-4 rounded-lg transition-colors mb-4">
+                        Analyze Performance (30 days)
+                    </button>
+                    
+                    <div id="performance-analysis" class="text-sm"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Strategy Creation -->
+        <div class="bg-slate-800 rounded-lg p-6 border border-slate-700 mb-8">
+            <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                <i data-feather="target" class="w-5 h-5 mr-2 text-red-400"></i>
+                AI Strategy Generator
+            </h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Strategy Type</label>
+                    <select id="strategy-type" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white">
+                        <option value="momentum">Momentum Trading</option>
+                        <option value="mean_reversion">Mean Reversion</option>
+                        <option value="breakout">Breakout Strategy</option>
+                        <option value="scalping">Scalping</option>
+                        <option value="swing">Swing Trading</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Risk Level</label>
+                    <select id="strategy-risk" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white">
+                        <option value="low">Low Risk</option>
+                        <option value="medium" selected>Medium Risk</option>
+                        <option value="high">High Risk</option>
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Timeframe</label>
+                    <select id="strategy-timeframe" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white">
+                        <option value="scalp">Scalping (minutes)</option>
+                        <option value="intraday">Intraday (hours)</option>
+                        <option value="swing" selected>Swing (days)</option>
+                        <option value="position">Position (weeks/months)</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button id="create-strategy" class="w-full bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg transition-colors mb-4">
+                Generate AI Trading Strategy
+            </button>
+            
+            <div id="generated-strategy" class="text-sm"></div>
+        </div>
+        
+        <!-- Voice Commands (if supported) -->
+        <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+            <h3 class="text-lg font-semibold text-white mb-4 flex items-center">
+                <i data-feather="mic" class="w-5 h-5 mr-2 text-indigo-400"></i>
+                Voice Trading Commands
+            </h3>
+            
+            <div class="text-center">
+                <button id="start-recording" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-3 rounded-lg transition-colors mr-4">
+                    🎤 Start Voice Command
+                </button>
+                
+                <button id="stop-recording" class="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg transition-colors" disabled>
+                    ⏹️ Stop Recording
+                </button>
+                
+                <div id="voice-status" class="mt-4 text-slate-400"></div>
+                <div id="voice-result" class="mt-4"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for OpenAI Integration -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Test OpenAI Connection
+    document.getElementById('test-connection').addEventListener('click', async function() {
+        const statusDiv = document.getElementById('connection-status');
+        statusDiv.innerHTML = '<div class="w-3 h-3 bg-yellow-400 rounded-full"></div><span class="text-yellow-400">Testing connection...</span>';
+        
+        try {
+            const response = await fetch('/api/simple-openai/test', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                statusDiv.innerHTML = '<div class="w-3 h-3 bg-green-400 rounded-full"></div><span class="text-green-400">Connected ✓</span>';
+            } else {
+                statusDiv.innerHTML = '<div class="w-3 h-3 bg-red-400 rounded-full"></div><span class="text-red-400">Connection failed</span>';
+            }
+        } catch (error) {
+            statusDiv.innerHTML = '<div class="w-3 h-3 bg-red-400 rounded-full"></div><span class="text-red-400">Error testing connection</span>';
+        }
+    });
+    
+    // Process Trading Command
+    document.getElementById('process-command').addEventListener('click', async function() {
+        const command = document.getElementById('trading-command').value.trim();
+        const isSimulation = document.getElementById('simulation-mode').checked;
+        const resultDiv = document.getElementById('command-result');
+        
+        if (!command) {
+            alert('Please enter a trading command');
+            return;
+        }
+        
+        resultDiv.innerHTML = '<div class="text-yellow-400">Processing command...</div>';
+        resultDiv.classList.remove('hidden');
+        
+        try {
+            const response = await fetch('/api/simple-openai/trade-command', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({command})
+            });
+            
+            const result = await response.json();
+            
+            let resultHtml = `<div class="p-3 rounded-lg ${result.success ? 'bg-green-900/20 border border-green-700' : 'bg-red-900/20 border border-red-700'}">`;
+            resultHtml += `<div class="font-medium ${result.success ? 'text-green-300' : 'text-red-300'}">${result.message}</div>`;
+            
+            if (result.decision) {
+                resultHtml += `
+                    <div class="mt-2 text-sm text-slate-300">
+                        <strong>Action:</strong> ${result.decision.action}<br>
+                        <strong>Symbol:</strong> ${result.decision.symbol}<br>
+                        <strong>Confidence:</strong> ${(result.decision.confidence * 100).toFixed(1)}%<br>
+                        <strong>Reasoning:</strong> ${result.decision.reasoning}
+                    </div>
+                `;
+            }
+            
+            resultHtml += '</div>';
+            resultDiv.innerHTML = resultHtml;
+        } catch (error) {
+            resultDiv.innerHTML = '<div class="text-red-400">Error processing command</div>';
+        }
+    });
+    
+    // Trading Assistant Chat
+    document.getElementById('send-message').addEventListener('click', async function() {
+        const messageInput = document.getElementById('assistant-message');
+        const message = messageInput.value.trim();
+        const chatMessages = document.getElementById('chat-messages');
+        
+        if (!message) return;
+        
+        // Add user message
+        const userMsg = document.createElement('div');
+        userMsg.className = 'mb-2 text-blue-300';
+        userMsg.innerHTML = `<strong>You:</strong> ${message}`;
+        chatMessages.appendChild(userMsg);
+        
+        // Add loading message
+        const loadingMsg = document.createElement('div');
+        loadingMsg.className = 'mb-2 text-yellow-400';
+        loadingMsg.innerHTML = '<strong>AI:</strong> Thinking...';
+        chatMessages.appendChild(loadingMsg);
+        
+        messageInput.value = '';
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        try {
+            const response = await fetch('/api/simple-openai/chat', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({message})
+            });
+            
+            const result = await response.json();
+            
+            loadingMsg.className = 'mb-2 text-green-300';
+            loadingMsg.innerHTML = `<strong>AI:</strong> ${result.response}`;
+        } catch (error) {
+            loadingMsg.className = 'mb-2 text-red-300';
+            loadingMsg.innerHTML = '<strong>AI:</strong> Sorry, I encountered an error.';
+        }
+        
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
+    
+    // Allow Enter key to send message
+    document.getElementById('assistant-message').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            document.getElementById('send-message').click();
+        }
+    });
+    
+    // Generate Market Insights
+    document.getElementById('generate-insights').addEventListener('click', async function() {
+        const symbols = document.getElementById('insights-symbols').value.trim().split(',').map(s => s.trim()).filter(s => s);
+        const insightsDiv = document.getElementById('market-insights');
+        
+        if (!symbols.length) {
+            alert('Please enter at least one symbol');
+            return;
+        }
+        
+        insightsDiv.innerHTML = '<div class="text-yellow-400">Generating insights...</div>';
+        
+        try {
+            const response = await fetch('/api/simple-openai/market-insights', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({symbols})
+            });
+            
+            const result = await response.json();
+            
+            if (result.success && result.insights) {
+                let html = '';
+                result.insights.forEach(insight => {
+                    const sentimentColor = insight.sentiment === 'bullish' ? 'text-green-400' : 
+                                         insight.sentiment === 'bearish' ? 'text-red-400' : 'text-yellow-400';
+                    
+                    html += `
+                        <div class="p-3 bg-slate-700 rounded-lg">
+                            <div class="flex justify-between items-center mb-2">
+                                <strong class="text-white">${insight.symbol}</strong>
+                                <span class="${sentimentColor}">${insight.sentiment.toUpperCase()}</span>
+                            </div>
+                            <div class="text-sm text-slate-300">
+                                <div>Confidence: ${(insight.confidence_score * 100).toFixed(1)}%</div>
+                                ${insight.price_prediction ? `<div>Target: $${insight.price_prediction}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                insightsDiv.innerHTML = html;
+            } else {
+                insightsDiv.innerHTML = '<div class="text-red-400">Failed to generate insights</div>';
+            }
+        } catch (error) {
+            insightsDiv.innerHTML = '<div class="text-red-400">Error generating insights</div>';
+        }
+    });
+    
+    // Generate Trading Signals
+    document.getElementById('generate-signals').addEventListener('click', async function() {
+        const symbols = document.getElementById('signals-symbols').value.trim().split(',').map(s => s.trim()).filter(s => s);
+        const signalsDiv = document.getElementById('trading-signals');
+        
+        if (!symbols.length) {
+            alert('Please enter at least one symbol');
+            return;
+        }
+        
+        signalsDiv.innerHTML = '<div class="text-yellow-400">Generating signals...</div>';
+        
+        try {
+            const response = await fetch('/api/openai/trading_signals', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({symbols})
+            });
+            
+            const result = await response.json();
+            
+            if (result.success && result.signals) {
+                let html = '';
+                result.signals.forEach(signal => {
+                    const signalColor = signal.signal_type === 'buy' ? 'text-green-400' : 
+                                      signal.signal_type === 'sell' ? 'text-red-400' : 'text-gray-400';
+                    
+                    html += `
+                        <div class="p-3 bg-slate-700 rounded-lg">
+                            <div class="flex justify-between items-center mb-2">
+                                <strong class="text-white">${signal.symbol}</strong>
+                                <span class="${signalColor} font-bold">${signal.signal_type.toUpperCase()}</span>
+                            </div>
+                            <div class="text-sm text-slate-300">
+                                <div>Strength: ${(signal.strength * 100).toFixed(1)}%</div>
+                                <div>Confidence: ${(signal.confidence * 100).toFixed(1)}%</div>
+                                ${signal.price_target ? `<div>Target: $${signal.price_target}</div>` : ''}
+                            </div>
+                        </div>
+                    `;
+                });
+                signalsDiv.innerHTML = html;
+            } else {
+                signalsDiv.innerHTML = '<div class="text-red-400">Failed to generate signals</div>';
+            }
+        } catch (error) {
+            signalsDiv.innerHTML = '<div class="text-red-400">Error generating signals</div>';
+        }
+    });
+    
+    // Portfolio Optimization
+    document.getElementById('optimize-portfolio').addEventListener('click', async function() {
+        const resultsDiv = document.getElementById('optimization-results');
+        resultsDiv.innerHTML = '<div class="text-yellow-400">Optimizing portfolio...</div>';
+        
+        try {
+            const response = await fetch('/api/openai/portfolio_optimization', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'}
+            });
+            
+            const result = await response.json();
+            
+            if (result.success && result.recommendation) {
+                const rec = result.recommendation;
+                let html = `
+                    <div class="p-3 bg-slate-700 rounded-lg">
+                        <div class="text-white font-medium mb-2">Portfolio Analysis</div>
+                        <div class="text-sm text-slate-300">
+                            <div>Total Value: $${rec.total_value.toFixed(2)}</div>
+                            <div>Risk Score: ${rec.risk_score.toFixed(1)}/100</div>
+                            <div class="mt-2">
+                                <strong>Recommendations:</strong>
+                                <ul class="list-disc list-inside mt-1">
+                `;
+                
+                rec.rebalancing_suggestions.forEach(suggestion => {
+                    html += `<li>${suggestion}</li>`;
+                });
+                
+                html += `
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                resultsDiv.innerHTML = html;
+            } else {
+                resultsDiv.innerHTML = '<div class="text-red-400">Failed to optimize portfolio</div>';
+            }
+        } catch (error) {
+            resultsDiv.innerHTML = '<div class="text-red-400">Error optimizing portfolio</div>';
+        }
+    });
+    
+    // Performance Analysis
+    document.getElementById('analyze-performance').addEventListener('click', async function() {
+        const analysisDiv = document.getElementById('performance-analysis');
+        analysisDiv.innerHTML = '<div class="text-yellow-400">Analyzing performance...</div>';
+        
+        try {
+            const response = await fetch('/api/openai/performance_analysis?days=30');
+            
+            const result = await response.json();
+            
+            if (result.success && result.analysis) {
+                const analysis = result.analysis;
+                let html = `
+                    <div class="p-3 bg-slate-700 rounded-lg">
+                        <div class="text-white font-medium mb-2">30-Day Performance</div>
+                        <div class="text-sm text-slate-300">
+                            <div>Total Trades: ${analysis.total_trades || 0}</div>
+                `;
+                
+                if (analysis.recommendations && analysis.recommendations.length > 0) {
+                    html += `
+                        <div class="mt-2">
+                            <strong>AI Recommendations:</strong>
+                            <ul class="list-disc list-inside mt-1">
+                    `;
+                    
+                    analysis.recommendations.slice(0, 3).forEach(rec => {
+                        html += `<li>${rec}</li>`;
+                    });
+                    
+                    html += '</ul></div>';
+                }
+                
+                html += '</div></div>';
+                
+                analysisDiv.innerHTML = html;
+            } else {
+                analysisDiv.innerHTML = '<div class="text-red-400">Failed to analyze performance</div>';
+            }
+        } catch (error) {
+            analysisDiv.innerHTML = '<div class="text-red-400">Error analyzing performance</div>';
+        }
+    });
+    
+    // Strategy Creation
+    document.getElementById('create-strategy').addEventListener('click', async function() {
+        const strategyType = document.getElementById('strategy-type').value;
+        const riskLevel = document.getElementById('strategy-risk').value;
+        const timeframe = document.getElementById('strategy-timeframe').value;
+        const resultsDiv = document.getElementById('generated-strategy');
+        
+        resultsDiv.innerHTML = '<div class="text-yellow-400">Generating strategy...</div>';
+        
+        const parameters = {
+            type: strategyType,
+            risk_level: riskLevel,
+            timeframe: timeframe,
+            user_preferences: {
+                max_drawdown: riskLevel === 'low' ? 5 : riskLevel === 'medium' ? 10 : 20,
+                target_return: riskLevel === 'low' ? 10 : riskLevel === 'medium' ? 20 : 40
+            }
+        };
+        
+        try {
+            const response = await fetch('/api/openai/create_strategy', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({parameters})
+            });
+            
+            const result = await response.json();
+            
+            if (result.success && result.strategy) {
+                const strategy = result.strategy;
+                let html = `
+                    <div class="p-4 bg-slate-700 rounded-lg">
+                        <div class="text-white font-medium text-lg mb-3">${strategy.name}</div>
+                        <div class="text-slate-300 text-sm mb-3">${strategy.description}</div>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                            <div>
+                                <div class="font-medium text-white mb-2">Entry Conditions:</div>
+                                <ul class="list-disc list-inside text-sm">
+                `;
+                
+                strategy.entry_conditions.forEach(condition => {
+                    html += `<li>${condition}</li>`;
+                });
+                
+                html += `
+                                </ul>
+                            </div>
+                            <div>
+                                <div class="font-medium text-white mb-2">Exit Conditions:</div>
+                                <ul class="list-disc list-inside text-sm">
+                `;
+                
+                strategy.exit_conditions.forEach(condition => {
+                    html += `<li>${condition}</li>`;
+                });
+                
+                html += `
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                            <div class="bg-slate-600 p-2 rounded">
+                                <div class="text-xs text-slate-400">Expected Return</div>
+                                <div class="text-white font-medium">${strategy.expected_return}%</div>
+                            </div>
+                            <div class="bg-slate-600 p-2 rounded">
+                                <div class="text-xs text-slate-400">Risk Level</div>
+                                <div class="text-white font-medium">${strategy.risk_level}</div>
+                            </div>
+                            <div class="bg-slate-600 p-2 rounded">
+                                <div class="text-xs text-slate-400">Timeframe</div>
+                                <div class="text-white font-medium">${strategy.timeframe}</div>
+                            </div>
+                            <div class="bg-slate-600 p-2 rounded">
+                                <div class="text-xs text-slate-400">Confidence</div>
+                                <div class="text-white font-medium">${(strategy.confidence_score * 100).toFixed(0)}%</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                resultsDiv.innerHTML = html;
+            } else {
+                resultsDiv.innerHTML = '<div class="text-red-400">Failed to generate strategy</div>';
+            }
+        } catch (error) {
+            resultsDiv.innerHTML = '<div class="text-red-400">Error generating strategy</div>';
+        }
+    });
+    
+    // Voice Commands (basic implementation)
+    let isRecording = false;
+    let mediaRecorder = null;
+    let audioChunks = [];
+    
+    document.getElementById('start-recording').addEventListener('click', async function() {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            alert('Voice commands are not supported in this browser');
+            return;
+        }
+        
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            
+            mediaRecorder.ondataavailable = function(event) {
+                audioChunks.push(event.data);
+            };
+            
+            mediaRecorder.onstop = async function() {
+                const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                audioChunks = [];
+                
+                const formData = new FormData();
+                formData.append('audio', audioBlob);
+                
+                document.getElementById('voice-status').textContent = 'Processing voice command...';
+                
+                try {
+                    const response = await fetch('/api/openai/voice_command', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        document.getElementById('voice-result').innerHTML = `
+                            <div class="p-3 bg-slate-700 rounded-lg">
+                                <div class="text-white font-medium">Transcription:</div>
+                                <div class="text-slate-300">"${result.transcription}"</div>
+                                <div class="text-white font-medium mt-2">Result:</div>
+                                <div class="text-slate-300">${result.trading_result.message}</div>
+                            </div>
+                        `;
+                    } else {
+                        document.getElementById('voice-result').innerHTML = '<div class="text-red-400">Voice command failed</div>';
+                    }
+                } catch (error) {
+                    document.getElementById('voice-result').innerHTML = '<div class="text-red-400">Error processing voice command</div>';
+                }
+                
+                document.getElementById('voice-status').textContent = '';
+            };
+            
+            mediaRecorder.start();
+            isRecording = true;
+            
+            document.getElementById('start-recording').disabled = true;
+            document.getElementById('stop-recording').disabled = false;
+            document.getElementById('voice-status').textContent = '🎤 Recording... Speak your trading command';
+            
+        } catch (error) {
+            alert('Could not access microphone: ' + error.message);
+        }
+    });
+    
+    document.getElementById('stop-recording').addEventListener('click', function() {
+        if (mediaRecorder && isRecording) {
+            mediaRecorder.stop();
+            isRecording = false;
+            
+            document.getElementById('start-recording').disabled = false;
+            document.getElementById('stop-recording').disabled = true;
+            document.getElementById('voice-status').textContent = 'Processing...';
+        }
+    });
+});
+</script>
+
+<style>
+/* Feather icons */
+[data-feather] {
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  fill: none;
+}
+
+/* Custom scrollbar for chat */
+#chat-messages::-webkit-scrollbar {
+  width: 4px;
+}
+
+#chat-messages::-webkit-scrollbar-track {
+  background: #334155;
+}
+
+#chat-messages::-webkit-scrollbar-thumb {
+  background: #64748b;
+  border-radius: 2px;
+}
+</style>
+{% endblock %}

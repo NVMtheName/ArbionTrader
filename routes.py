@@ -487,6 +487,12 @@ def api_ai_bot_signals():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@main_bp.route('/openai-integration')
+@login_required
+def openai_integration():
+    """Comprehensive OpenAI Integration Dashboard"""
+    return render_template('openai_integration.html')
+
 @main_bp.route('/api/ai-bot/analysis')
 @login_required
 def api_ai_bot_analysis():
