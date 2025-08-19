@@ -987,12 +987,12 @@ def oauth_callback_schwab():
             existing_cred.updated_at = datetime.utcnow()
             existing_cred.test_status = 'success'
         else:
-            new_cred = APICredential(
-                user_id=current_user.id,
-                provider='schwab',
-                encrypted_credentials=encrypted_creds,
-                test_status='success'
-            )
+            new_cred = APICredential()
+            new_cred.user_id = current_user.id
+            new_cred.provider = 'schwab'
+            new_cred.encrypted_credentials = encrypted_creds
+            new_cred.test_status = 'success'
+            new_cred.is_active = True
             db.session.add(new_cred)
         
         db.session.commit()
