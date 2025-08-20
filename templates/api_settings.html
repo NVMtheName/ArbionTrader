@@ -249,7 +249,7 @@
                                     {% set has_creds = false %}
                                     {% if credentials %}
                                         {% for cred in credentials %}
-                                            {% if cred.provider == provider_id %}
+                                            {% if cred.provider == provider_id and cred.is_active %}
                                                 {% set has_creds = true %}
                                             {% endif %}
                                         {% endfor %}
