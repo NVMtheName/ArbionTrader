@@ -33,7 +33,7 @@ def debug_schwab_balance():
                     
                     # Try to fetch balance
                     fetcher = RealTimeDataFetcher(cred.user_id)
-                    result = fetcher.get_live_schwab_balance(decrypted_creds['access_token'])
+                    result = fetcher.get_live_schwab_balance()
                     
                     if result.get('success'):
                         print(f"  ✓ Balance fetch successful: ${result['balance']:.2f}")
@@ -52,7 +52,7 @@ def debug_schwab_balance():
                         if access_token:
                             print(f"  ✓ OAuth helper provided token: {len(access_token)} chars")
                             
-                            result = fetcher.get_live_schwab_balance(access_token)
+                            result = fetcher.get_live_schwab_balance()
                             if result.get('success'):
                                 print(f"  ✓ OAuth balance fetch successful: ${result['balance']:.2f}")
                             else:
