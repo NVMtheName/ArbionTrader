@@ -136,12 +136,18 @@ class RealTimeDataFetcher:
             logger.error(f"Error fetching Coinbase balance: {str(e)}")
             return {'success': False, 'error': str(e)}
     
-    def get_live_schwab_balance(self, user_id: str) -> Dict[str, Any]:
+    def get_live_schwab_balance(self, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Get live balance from Schwab API using official Trader API"""
         try:
+            # Fall back to the user ID provided when the fetcher was created
+            user_identifier = user_id or str(self.user_id) if self.user_id is not None else None
+
+            if not user_identifier:
+                return {'success': False, 'error': 'User ID is required to fetch Schwab balances'}
+
             from utils.schwab_trader_client import SchwabTraderClient
 
-            client = SchwabTraderClient(user_id=user_id)
+            client = SchwabTraderClient(user_id=user_identifier)
             accounts_data = client.get_accounts()
             
             if not accounts_data:
@@ -264,12 +270,17 @@ class RealTimeDataFetcher:
             logger.error(f"Error fetching market data: {str(e)}")
             return {}
 
-    def get_live_schwab_positions(self, user_id: str) -> Dict[str, Any]:
+    def get_live_schwab_positions(self, user_id: Optional[str] = None) -> Dict[str, Any]:
         """Get live positions from Schwab accounts using official Trader API"""
         try:
+            user_identifier = user_id or str(self.user_id) if self.user_id is not None else None
+
+            if not user_identifier:
+                return {'success': False, 'error': 'User ID is required to fetch Schwab positions'}
+
             from utils.schwab_trader_client import SchwabTraderClient
 
-            client = SchwabTraderClient(user_id=user_id)
+            client = SchwabTraderClient(user_id=user_identifier)
             accounts_data = client.get_accounts()
             
             if not accounts_data:

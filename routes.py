@@ -167,8 +167,8 @@ def get_account_balance():
                     if 'access_token' in decrypted_creds:
                         # OAuth2 token available
                         access_token = decrypted_creds['access_token']
-                        result = fetcher.get_live_schwab_balance(access_token)
-                        positions_result = fetcher.get_live_schwab_positions(access_token)
+                        result = fetcher.get_live_schwab_balance(str(current_user.id))
+                        positions_result = fetcher.get_live_schwab_positions(str(current_user.id))
                         
                         if result.get('success'):
                             account_info['balance'] = result['balance']
@@ -203,8 +203,8 @@ def get_account_balance():
                             access_token = schwab_oauth.get_valid_token(cred.encrypted_credentials)
                             
                             if access_token:
-                                result = fetcher.get_live_schwab_balance(access_token)
-                                positions_result = fetcher.get_live_schwab_positions(access_token)
+                                result = fetcher.get_live_schwab_balance(str(current_user.id))
+                                positions_result = fetcher.get_live_schwab_positions(str(current_user.id))
                                 if result.get('success'):
                                     account_info['balance'] = result['balance']
                                     account_info['status'] = 'connected'
