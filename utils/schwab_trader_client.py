@@ -2,6 +2,9 @@
 Enhanced Schwab Trader API Client for Arbion Platform
 Production-ready integration with OAuth2 3-legged authentication flow
 
+FIXED VERSION - Corrects the credential loading bug where the code tried to
+decrypt OAuthClientCredential.encrypted_credentials which doesn't exist.
+
 This module provides a complete Schwab API integration that can be used
 throughout the Arbion platform for account access, balance fetching,
 and trading operations.
@@ -18,7 +21,6 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple
 
 import requests
-from cryptography.fernet import Fernet
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -53,12 +55,17 @@ class SchwabTraderClient:
         })
     
     def _get_client_credentials(self) -> Tuple[Optional[str], Optional[str]]:
-        """Get Schwab client credentials from database or environment"""
+        """
+        Get Schwab client credentials from database or environment
+        
+        FIXED: The OAuthClientCredential model stores client_id and client_secret
+        as plain text fields, NOT as encrypted_credentials. The previous code
+        tried to decrypt a field that doesn't exist, causing failures.
+        """
         try:
             if self.user_id:
                 # Try to get user-specific credentials from database
                 from models import OAuthClientCredential
-                from utils.encryption import decrypt_credentials
                 
                 client_cred = OAuthClientCredential.query.filter_by(
                     user_id=self.user_id,
@@ -67,21 +74,25 @@ class SchwabTraderClient:
                 ).first()
                 
                 if client_cred:
-                    decrypted = decrypt_credentials(client_cred.encrypted_credentials)
-                    return decrypted.get('client_id'), decrypted.get('client_secret')
+                    # FIXED: Access plain text fields directly instead of trying to decrypt
+                    logger.info(f"Found Schwab client credentials for user {self.user_id}")
+                    return client_cred.client_id, client_cred.client_secret
             
-            # Fallback to environment variables
-            client_id = os.environ.get('SCHWAB_CLIENT_ID')
-            client_secret = os.environ.get('SCHWAB_CLIENT_SECRET')
+            # Fallback to environment variables (check both naming conventions)
+            client_id = os.environ.get('SCHWAB_APP_KEY') or os.environ.get('SCHWAB_CLIENT_ID')
+            client_secret = os.environ.get('SCHWAB_APP_SECRET') or os.environ.get('SCHWAB_CLIENT_SECRET')
             
             if client_id and client_secret:
+                logger.info("Using Schwab credentials from environment variables")
                 return client_id, client_secret
                 
-            logger.warning("No Schwab client credentials found")
+            logger.warning("No Schwab client credentials found in database or environment")
             return None, None
             
         except Exception as e:
-            logger.error(f"Error getting client credentials: {e}")
+            logger.error(f"Error getting Schwab client credentials: {e}")
+            import traceback
+            traceback.print_exc()
             return None, None
     
     def generate_authorization_url(self, state: str = None) -> Tuple[str, str]:
@@ -178,7 +189,7 @@ class SchwabTraderClient:
         client_id, client_secret = self._get_client_credentials()
         
         if not client_id or not client_secret:
-            logger.error("Schwab client credentials not available")
+            logger.error("Schwab client credentials not available for token refresh")
             return None
         
         try:
@@ -236,7 +247,7 @@ class SchwabTraderClient:
             from models import APICredential
             from utils.encryption import decrypt_credentials
             
-            # Get stored credentials
+            # Get stored credentials (these are the OAuth TOKENS, not client credentials)
             schwab_cred = APICredential.query.filter_by(
                 user_id=self.user_id,
                 provider='schwab',
@@ -244,45 +255,61 @@ class SchwabTraderClient:
             ).first()
             
             if not schwab_cred:
-                logger.warning(f"No Schwab credentials found for user: {self.user_id}")
+                logger.warning(f"No Schwab API credentials (tokens) found for user: {self.user_id}")
                 return None
             
             # Decrypt and parse token data
-            decrypted = decrypt_credentials(schwab_cred.encrypted_credentials)
+            try:
+                decrypted = decrypt_credentials(schwab_cred.encrypted_credentials)
+            except Exception as e:
+                logger.error(f"Failed to decrypt Schwab credentials for user {self.user_id}: {e}")
+                return None
             
             if 'access_token' not in decrypted:
-                logger.warning(f"No access token found for user: {self.user_id}")
+                logger.warning(f"No access_token in decrypted credentials for user: {self.user_id}")
                 return None
             
             # Check if token is expired
-            expires_at_str = decrypted.get('expires_at')
+            expires_at_str = decrypted.get('expires_at') or decrypted.get('token_expiry')
             if expires_at_str:
-                expires_at = datetime.fromisoformat(expires_at_str)
-                # Add 5-minute buffer before expiration
-                if datetime.utcnow() + timedelta(minutes=5) >= expires_at:
-                    logger.info(f"Schwab token expired for user {self.user_id}, attempting refresh")
+                try:
+                    # Handle various datetime formats
+                    if expires_at_str.endswith('Z'):
+                        expires_at_str = expires_at_str[:-1] + '+00:00'
+                    expires_at = datetime.fromisoformat(expires_at_str)
                     
-                    # Try to refresh token
-                    refresh_token = decrypted.get('refresh_token')
-                    if refresh_token:
-                        new_token_data = self.refresh_access_token(refresh_token)
-                        if new_token_data:
-                            # Update stored credentials
-                            from utils.encryption import encrypt_credentials
-                            schwab_cred.encrypted_credentials = encrypt_credentials(new_token_data)
-                            
-                            from app import db
-                            db.session.commit()
-                            
-                            return new_token_data['access_token']
-                    
-                    logger.error(f"Failed to refresh Schwab token for user: {self.user_id}")
-                    return None
+                    # Add 5-minute buffer before expiration
+                    if datetime.utcnow() + timedelta(minutes=5) >= expires_at:
+                        logger.info(f"Schwab token expired for user {self.user_id}, attempting refresh")
+                        
+                        # Try to refresh token
+                        refresh_token = decrypted.get('refresh_token')
+                        if refresh_token:
+                            new_token_data = self.refresh_access_token(refresh_token)
+                            if new_token_data:
+                                # Update stored credentials
+                                from utils.encryption import encrypt_credentials
+                                from app import db
+                                
+                                schwab_cred.encrypted_credentials = encrypt_credentials(new_token_data)
+                                schwab_cred.updated_at = datetime.utcnow()
+                                db.session.commit()
+                                
+                                logger.info(f"Successfully refreshed and saved Schwab tokens for user {self.user_id}")
+                                return new_token_data['access_token']
+                        
+                        logger.error(f"Failed to refresh Schwab token for user: {self.user_id}")
+                        return None
+                except Exception as e:
+                    logger.warning(f"Error parsing token expiry for user {self.user_id}: {e}")
+                    # Continue with existing token
             
             return decrypted['access_token']
             
         except Exception as e:
-            logger.error(f"Error getting valid access token: {e}")
+            logger.error(f"Error getting valid access token for user {self.user_id}: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def make_authenticated_request(self, method: str, endpoint: str, **kwargs) -> Optional[requests.Response]:
@@ -313,22 +340,50 @@ class SchwabTraderClient:
         url = f"{self.base_url}{endpoint}"
         
         try:
+            logger.info(f"Making Schwab API request: {method} {endpoint}")
             response = self.session.request(method, url, timeout=30, **kwargs)
+            
+            logger.info(f"Schwab API response: {response.status_code}")
             
             # Handle 401 Unauthorized - try token refresh
             if response.status_code == 401:
                 logger.warning(f"Received 401 for Schwab API, attempting token refresh for user: {self.user_id}")
                 
-                # Get fresh token and retry
-                access_token = self.get_valid_access_token()
-                if access_token:
-                    headers['Authorization'] = f'Bearer {access_token}'
-                    response = self.session.request(method, url, timeout=30, **kwargs)
+                # Force token refresh by getting fresh token
+                from models import APICredential
+                from utils.encryption import decrypt_credentials
+                
+                schwab_cred = APICredential.query.filter_by(
+                    user_id=self.user_id,
+                    provider='schwab',
+                    is_active=True
+                ).first()
+                
+                if schwab_cred:
+                    decrypted = decrypt_credentials(schwab_cred.encrypted_credentials)
+                    refresh_token = decrypted.get('refresh_token')
+                    
+                    if refresh_token:
+                        new_token_data = self.refresh_access_token(refresh_token)
+                        if new_token_data:
+                            # Update stored credentials
+                            from utils.encryption import encrypt_credentials
+                            from app import db
+                            
+                            schwab_cred.encrypted_credentials = encrypt_credentials(new_token_data)
+                            db.session.commit()
+                            
+                            # Retry request with new token
+                            headers['Authorization'] = f'Bearer {new_token_data["access_token"]}'
+                            response = self.session.request(method, url, timeout=30, **kwargs)
+                            logger.info(f"Retry response after token refresh: {response.status_code}")
             
             return response
             
         except Exception as e:
             logger.error(f"Error making Schwab API request: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def get_accounts(self) -> Optional[Dict[str, Any]]:
@@ -341,12 +396,14 @@ class SchwabTraderClient:
         response = self.make_authenticated_request('GET', '/trader/v1/accounts')
         
         if response and response.status_code == 200:
+            data = response.json()
             logger.info(f"Successfully fetched Schwab accounts for user: {self.user_id}")
-            return response.json()
+            return data
         elif response:
             logger.error(f"Failed to fetch Schwab accounts: {response.status_code} - {response.text}")
             return None
         else:
+            logger.error("No response from Schwab API")
             return None
     
     def get_account_balances(self, account_hash: str = None) -> Optional[Dict[str, Any]]:
@@ -385,7 +442,7 @@ class SchwabTraderClient:
         Returns:
             Position data or None if failed
         """
-        endpoint = f'/trader/v1/accounts/{account_hash}/positions'
+        endpoint = f'/trader/v1/accounts/{account_hash}?fields=positions'
         response = self.make_authenticated_request('GET', endpoint)
         
         if response and response.status_code == 200:
@@ -397,34 +454,51 @@ class SchwabTraderClient:
         else:
             return None
     
-    def test_connection(self) -> Dict[str, Any]:
+    def place_order(self, account_hash: str, order_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
-        Test Schwab API connection and authentication
+        Place a trading order
         
-        Returns:
-            Connection test results
-        """
-        try:
-            accounts_data = self.get_accounts()
+        Args:
+            account_hash: Account hash identifier
+            order_data: Order specification dictionary
             
-            if accounts_data:
-                return {
-                    'success': True,
-                    'message': 'Schwab API connection successful',
-                    'account_count': len(accounts_data) if isinstance(accounts_data, list) else 1,
-                    'timestamp': datetime.utcnow().isoformat()
-                }
-            else:
-                return {
-                    'success': False,
-                    'message': 'Failed to fetch accounts from Schwab API',
-                    'timestamp': datetime.utcnow().isoformat()
-                }
-                
-        except Exception as e:
-            logger.error(f"Error testing Schwab connection: {e}")
-            return {
-                'success': False,
-                'message': f'Connection test failed: {str(e)}',
-                'timestamp': datetime.utcnow().isoformat()
-            }
+        Returns:
+            Order response or None if failed
+        """
+        endpoint = f'/trader/v1/accounts/{account_hash}/orders'
+        response = self.make_authenticated_request(
+            'POST', 
+            endpoint, 
+            json=order_data,
+            headers={'Content-Type': 'application/json'}
+        )
+        
+        if response and response.status_code in [200, 201]:
+            logger.info(f"Successfully placed Schwab order for user: {self.user_id}")
+            return response.json() if response.text else {'success': True}
+        elif response:
+            logger.error(f"Failed to place Schwab order: {response.status_code} - {response.text}")
+            return None
+        else:
+            return None
+    
+    def get_quote(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """
+        Get market quote for a symbol
+        
+        Args:
+            symbol: Stock ticker symbol
+            
+        Returns:
+            Quote data or None if failed
+        """
+        endpoint = f'/marketdata/v1/quotes?symbols={symbol}'
+        response = self.make_authenticated_request('GET', endpoint)
+        
+        if response and response.status_code == 200:
+            return response.json()
+        elif response:
+            logger.error(f"Failed to get quote for {symbol}: {response.status_code}")
+            return None
+        else:
+            return None
