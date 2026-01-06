@@ -412,7 +412,7 @@ def configure_openai_settings():
             "max_position_size": data.get("max_position_size", 5.0),
             "stop_loss_percentage": data.get("stop_loss_percentage", 2.0),
             "take_profit_percentage": data.get("take_profit_percentage", 6.0),
-            "preferred_model": data.get("preferred_model", "gpt-4o"),
+            "preferred_model": data.get("preferred_model", "gpt-5.2"),
             "enable_voice_commands": data.get("enable_voice_commands", False),
             "enable_speech_alerts": data.get("enable_speech_alerts", False)
         }

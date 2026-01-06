@@ -75,7 +75,7 @@ class OpenAITrader:
             if models_response and models_response.data:
                 # Test with a simple chat completion to ensure full API access
                 response = self.client.chat.completions.create(
-                    model="gpt-4o-mini",  # Use cheaper model for testing
+                    model="gpt-5.2-mini",  # Use cheaper model for testing
                     messages=[{"role": "user", "content": "Test"}],
                     max_tokens=1
                 )
@@ -137,7 +137,7 @@ class OpenAITrader:
             elif "model" in error_msg.lower() and "not found" in error_msg.lower():
                 return {
                     "success": False, 
-                    "message": "Model access error. Ensure you have access to the gpt-4o-mini model."
+                    "message": "Model access error. Ensure you have access to the gpt-5.2-mini model."
                 }
             else:
                 return {"success": False, "message": f"OpenAI API error: {error_msg}"}
@@ -191,10 +191,10 @@ Rules:
 - Default to "market" order type unless specified otherwise
 - Set confidence based on how clear the instruction is"""
 
-            # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
+            # the newest OpenAI model is "gpt-5.2" which is the current model.
             # do not change this unless explicitly requested by the user
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.2",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}
@@ -351,10 +351,10 @@ Rules:
                 "reasoning": "detailed explanation"
             }}"""
             
-            # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
+            # the newest OpenAI model is "gpt-5.2" which is the current model.
             # do not change this unless explicitly requested by the user
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.2",
                 messages=[
                     {"role": "system", "content": "You are a financial market analyst providing objective market analysis."},
                     {"role": "user", "content": analysis_prompt}
@@ -405,10 +405,10 @@ Rules:
                 "description": "detailed strategy explanation"
             }}"""
             
-            # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
+            # the newest OpenAI model is "gpt-5.2" which is the current model.
             # do not change this unless explicitly requested by the user
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.2",
                 messages=[
                     {"role": "system", "content": "You are a professional trading strategy developer."},
                     {"role": "user", "content": strategy_prompt}

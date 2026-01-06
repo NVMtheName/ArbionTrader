@@ -217,7 +217,7 @@ class ComprehensiveOpenAIClient:
     async def create_chat_completion(
         self,
         messages: List[Dict[str, str]],
-        model: str = "gpt-4o",
+        model: str = "gpt-5.2",
         stream: bool = False,
         tools: Optional[List[Dict]] = None,
         temperature: float = 0.1,
@@ -281,7 +281,7 @@ class ComprehensiveOpenAIClient:
                 Use the available tools to access real market data and execute trades.
                 Never make recommendations without current data analysis.""",
                 tools=self.trading_tools + [{"type": "code_interpreter"}, {"type": "file_search"}],
-                model="gpt-4o"
+                model="gpt-5.2"
             )
             
             self.assistants[assistant.id] = assistant
@@ -641,7 +641,7 @@ class ComprehensiveOpenAIClient:
             
             response = await self.create_chat_completion(
                 messages=messages,
-                model="gpt-4o",
+                model="gpt-5.2",
                 tools=self.trading_tools,
                 response_format={"type": "json_object"},
                 temperature=0.1
@@ -691,7 +691,7 @@ class ComprehensiveOpenAIClient:
                 
                 response = await self.create_chat_completion(
                     messages=messages,
-                    model="gpt-4o",
+                    model="gpt-5.2",
                     response_format={"type": "json_object"}
                 )
                 
@@ -737,7 +737,7 @@ class ComprehensiveOpenAIClient:
             
             response = await self.create_chat_completion(
                 messages=messages,
-                model="gpt-4o",
+                model="gpt-5.2",
                 tools=[{
                     "type": "function",
                     "function": {
@@ -778,7 +778,7 @@ class ComprehensiveOpenAIClient:
             # Test chat completion
             response = await self.create_chat_completion(
                 messages=[{"role": "user", "content": "Test connection"}],
-                model="gpt-4o-mini",
+                model="gpt-5.2-mini",
                 max_tokens=1
             )
             

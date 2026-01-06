@@ -59,7 +59,7 @@ class GitHubCodexIntegration:
                 openai_data = decrypt_credentials(openai_cred.encrypted_credentials)
                 api_key = openai_data.get('api_key')
                 if api_key:
-                    # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
+                    # the newest OpenAI model is "gpt-5.2" which is the current model.
                     # do not change this unless explicitly requested by the user
                     self.openai_client = OpenAI(api_key=api_key)
                     logger.info(f"OpenAI Codex credentials loaded for user {self.user_id}")
@@ -70,7 +70,7 @@ class GitHubCodexIntegration:
     def set_credentials(self, github_token: str, openai_api_key: str):
         """Set credentials programmatically"""
         self.github_token = github_token
-        # the newest OpenAI model is "gpt-4o" which was released May 13, 2024.
+        # the newest OpenAI model is "gpt-5.2" which is the current model.
         # do not change this unless explicitly requested by the user
         self.openai_client = OpenAI(api_key=openai_api_key)
     
@@ -210,7 +210,7 @@ class GitHubCodexIntegration:
             """
             
             response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.2",
                 messages=[
                     {"role": "system", "content": "You are an expert code reviewer and software architect."},
                     {"role": "user", "content": prompt}
@@ -246,7 +246,7 @@ class GitHubCodexIntegration:
             """
             
             response = self.openai_client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-5.2",
                 messages=[
                     {"role": "system", "content": "You are an expert software developer focused on code improvement and optimization."},
                     {"role": "user", "content": prompt}

@@ -250,7 +250,7 @@ class OpenAITradingEngine:
             
             response = await self.openai_client.create_chat_completion(
                 messages=messages,
-                model="gpt-4o",
+                model="gpt-5.2",
                 response_format={"type": "json_object"}
             )
             
@@ -306,7 +306,7 @@ class OpenAITradingEngine:
                 
                 response = await self.openai_client.create_chat_completion(
                     messages=messages,
-                    model="gpt-4o",
+                    model="gpt-5.2",
                     response_format={"type": "json_object"}
                 )
                 
@@ -425,7 +425,7 @@ class OpenAITradingEngine:
             
             response = await self.openai_client.create_chat_completion(
                 messages=messages,
-                model="gpt-4o",
+                model="gpt-5.2",
                 response_format={"type": "json_object"}
             )
             

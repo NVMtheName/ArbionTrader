@@ -257,7 +257,7 @@ class AITradingBot:
             
             # Get AI analysis
             response = await self.openai_manager.make_chat_completion(
-                model="gpt-4o",
+                model="gpt-5.2",
                 messages=[{"role": "user", "content": analysis_prompt}],
                 response_format={"type": "json_object"},
                 max_tokens=1500
@@ -339,7 +339,7 @@ class AITradingBot:
             """
             
             response = await self.openai_manager.make_chat_completion(
-                model="gpt-4o",
+                model="gpt-5.2",
                 messages=[{"role": "user", "content": signal_prompt}],
                 response_format={"type": "json_object"},
                 max_tokens=800

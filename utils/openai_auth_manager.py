@@ -303,7 +303,7 @@ class OpenAIAuthManager:
             
             # Make a simple API call to test connection
             response = await client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-5.2-mini",
                 messages=[{"role": "user", "content": "Test connection"}],
                 max_tokens=5
             )

@@ -168,7 +168,7 @@ class CoinbaseAgentKit:
             """
             
             response = self.openai_client.chat.completions.create(
-                model="gpt-4o",  # Latest model for best analysis
+                model="gpt-5.2",  # GPT-5.2 for best analysis
                 messages=[
                     {"role": "system", "content": "You are a professional trading AI agent with expertise in technical analysis and risk management."},
                     {"role": "user", "content": prompt}

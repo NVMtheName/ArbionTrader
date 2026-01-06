@@ -84,7 +84,7 @@ class ComprehensiveOpenAIClient:
     async def create_chat_completion(
         self,
         messages: List[Dict[str, str]],
-        model: str = "gpt-4o",
+        model: str = "gpt-5.2",
         temperature: float = 0.1,
         max_tokens: Optional[int] = None,
         response_format: Optional[Dict] = None
@@ -143,7 +143,7 @@ class ComprehensiveOpenAIClient:
             
             result = await self.create_chat_completion(
                 messages=messages,
-                model="gpt-4o",
+                model="gpt-5.2",
                 response_format={"type": "json_object"},
                 temperature=0.1
             )
@@ -196,7 +196,7 @@ class ComprehensiveOpenAIClient:
                 
                 result = await self.create_chat_completion(
                     messages=messages,
-                    model="gpt-4o",
+                    model="gpt-5.2",
                     response_format={"type": "json_object"}
                 )
                 
@@ -284,7 +284,7 @@ class ComprehensiveOpenAIClient:
             # Test simple chat
             response = await self.create_chat_completion(
                 messages=[{"role": "user", "content": "Hello"}],
-                model="gpt-4o-mini",
+                model="gpt-5.2-mini",
                 max_tokens=1
             )
             
@@ -331,7 +331,7 @@ class ComprehensiveOpenAIClient:
             
             result = await self.create_chat_completion(
                 messages=messages,
-                model="gpt-4o"
+                model="gpt-5.2"
             )
             
             if result.get("success"):

@@ -68,9 +68,9 @@ class EnhancedOpenAIClient:
         
         # Enhanced model selection
         self.models = {
-            "primary": "gpt-4o",  # Latest GPT-4 Omni model
-            "analysis": "gpt-4o",  # For detailed market analysis
-            "fast": "gpt-4o-mini",  # For quick responses
+            "primary": "gpt-5.2",  # Latest GPT-5.2 model
+            "analysis": "gpt-5.2",  # For detailed market analysis
+            "fast": "gpt-5.2-mini",  # For quick responses
             "reasoning": "o1-preview"  # For complex reasoning (when available)
         }
         
