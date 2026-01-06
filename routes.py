@@ -964,6 +964,7 @@ def oauth_callback_schwab():
             existing_cred.encrypted_credentials = encrypted_creds
             existing_cred.updated_at = datetime.utcnow()
             existing_cred.test_status = 'success'
+            existing_cred.is_active = True
         else:
             new_cred = APICredential()
             new_cred.user_id = current_user.id
@@ -2066,10 +2067,9 @@ def schwab_oauth_callback():
         # Find or create Schwab credential record
         schwab_cred = APICredential.query.filter_by(
             user_id=stored_user_id,
-            provider='schwab',
-            is_active=True
+            provider='schwab'
         ).first()
-        
+
         if not schwab_cred:
             schwab_cred = APICredential(
                 user_id=stored_user_id,
@@ -2077,11 +2077,12 @@ def schwab_oauth_callback():
                 is_active=True
             )
             db.session.add(schwab_cred)
-        
+
         # Encrypt and store token data
         schwab_cred.encrypted_credentials = encrypt_credentials(token_data)
         schwab_cred.test_status = 'success'
-        schwab_cred.last_updated = datetime.utcnow()
+        schwab_cred.is_active = True
+        schwab_cred.updated_at = datetime.utcnow()
         
         db.session.commit()
         
