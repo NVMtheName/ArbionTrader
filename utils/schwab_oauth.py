@@ -150,39 +150,29 @@ class SchwabOAuth:
                 logger.warning(f"Rate limit exceeded for Schwab token exchange - user {self.user_id}")
                 return {'success': False, 'message': message}
             
-            # Enhanced state parameter validation with fallback
+            # Enhanced state parameter validation (strict - no fallback)
             stored_state = session.get('schwab_oauth_state')
             logger.info(f"Enhanced Schwab state validation - stored: {stored_state}, received: {state}")
-            
-            # Check if this is a fallback state (for debugging)
-            if state.startswith('fallback_'):
-                logger.warning(f"Using fallback state authentication for user {self.user_id}")
-                # Allow fallback authentication but log it
-                oauth_security.record_security_event(self.user_id, "schwab_fallback_auth", "Used fallback state parameter")
-            else:
-                # Normal state validation
-                is_valid, validation_message = oauth_security.validate_state_security(stored_state, state, self.user_id)
-                if not is_valid:
-                    oauth_security.record_failed_attempt(self.user_id, "schwab_token_exchange")
-                    # Instead of raising an error, try fallback authentication
-                    logger.warning(f"State validation failed, attempting fallback: {validation_message}")
-                    oauth_security.record_security_event(self.user_id, "schwab_state_validation_failed", validation_message)
-            
-            # Check session timestamp to prevent replay attacks (with fallback)
+
+            # Strict state validation - no fallbacks allowed for security
+            is_valid, validation_message = oauth_security.validate_state_security(stored_state, state, self.user_id)
+            if not is_valid:
+                oauth_security.record_failed_attempt(self.user_id, "schwab_token_exchange")
+                logger.error(f"State validation failed: {validation_message}")
+                return {'success': False, 'message': f'State validation failed: {validation_message}'}
+
+            # Check session timestamp to prevent replay attacks
             session_timestamp = session.get('schwab_oauth_timestamp', 0)
             current_time = int(time.time())
             if current_time - session_timestamp > 600:  # 10 minutes max
-                logger.warning("Schwab OAuth session expired - allowing with security log")
-                oauth_security.record_security_event(self.user_id, "schwab_session_expired", "Session timestamp exceeded 10 minutes")
-                # Don't raise error, just log the security event
-            
-            # Get code verifier from session (with fallback)
+                logger.error("Schwab OAuth session expired - potential replay attack")
+                return {'success': False, 'message': 'OAuth session expired. Please try authenticating again.'}
+
+            # Get code verifier from session (required for PKCE)
             code_verifier = session.get('schwab_code_verifier')
             if not code_verifier:
-                logger.warning("Code verifier not found in session - generating fallback")
-                # Generate a fallback code verifier
-                code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode('utf-8').rstrip('=')
-                oauth_security.record_security_event(self.user_id, "schwab_fallback_verifier", "Generated fallback code verifier")
+                logger.error("Code verifier not found in session - PKCE validation failed")
+                return {'success': False, 'message': 'PKCE validation failed. Please try authenticating again.'}
             
             # Prepare token request with security headers
             auth_header = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
@@ -294,40 +284,73 @@ class SchwabOAuth:
     def is_token_expired(self, credentials):
         """Check if access token is expired"""
         try:
-            expires_at_str = credentials.get('expires_at')
+            # Support both standardized field and legacy field for backwards compatibility
+            expires_at_str = credentials.get('expires_at') or credentials.get('token_expiry')
             if not expires_at_str:
                 return True
-            
+
             expires_at = datetime.fromisoformat(expires_at_str)
-            return datetime.utcnow() >= expires_at
-            
+            # Add 5-minute buffer before expiration for safety
+            return datetime.utcnow() + timedelta(minutes=5) >= expires_at
+
         except Exception as e:
             logger.error(f"Error checking token expiration: {e}")
             return True
     
     def get_valid_token(self, encrypted_credentials):
-        """Get a valid access token, refreshing if necessary"""
+        """Get a valid access token, refreshing if necessary and updating database"""
         try:
-            from utils.encryption import decrypt_credentials
-            
+            from utils.encryption import decrypt_credentials, encrypt_credentials
+
             credentials = decrypt_credentials(encrypted_credentials)
-            
+
             # Check if token is expired
             if not self.is_token_expired(credentials):
+                logger.info(f"Schwab token is still valid for user {self.user_id}")
                 return credentials['access_token']
-            
+
             # Try to refresh token
             refresh_token = credentials.get('refresh_token')
-            if refresh_token:
-                refresh_result = self.refresh_token(refresh_token)
-                if refresh_result['success']:
-                    return refresh_result['credentials']['access_token']
-            
-            # Token expired and refresh failed
-            return None
-            
+            if not refresh_token:
+                logger.error(f"No refresh token available for user {self.user_id}")
+                return None
+
+            logger.info(f"Refreshing expired Schwab token for user {self.user_id}")
+            refresh_result = self.refresh_token(refresh_token)
+
+            if refresh_result['success']:
+                # Update the database with new tokens
+                try:
+                    from models import APICredential
+                    from app import db
+
+                    cred = APICredential.query.filter_by(
+                        user_id=self.user_id,
+                        provider='schwab',
+                        is_active=True
+                    ).first()
+
+                    if cred:
+                        cred.encrypted_credentials = encrypt_credentials(refresh_result['credentials'])
+                        cred.updated_at = datetime.utcnow()
+                        db.session.commit()
+                        logger.info(f"Updated Schwab credentials in database for user {self.user_id}")
+                    else:
+                        logger.warning(f"No Schwab credential record found to update for user {self.user_id}")
+
+                except Exception as db_error:
+                    logger.error(f"Error updating Schwab credentials in database: {db_error}")
+                    # Continue anyway - we still have the refreshed token
+
+                return refresh_result['credentials']['access_token']
+            else:
+                logger.error(f"Failed to refresh Schwab token: {refresh_result.get('message')}")
+                return None
+
         except Exception as e:
             logger.error(f"Error getting valid Schwab token: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def test_connection(self, access_token):

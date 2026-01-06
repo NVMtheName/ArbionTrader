@@ -216,7 +216,7 @@ class CoinbaseOAuth:
                 credentials = {
                     'access_token': token_info['access_token'],
                     'refresh_token': token_info.get('refresh_token'),
-                    'token_expiry': expiry_time.isoformat(),
+                    'expires_at': expiry_time.isoformat(),  # Standardized to match Schwab
                     'scope': token_info.get('scope', 'wallet:accounts:read,wallet:transactions:read')
                 }
                 
@@ -279,7 +279,7 @@ class CoinbaseOAuth:
                 credentials = {
                     'access_token': token_info['access_token'],
                     'refresh_token': token_info.get('refresh_token', refresh_token),
-                    'token_expiry': expiry_time.isoformat(),
+                    'expires_at': expiry_time.isoformat(),  # Standardized to match Schwab
                     'scope': token_info.get('scope', 'wallet:accounts:read,wallet:transactions:read')
                 }
                 
@@ -306,38 +306,71 @@ class CoinbaseOAuth:
     def is_token_expired(self, credentials):
         """Check if access token is expired"""
         try:
-            expiry_str = credentials.get('token_expiry')
+            # Support both new standardized field and legacy field for backwards compatibility
+            expiry_str = credentials.get('expires_at') or credentials.get('token_expiry')
             if not expiry_str:
                 return True
-            
+
             expiry_time = datetime.fromisoformat(expiry_str)
-            return datetime.utcnow() >= expiry_time
-        
+            # Add 5-minute buffer before expiration for safety
+            return datetime.utcnow() + timedelta(minutes=5) >= expiry_time
+
         except Exception as e:
             logger.error(f"Error checking token expiration: {str(e)}")
             return True
     
     def get_valid_token(self, encrypted_credentials):
-        """Get a valid access token, refreshing if necessary"""
+        """Get a valid access token, refreshing if necessary and updating database"""
         try:
             credentials = decrypt_credentials(encrypted_credentials)
-            
+
             # Check if token is expired
             if not self.is_token_expired(credentials):
+                logger.info(f"Coinbase token is still valid for user {self.user_id}")
                 return credentials['access_token']
-            
+
             # Try to refresh token
             refresh_token = credentials.get('refresh_token')
-            if refresh_token:
-                refresh_result = self.refresh_token(refresh_token)
-                if refresh_result['success']:
-                    return refresh_result['credentials']['access_token']
-            
-            # Token expired and refresh failed
-            return None
-        
+            if not refresh_token:
+                logger.error(f"No refresh token available for user {self.user_id}")
+                return None
+
+            logger.info(f"Refreshing expired Coinbase token for user {self.user_id}")
+            refresh_result = self.refresh_token(refresh_token)
+
+            if refresh_result['success']:
+                # Update the database with new tokens
+                try:
+                    from models import APICredential
+                    from app import db
+
+                    cred = APICredential.query.filter_by(
+                        user_id=self.user_id,
+                        provider='coinbase',
+                        is_active=True
+                    ).first()
+
+                    if cred:
+                        cred.encrypted_credentials = encrypt_credentials(refresh_result['credentials'])
+                        cred.updated_at = datetime.utcnow()
+                        db.session.commit()
+                        logger.info(f"Updated Coinbase credentials in database for user {self.user_id}")
+                    else:
+                        logger.warning(f"No Coinbase credential record found to update for user {self.user_id}")
+
+                except Exception as db_error:
+                    logger.error(f"Error updating Coinbase credentials in database: {db_error}")
+                    # Continue anyway - we still have the refreshed token
+
+                return refresh_result['credentials']['access_token']
+            else:
+                logger.error(f"Failed to refresh Coinbase token: {refresh_result.get('message')}")
+                return None
+
         except Exception as e:
             logger.error(f"Error getting valid Coinbase token: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def test_connection(self, access_token):
