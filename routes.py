@@ -111,126 +111,107 @@ def get_account_balance():
                 logging.info(f"Processing {cred.provider} credentials for user {current_user.id}")
                 
                 if cred.provider == 'coinbase':
-                    # Get LIVE Coinbase balance
-                    if 'access_token' in decrypted_creds:
-                        access_token = decrypted_creds['access_token']
-                        result = fetcher.get_live_coinbase_balance(access_token)
-                        
-                        if result.get('success'):
-                            account_info['balance'] = result['balance']
-                            account_info['status'] = 'connected'
-                            account_info['account_type'] = 'crypto'
-                            account_info['holdings'] = result.get('holdings', [])
-                            account_info['last_updated'] = result['timestamp']
-                            cred.test_status = 'success'
-                            logging.info(f"Coinbase balance fetched: ${result['balance']:.2f}")
-                        else:
-                            account_info['status'] = 'error'
-                            error_msg = f"Coinbase: {result.get('error', 'Unknown error')}"
-                            balance_data['errors'].append(error_msg)
-                            cred.test_status = 'failed'
-                            logging.error(f"Coinbase error: {error_msg}")
-                    else:
-                        # Try OAuth helper
-                        try:
-                            from utils.coinbase_oauth import CoinbaseOAuth
-                            coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
-                            access_token = coinbase_oauth.get_valid_token(cred.encrypted_credentials)
-                            
-                            if access_token:
-                                result = fetcher.get_live_coinbase_balance(access_token)
-                                if result.get('success'):
-                                    account_info['balance'] = result['balance']
-                                    account_info['status'] = 'connected'
-                                    account_info['account_type'] = 'crypto'
-                                    account_info['holdings'] = result.get('holdings', [])
-                                    account_info['last_updated'] = result['timestamp']
-                                    cred.test_status = 'success'
-                                    logging.info(f"Coinbase OAuth balance fetched: ${result['balance']:.2f}")
-                                else:
-                                    account_info['status'] = 'error'
-                                    error_msg = f"Coinbase OAuth: {result.get('error', 'Unknown error')}"
-                                    balance_data['errors'].append(error_msg)
-                                    cred.test_status = 'failed'
+                    # Get LIVE Coinbase balance using OAuth helper for automatic token refresh
+                    try:
+                        from utils.coinbase_oauth import CoinbaseOAuth
+
+                        # Always use OAuth helper to ensure tokens are refreshed if needed
+                        coinbase_oauth = CoinbaseOAuth(user_id=current_user.id)
+                        access_token = coinbase_oauth.get_valid_token(cred.encrypted_credentials)
+
+                        if access_token:
+                            # Use user_id for v2 API support
+                            result = fetcher.get_live_coinbase_balance(access_token=access_token, user_id=str(current_user.id))
+
+                            if result.get('success'):
+                                account_info['balance'] = result['balance']
+                                account_info['status'] = 'connected'
+                                account_info['account_type'] = 'crypto'
+                                account_info['holdings'] = result.get('holdings', [])
+                                account_info['last_updated'] = result['timestamp']
+                                account_info['api_version'] = result.get('api_version', 'v1')
+                                cred.test_status = 'success'
+                                logging.info(f"Coinbase balance fetched: ${result['balance']:.2f} using {result.get('api_version', 'v1')} API")
                             else:
                                 account_info['status'] = 'error'
-                                balance_data['errors'].append('Coinbase: No valid token available')
+                                error_msg = f"Coinbase: {result.get('error', 'Failed to fetch balance')}"
+                                balance_data['errors'].append(error_msg)
                                 cred.test_status = 'failed'
-                        except Exception as e:
-                            account_info['status'] = 'error'
-                            balance_data['errors'].append(f'Coinbase: {str(e)}')
-                            cred.test_status = 'failed'
-                            logging.error(f"Coinbase error: {str(e)}")
-                
-                elif cred.provider == 'schwab':
-                    # Get LIVE Schwab balance
-                    if 'access_token' in decrypted_creds:
-                        # OAuth2 token available
-                        access_token = decrypted_creds['access_token']
-                        result = fetcher.get_live_schwab_balance(str(current_user.id))
-                        positions_result = fetcher.get_live_schwab_positions(str(current_user.id))
-                        
-                        if result.get('success'):
-                            account_info['balance'] = result['balance']
-                            account_info['status'] = 'connected'
-                            account_info['account_type'] = 'brokerage'
-                            account_info['accounts'] = result.get('accounts', [])
-                            if positions_result.get('success'):
-                                position_map = {p['account_number']: p.get('positions', []) for p in positions_result.get('accounts', [])}
-                                for acc in account_info['accounts']:
-                                    acc['positions'] = position_map.get(acc['account_number'], [])
-                            account_info['last_updated'] = result['timestamp']
-                            cred.test_status = 'success'
-                            logging.info(f"Schwab balance fetched: ${result['balance']:.2f}")
+                                logging.error(f"Coinbase API error: {error_msg}")
                         else:
                             account_info['status'] = 'error'
-                            error_msg = f"Schwab: {result.get('error', 'Unknown error')}"
+                            error_msg = 'Coinbase: Token expired and refresh failed. Please re-authenticate in API Settings.'
                             balance_data['errors'].append(error_msg)
                             cred.test_status = 'failed'
-                            logging.error(f"Schwab error: {error_msg}")
-                    elif 'api_key' in decrypted_creds and 'secret' in decrypted_creds:
-                        # Legacy API key format - remove and redirect to OAuth2
+                            logging.error(f"Coinbase token error for user {current_user.id}: {error_msg}")
+
+                    except Exception as e:
                         account_info['status'] = 'error'
-                        error_msg = 'Schwab: OAuth2 authentication required. Please configure OAuth2 credentials in API Settings.'
+                        error_msg = f'Coinbase: {str(e)}'
                         balance_data['errors'].append(error_msg)
                         cred.test_status = 'failed'
-                        logging.warning(f"Schwab legacy credentials detected for user {current_user.id} - OAuth2 required")
-                    else:
-                        # Try OAuth helper to get token
-                        try:
-                            from utils.schwab_oauth import SchwabOAuth
+                        logging.error(f"Coinbase error for user {current_user.id}: {str(e)}")
+                        import traceback
+                        traceback.print_exc()
+                
+                elif cred.provider == 'schwab':
+                    # Get LIVE Schwab balance using OAuth helper for automatic token refresh
+                    try:
+                        from utils.schwab_oauth import SchwabOAuth
+
+                        # Check for legacy credentials
+                        if 'api_key' in decrypted_creds and 'secret' in decrypted_creds and 'access_token' not in decrypted_creds:
+                            account_info['status'] = 'error'
+                            error_msg = 'Schwab: OAuth2 authentication required. Please re-authenticate in API Settings.'
+                            balance_data['errors'].append(error_msg)
+                            cred.test_status = 'failed'
+                            logging.warning(f"Schwab legacy credentials detected for user {current_user.id} - OAuth2 required")
+                        else:
+                            # Always use OAuth helper to ensure tokens are refreshed if needed
                             schwab_oauth = SchwabOAuth(user_id=current_user.id)
                             access_token = schwab_oauth.get_valid_token(cred.encrypted_credentials)
-                            
+
                             if access_token:
+                                # Fetch balance and positions
                                 result = fetcher.get_live_schwab_balance(str(current_user.id))
                                 positions_result = fetcher.get_live_schwab_positions(str(current_user.id))
+
                                 if result.get('success'):
                                     account_info['balance'] = result['balance']
                                     account_info['status'] = 'connected'
                                     account_info['account_type'] = 'brokerage'
                                     account_info['accounts'] = result.get('accounts', [])
+
+                                    # Add positions to accounts
                                     if positions_result.get('success'):
                                         position_map = {p['account_number']: p.get('positions', []) for p in positions_result.get('accounts', [])}
                                         for acc in account_info['accounts']:
                                             acc['positions'] = position_map.get(acc['account_number'], [])
+
                                     account_info['last_updated'] = result['timestamp']
                                     cred.test_status = 'success'
-                                    logging.info(f"Schwab OAuth balance fetched: ${result['balance']:.2f}")
+                                    logging.info(f"Schwab balance fetched: ${result['balance']:.2f} from {len(account_info['accounts'])} accounts")
                                 else:
                                     account_info['status'] = 'error'
-                                    error_msg = f"Schwab OAuth: {result.get('error', 'Unknown error')}"
+                                    error_msg = f"Schwab: {result.get('error', 'Failed to fetch balance')}"
                                     balance_data['errors'].append(error_msg)
                                     cred.test_status = 'failed'
+                                    logging.error(f"Schwab API error: {error_msg}")
                             else:
                                 account_info['status'] = 'error'
-                                balance_data['errors'].append('Schwab: OAuth2 setup required. Please configure OAuth2 credentials.')
+                                error_msg = 'Schwab: Token expired and refresh failed. Please re-authenticate in API Settings.'
+                                balance_data['errors'].append(error_msg)
                                 cred.test_status = 'failed'
-                        except Exception as e:
-                            account_info['status'] = 'error'
-                            balance_data['errors'].append(f'Schwab: OAuth2 required - {str(e)}')
-                            cred.test_status = 'failed'
-                            logging.error(f"Schwab OAuth error: {str(e)}")
+                                logging.error(f"Schwab token error for user {current_user.id}: {error_msg}")
+
+                    except Exception as e:
+                        account_info['status'] = 'error'
+                        error_msg = f'Schwab: {str(e)}'
+                        balance_data['errors'].append(error_msg)
+                        cred.test_status = 'failed'
+                        logging.error(f"Schwab error for user {current_user.id}: {str(e)}")
+                        import traceback
+                        traceback.print_exc()
                 
                 elif cred.provider == 'etrade':
                     # Get LIVE E-trade balance using OAuth 1.0a
@@ -947,14 +928,11 @@ def oauth_callback_schwab():
             logging.error(f"State parameter missing from Schwab callback")
             logging.error(f"Available query params: {dict(request.args)}")
             logging.error(f"Session contents: {dict(session)}")
-            
-            # Try to proceed without state validation for debugging
-            flash('State parameter missing from Schwab callback - attempting fallback authentication', 'warning')
-            
-            # Generate a fallback state for the token exchange
-            import time
-            state = f"fallback_{current_user.id}_{int(time.time())}"
-            logging.warning(f"Using fallback state: {state}")
+
+            # SECURITY: Reject OAuth flow if state parameter is missing
+            flash('State parameter missing from Schwab callback. Please try authenticating again.', 'error')
+            logging.error(f"State parameter missing - rejecting OAuth flow for security")
+            return redirect(url_for('main.api_settings'))
         
         # Enhanced security checks before token exchange
         from utils.oauth_security import oauth_security
