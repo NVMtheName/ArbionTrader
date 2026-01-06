@@ -2102,26 +2102,26 @@ def schwab_oauth_callback():
 @main_bp.route('/api/schwab-accounts')
 @login_required
 def get_schwab_accounts():
-    """API endpoint to fetch Schwab accounts"""
+    """API endpoint to fetch Schwab accounts using schwabdev"""
     try:
-        from utils.schwab_trader_client import SchwabTraderClient
-        
-        schwab_client = SchwabTraderClient(user_id=current_user.id)
-        accounts_data = schwab_client.get_accounts()
-        
-        if accounts_data:
+        from utils.schwabdev_wrapper import SchwabdevWrapper
+
+        schwab_client = SchwabdevWrapper(user_id=current_user.id)
+        result = schwab_client.get_linked_accounts()
+
+        if result.get('success'):
             return jsonify({
                 'success': True,
-                'data': accounts_data,
+                'data': result.get('accounts', []),
                 'timestamp': datetime.utcnow().isoformat()
             })
         else:
             return jsonify({
                 'success': False,
-                'error': 'Failed to fetch accounts. Please re-authenticate with Schwab.',
+                'error': result.get('error', 'Failed to fetch accounts'),
                 'needs_auth': True
             }), 401
-            
+
     except Exception as e:
         logging.error(f"Error fetching Schwab accounts: {str(e)}")
         return jsonify({
@@ -2132,27 +2132,36 @@ def get_schwab_accounts():
 @main_bp.route('/api/schwab-balances')
 @login_required
 def get_schwab_balances():
-    """API endpoint to fetch Schwab account balances"""
+    """API endpoint to fetch Schwab account balances using schwabdev"""
     try:
-        from utils.schwab_trader_client import SchwabTraderClient
-        
+        from utils.schwabdev_wrapper import SchwabdevWrapper
+
         account_hash = request.args.get('account_hash')
-        schwab_client = SchwabTraderClient(user_id=current_user.id)
-        balances_data = schwab_client.get_account_balances(account_hash)
-        
-        if balances_data:
+        if not account_hash:
+            return jsonify({
+                'success': False,
+                'error': 'Account hash parameter required'
+            }), 400
+
+        schwab_client = SchwabdevWrapper(user_id=current_user.id)
+        result = schwab_client.get_account_details(account_hash=account_hash, fields='positions')
+
+        if result.get('success'):
+            account_data = result.get('account', {})
+            balances = account_data.get('securitiesAccount', {}).get('currentBalances', {})
+
             return jsonify({
                 'success': True,
-                'data': balances_data,
+                'data': balances,
                 'timestamp': datetime.utcnow().isoformat()
             })
         else:
             return jsonify({
                 'success': False,
-                'error': 'Failed to fetch balances. Please re-authenticate with Schwab.',
+                'error': result.get('error', 'Failed to fetch balances'),
                 'needs_auth': True
             }), 401
-            
+
     except Exception as e:
         logging.error(f"Error fetching Schwab balances: {str(e)}")
         return jsonify({
@@ -2163,33 +2172,36 @@ def get_schwab_balances():
 @main_bp.route('/api/schwab-positions')
 @login_required
 def get_schwab_positions():
-    """API endpoint to fetch Schwab account positions"""
+    """API endpoint to fetch Schwab account positions using schwabdev"""
     try:
-        from utils.schwab_trader_client import SchwabTraderClient
-        
+        from utils.schwabdev_wrapper import SchwabdevWrapper
+
         account_hash = request.args.get('account_hash')
         if not account_hash:
             return jsonify({
                 'success': False,
                 'error': 'Account hash parameter required'
             }), 400
-        
-        schwab_client = SchwabTraderClient(user_id=current_user.id)
-        positions_data = schwab_client.get_account_positions(account_hash)
-        
-        if positions_data:
+
+        schwab_client = SchwabdevWrapper(user_id=current_user.id)
+        result = schwab_client.get_account_details(account_hash=account_hash, fields='positions')
+
+        if result.get('success'):
+            account_data = result.get('account', {})
+            positions = account_data.get('securitiesAccount', {}).get('positions', [])
+
             return jsonify({
                 'success': True,
-                'data': positions_data,
+                'data': positions,
                 'timestamp': datetime.utcnow().isoformat()
             })
         else:
             return jsonify({
                 'success': False,
-                'error': 'Failed to fetch positions. Please re-authenticate with Schwab.',
+                'error': result.get('error', 'Failed to fetch positions'),
                 'needs_auth': True
             }), 401
-            
+
     except Exception as e:
         logging.error(f"Error fetching Schwab positions: {str(e)}")
         return jsonify({
