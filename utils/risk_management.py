@@ -4,10 +4,11 @@ from typing import Dict, List, Optional, Tuple
 import json
 
 class RiskManager:
-    """Advanced risk management system for trading operations"""
-    
-    def __init__(self):
+    """Advanced risk management system for trading operations with stop-loss enforcement"""
+
+    def __init__(self, db=None):
         self.logger = logging.getLogger(__name__)
+        self.db = db  # Database session for trade updates
         
     def calculate_position_size(self, account_balance: float, risk_percentage: float, 
                               entry_price: float, stop_loss: float) -> int:
@@ -252,7 +253,7 @@ class RiskManager:
                 'timestamp': datetime.utcnow().isoformat()
             }
     
-    def log_risk_event(self, user_id: int, event_type: str, 
+    def log_risk_event(self, user_id: int, event_type: str,
                       message: str, severity: str = 'info'):
         """Log risk management events"""
         try:
@@ -260,3 +261,303 @@ class RiskManager:
             self.logger.info(f"Risk Management - {event_type}: {message}")
         except Exception as e:
             self.logger.error(f"Error logging risk event: {str(e)}")
+
+    def place_stop_loss_order(self, trade_id: int, stop_price: float,
+                             api_client) -> Tuple[bool, str, Optional[str]]:
+        """
+        Place a stop-loss order at the broker for an open position
+
+        Args:
+            trade_id: Trade database ID
+            stop_price: Stop loss trigger price
+            api_client: Broker API client (SchwabAPIClient, CoinbaseConnector, etc.)
+
+        Returns:
+            Tuple of (success, message, stop_order_id)
+        """
+        try:
+            from models import Trade
+
+            trade = Trade.query.get(trade_id)
+            if not trade:
+                return False, f"Trade {trade_id} not found", None
+
+            if trade.status != 'executed':
+                return False, f"Trade {trade_id} is not executed (status: {trade.status})", None
+
+            # Build stop-loss order based on provider
+            if trade.provider == 'schwab':
+                # Schwab stop-loss order structure
+                stop_order = {
+                    "orderType": "STOP",
+                    "session": "NORMAL",
+                    "duration": "GOOD_TILL_CANCEL",
+                    "orderStrategyType": "SINGLE",
+                    "stopPrice": stop_price,
+                    "orderLegCollection": [
+                        {
+                            "instruction": "SELL" if trade.side == 'buy' else "BUY_TO_COVER",
+                            "quantity": trade.quantity,
+                            "instrument": {
+                                "symbol": trade.symbol,
+                                "assetType": "EQUITY"
+                            }
+                        }
+                    ]
+                }
+
+                result = api_client.place_order(trade.account_hash, stop_order)
+
+                if result.get('success'):
+                    stop_order_id = result.get('order_id')
+
+                    # Update trade with stop-loss info
+                    trade.stop_loss_price = stop_price
+                    trade.stop_loss_order_id = stop_order_id
+
+                    if self.db:
+                        self.db.session.commit()
+
+                    self.logger.info(f"Placed stop-loss order {stop_order_id} for trade {trade_id} at ${stop_price}")
+                    return True, f"Stop-loss order placed at ${stop_price}", stop_order_id
+                else:
+                    error_msg = result.get('message', 'Unknown error')
+                    self.logger.error(f"Failed to place stop-loss for trade {trade_id}: {error_msg}")
+                    return False, f"Failed to place stop-loss: {error_msg}", None
+
+            elif trade.provider == 'coinbase':
+                # Coinbase stop-loss order (using stop-limit)
+                # Implementation would go here
+                return False, "Coinbase stop-loss not yet implemented", None
+            else:
+                return False, f"Stop-loss not supported for provider: {trade.provider}", None
+
+        except Exception as e:
+            self.logger.error(f"Error placing stop-loss order: {str(e)}")
+            return False, f"Stop-loss placement error: {str(e)}", None
+
+    def monitor_stop_losses(self, user_id: int, api_client) -> Dict:
+        """
+        Monitor all open positions and enforce stop-losses
+        CRITICAL: This should be called periodically (e.g., every minute via Celery task)
+
+        Args:
+            user_id: User ID to monitor positions for
+            api_client: Broker API client
+
+        Returns:
+            Dict with monitoring results and actions taken
+        """
+        try:
+            from models import Trade
+
+            # Get all open positions with stop losses
+            open_trades = Trade.query.filter(
+                Trade.user_id == user_id,
+                Trade.status == 'executed',
+                Trade.stop_loss_price.isnot(None)
+            ).all()
+
+            results = {
+                'trades_monitored': len(open_trades),
+                'stop_losses_triggered': 0,
+                'positions_closed': 0,
+                'errors': [],
+                'timestamp': datetime.utcnow().isoformat()
+            }
+
+            for trade in open_trades:
+                try:
+                    # Get current market price
+                    if trade.provider == 'schwab':
+                        market_data = api_client.get_market_data([trade.symbol])
+                        if market_data and trade.symbol in market_data:
+                            current_price = market_data[trade.symbol].get('mark', 0)
+                        else:
+                            self.logger.warning(f"Could not get market price for {trade.symbol}")
+                            continue
+                    else:
+                        continue  # Skip non-Schwab for now
+
+                    # Check if stop loss is breached
+                    stop_triggered = False
+                    if trade.side == 'buy' and current_price <= trade.stop_loss_price:
+                        stop_triggered = True
+                    elif trade.side == 'sell' and current_price >= trade.stop_loss_price:
+                        stop_triggered = True
+
+                    if stop_triggered:
+                        self.logger.warning(
+                            f"Stop loss triggered for trade {trade.id}: {trade.symbol} "
+                            f"current=${current_price} stop=${trade.stop_loss_price}"
+                        )
+                        results['stop_losses_triggered'] += 1
+
+                        # Force close the position
+                        close_success, close_msg = self.force_close_position(trade.id, api_client,
+                                                                             reason='stop_loss_triggered')
+                        if close_success:
+                            results['positions_closed'] += 1
+                            self.log_risk_event(
+                                user_id,
+                                'STOP_LOSS_EXECUTED',
+                                f"Position {trade.symbol} closed at ${current_price} (stop: ${trade.stop_loss_price})",
+                                severity='warning'
+                            )
+                        else:
+                            results['errors'].append({
+                                'trade_id': trade.id,
+                                'symbol': trade.symbol,
+                                'error': close_msg
+                            })
+
+                except Exception as e:
+                    self.logger.error(f"Error monitoring trade {trade.id}: {str(e)}")
+                    results['errors'].append({
+                        'trade_id': trade.id,
+                        'error': str(e)
+                    })
+
+            return results
+
+        except Exception as e:
+            self.logger.error(f"Error in stop-loss monitoring: {str(e)}")
+            return {
+                'error': str(e),
+                'timestamp': datetime.utcnow().isoformat()
+            }
+
+    def force_close_position(self, trade_id: int, api_client,
+                            reason: str = 'manual_close') -> Tuple[bool, str]:
+        """
+        Force close a position immediately with market order
+        CRITICAL: Used for stop-loss enforcement and risk management
+
+        Args:
+            trade_id: Trade database ID to close
+            api_client: Broker API client
+            reason: Reason for closure (stop_loss_triggered, risk_limit_exceeded, manual_close)
+
+        Returns:
+            Tuple of (success, message)
+        """
+        try:
+            from models import Trade
+
+            trade = Trade.query.get(trade_id)
+            if not trade:
+                return False, f"Trade {trade_id} not found"
+
+            if trade.status != 'executed':
+                return False, f"Trade {trade_id} is not open (status: {trade.status})"
+
+            # Cancel any existing stop-loss order first
+            if trade.stop_loss_order_id and trade.provider == 'schwab':
+                cancel_result = api_client.cancel_order(trade.account_hash, trade.stop_loss_order_id)
+                if cancel_result.get('success'):
+                    self.logger.info(f"Cancelled stop-loss order {trade.stop_loss_order_id}")
+
+            # Build market order to close position
+            if trade.provider == 'schwab':
+                close_order = {
+                    "orderType": "MARKET",
+                    "session": "NORMAL",
+                    "duration": "DAY",
+                    "orderStrategyType": "SINGLE",
+                    "orderLegCollection": [
+                        {
+                            "instruction": "SELL" if trade.side == 'buy' else "BUY_TO_COVER",
+                            "quantity": trade.quantity,
+                            "instrument": {
+                                "symbol": trade.symbol,
+                                "assetType": "EQUITY"
+                            }
+                        }
+                    ]
+                }
+
+                result = api_client.place_order(trade.account_hash, close_order)
+
+                if result.get('success'):
+                    # Update trade status
+                    trade.status = 'closed'
+                    trade.exit_date = datetime.utcnow()
+
+                    # Add note about closure reason
+                    current_notes = trade.trade_notes or ''
+                    trade.trade_notes = f"{current_notes}\nClosed by system: {reason} at {datetime.utcnow().isoformat()}"
+
+                    if self.db:
+                        self.db.session.commit()
+
+                    self.logger.info(f"Successfully closed position for trade {trade_id} (reason: {reason})")
+                    return True, f"Position closed successfully (reason: {reason})"
+                else:
+                    error_msg = result.get('message', 'Unknown error')
+                    self.logger.error(f"Failed to close position for trade {trade_id}: {error_msg}")
+                    return False, f"Failed to close position: {error_msg}"
+
+            else:
+                return False, f"Force close not supported for provider: {trade.provider}"
+
+        except Exception as e:
+            self.logger.error(f"Error force closing position: {str(e)}")
+            return False, f"Force close error: {str(e)}"
+
+    def enforce_risk_limits(self, user_id: int, trade_amount: float,
+                           symbol: str, user_role: str = 'standard') -> Tuple[bool, str]:
+        """
+        ENFORCED risk limit check - blocks trades that exceed limits
+        This is called BEFORE placing any trade
+
+        Args:
+            user_id: User ID
+            trade_amount: Trade amount in dollars
+            symbol: Trading symbol
+            user_role: User's role (determines limits)
+
+        Returns:
+            Tuple of (allowed, message) - If allowed=False, trade MUST be blocked
+        """
+        # First check basic limits
+        passed, message = self.validate_trade_limits(user_id, trade_amount, symbol, user_role)
+
+        if not passed:
+            self.logger.warning(f"Trade blocked for user {user_id}: {message}")
+            self.log_risk_event(user_id, 'TRADE_BLOCKED', message, severity='warning')
+            return False, message
+
+        # Check daily trading limit
+        try:
+            from models import Trade
+
+            today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+
+            today_trades = Trade.query.filter(
+                Trade.user_id == user_id,
+                Trade.created_at >= today_start,
+                Trade.status.in_(['executed', 'pending'])
+            ).all()
+
+            today_volume = sum(t.amount or 0 for t in today_trades)
+
+            # Set daily limits based on role
+            if user_role == 'superadmin':
+                daily_limit = 1000000
+            elif user_role == 'admin':
+                daily_limit = 100000
+            else:
+                daily_limit = 10000
+
+            if today_volume + trade_amount > daily_limit:
+                message = f"Daily trading limit exceeded. Used: ${today_volume:,.2f}, Limit: ${daily_limit:,.2f}"
+                self.logger.warning(f"Daily limit exceeded for user {user_id}: {message}")
+                self.log_risk_event(user_id, 'DAILY_LIMIT_EXCEEDED', message, severity='error')
+                return False, message
+
+            return True, "Risk limits check passed"
+
+        except Exception as e:
+            self.logger.error(f"Error enforcing risk limits: {str(e)}")
+            # FAIL CLOSED - if we can't verify limits, block the trade
+            return False, f"Risk limit verification failed: {str(e)}"
