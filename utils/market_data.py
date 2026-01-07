@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 import yfinance as yf
 
 class MarketDataProvider:
-    """Unified market data provider for real-time and historical data with caching"""
+    """Unified market data provider for real-time and historical data with Redis caching"""
 
     def __init__(self, cache_ttl=60):
         """
@@ -17,30 +17,62 @@ class MarketDataProvider:
         """
         self.logger = logging.getLogger(__name__)
         self.cache_ttl = cache_ttl
-        self._cache = {}  # {key: (data, timestamp)}
+
+        # Try to import Flask cache (Redis-backed)
+        try:
+            from app import cache
+            self.cache = cache
+            self.use_redis = True
+            self.logger.info("Using Redis cache for market data")
+        except Exception as e:
+            # Fallback to in-memory cache if Redis unavailable
+            self.logger.warning(f"Redis cache unavailable, using in-memory cache: {str(e)}")
+            self.use_redis = False
+            self._cache = {}  # {key: (data, timestamp)}
 
     def _get_cached(self, cache_key):
         """Get data from cache if not expired"""
-        if cache_key in self._cache:
-            data, timestamp = self._cache[cache_key]
-            age = (datetime.utcnow() - timestamp).total_seconds()
-            if age < self.cache_ttl:
-                self.logger.debug(f"Cache hit for {cache_key} (age: {age:.1f}s)")
-                return data
+        try:
+            if self.use_redis:
+                # Use Flask-Caching (Redis)
+                data = self.cache.get(cache_key)
+                if data:
+                    self.logger.debug(f"Redis cache hit for {cache_key}")
+                    return data
+                return None
             else:
-                # Remove expired cache entry
-                del self._cache[cache_key]
-        return None
+                # Fallback to in-memory cache
+                if cache_key in self._cache:
+                    data, timestamp = self._cache[cache_key]
+                    age = (datetime.utcnow() - timestamp).total_seconds()
+                    if age < self.cache_ttl:
+                        self.logger.debug(f"Memory cache hit for {cache_key} (age: {age:.1f}s)")
+                        return data
+                    else:
+                        # Remove expired cache entry
+                        del self._cache[cache_key]
+                return None
+        except Exception as e:
+            self.logger.error(f"Cache get error: {str(e)}")
+            return None
 
     def _set_cache(self, cache_key, data):
         """Store data in cache with timestamp"""
-        self._cache[cache_key] = (data, datetime.utcnow())
-        # Limit cache size to prevent memory issues
-        if len(self._cache) > 1000:
-            # Remove oldest entries
-            sorted_keys = sorted(self._cache.keys(), key=lambda k: self._cache[k][1])
-            for key in sorted_keys[:100]:
-                del self._cache[key]
+        try:
+            if self.use_redis:
+                # Use Flask-Caching (Redis) with TTL
+                self.cache.set(cache_key, data, timeout=self.cache_ttl)
+            else:
+                # Fallback to in-memory cache
+                self._cache[cache_key] = (data, datetime.utcnow())
+                # Limit cache size to prevent memory issues
+                if len(self._cache) > 1000:
+                    # Remove oldest entries
+                    sorted_keys = sorted(self._cache.keys(), key=lambda k: self._cache[k][1])
+                    for key in sorted_keys[:100]:
+                        del self._cache[key]
+        except Exception as e:
+            self.logger.error(f"Cache set error: {str(e)}")
         
     def get_stock_quote(self, symbol: str) -> Optional[Dict]:
         """Get real-time stock quote using yfinance with caching"""

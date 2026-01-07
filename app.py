@@ -5,6 +5,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
+from flask_caching import Cache
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -19,6 +20,7 @@ db = SQLAlchemy(model_class=Base)
 login_manager = LoginManager()
 migrate = Migrate()
 csrf = CSRFProtect()
+cache = Cache()
 
 def create_app():
     app = Flask(__name__)
@@ -60,6 +62,16 @@ def create_app():
     csrf.exempt("utils.schwabdev_routes.*")  # Schwab OAuth callbacks
     csrf.exempt("utils.coinbase_v2_routes.*")  # Coinbase OAuth callbacks
     csrf.exempt("utils.openai_auth_routes.*")  # OpenAI OAuth callbacks
+
+    # Redis Cache Configuration
+    redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/1')  # Use DB 1 for cache (DB 0 for Celery)
+    app.config['CACHE_TYPE'] = 'redis'
+    app.config['CACHE_REDIS_URL'] = redis_url
+    app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutes default
+    app.config['CACHE_KEY_PREFIX'] = 'arbion_cache_'
+
+    cache.init_app(app)
+    logging.info(f"✓ Redis cache configured: {redis_url}")
 
     # Login manager configuration
     login_manager.login_view = 'auth.login'
