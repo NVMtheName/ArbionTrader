@@ -52,15 +52,28 @@ class Trade(db.Model):
     quantity = db.Column(db.Float, nullable=False)
     price = db.Column(db.Float)
     amount = db.Column(db.Float)
-    status = db.Column(db.String(20), default='pending')  # pending, executed, failed, cancelled
-    trade_type = db.Column(db.String(20), default='market')  # market, limit, stop
+    status = db.Column(db.String(20), default='pending')  # pending, executed, failed, cancelled, partially_filled
+    trade_type = db.Column(db.String(20), default='market')  # market, limit, stop, stop_limit
     strategy = db.Column(db.String(50))  # manual, wheel, collar, ai
     natural_language_prompt = db.Column(Text)
     execution_details = db.Column(Text)  # JSON string with execution details
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     executed_at = db.Column(db.DateTime)
     is_simulation = db.Column(db.Boolean, default=False)
-    
+
+    # Order tracking fields (CRITICAL FOR PRODUCTION)
+    order_id = db.Column(db.String(100))  # Broker's order ID
+    account_hash = db.Column(db.String(100))  # Broker account identifier (hash for Schwab)
+    filled_quantity = db.Column(db.Float, default=0.0)  # Actual filled quantity (for partial fills)
+    average_fill_price = db.Column(db.Float)  # Average price of fills
+    remaining_quantity = db.Column(db.Float)  # Remaining unfilled quantity
+
+    # Risk management fields (CRITICAL FOR PRODUCTION)
+    stop_loss_price = db.Column(db.Float)  # Stop loss trigger price
+    stop_loss_order_id = db.Column(db.String(100))  # Stop loss order ID at broker
+    take_profit_price = db.Column(db.Float)  # Take profit target price
+    take_profit_order_id = db.Column(db.String(100))  # Take profit order ID at broker
+
     # Enhanced analytics fields
     fees = db.Column(db.Float, default=0.0)
     commission = db.Column(db.Float, default=0.0)

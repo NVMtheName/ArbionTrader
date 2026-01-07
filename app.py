@@ -83,32 +83,50 @@ def create_app():
     from utils.simple_openai_routes import simple_openai_bp
     app.register_blueprint(simple_openai_bp)
     
+    # Validate encryption configuration on startup
+    try:
+        from utils.encryption import validate_encryption_config
+        is_valid, message = validate_encryption_config()
+        if is_valid:
+            logging.info(f"✓ Encryption: {message}")
+        else:
+            logging.critical(f"✗ Encryption validation failed: {message}")
+            logging.critical("Application cannot start without proper encryption configuration!")
+            raise ValueError(f"Encryption configuration error: {message}")
+    except Exception as e:
+        logging.critical(f"✗ Fatal: Encryption configuration error: {str(e)}")
+        logging.critical("Set ENCRYPTION_KEY or ENCRYPTION_SECRET+ENCRYPTION_SALT environment variables")
+        raise
+
     # Create tables and default admin user
     with app.app_context():
         # Import models to ensure they're registered
         import models
-        
+
         db.create_all()
-        
-        # Create default superadmin user
-        from models import User
-        from werkzeug.security import generate_password_hash
-        
-        admin_email = "nvm427@gmail.com"
-        admin_password = "$@MP$0n9174201989"
-        
-        existing_admin = User.query.filter_by(email=admin_email).first()
-        if not existing_admin:
-            admin_user = User(
-                username="superadmin",
-                email=admin_email,
-                password_hash=generate_password_hash(admin_password),
-                role="superadmin"
-            )
-            db.session.add(admin_user)
-            db.session.commit()
-            logging.info(f"Created default superadmin user: {admin_email}")
-    
+
+        # Create default superadmin user (only if configured via environment)
+        admin_email = os.environ.get("SUPERADMIN_EMAIL")
+        admin_password = os.environ.get("SUPERADMIN_PASSWORD")
+
+        if admin_email and admin_password:
+            from models import User
+            from werkzeug.security import generate_password_hash
+
+            existing_admin = User.query.filter_by(email=admin_email).first()
+            if not existing_admin:
+                admin_user = User(
+                    username="superadmin",
+                    email=admin_email,
+                    password_hash=generate_password_hash(admin_password),
+                    role="superadmin"
+                )
+                db.session.add(admin_user)
+                db.session.commit()
+                logging.info(f"Created default superadmin user: {admin_email}")
+        else:
+            logging.info("No SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD set - skipping superadmin creation")
+
     return app
 
 app = create_app()

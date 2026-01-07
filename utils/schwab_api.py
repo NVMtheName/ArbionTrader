@@ -316,17 +316,322 @@ class SchwabAPIClient:
             logger.error(f"Failed to get market data: {str(e)}")
             return {}
     
+    def place_order(self, account_hash: str, order_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Place a trading order
+
+        Args:
+            account_hash: Schwab account hash value (required for API calls)
+            order_data: Order specification following Schwab's order schema
+
+        Returns:
+            Order response with order_id or error details
+
+        Raises:
+            requests.exceptions.HTTPError: For API errors
+        """
+        try:
+            response = self._make_request(
+                'POST',
+                f'/trader/v1/accounts/{account_hash}/orders',
+                json=order_data
+            )
+
+            # Schwab returns 201 on successful order placement
+            # Order ID is in Location header
+            if response.status_code == 201:
+                location = response.headers.get('Location', '')
+                order_id = location.split('/')[-1] if location else None
+
+                logger.info(f"Successfully placed order for account {account_hash[:8]}... Order ID: {order_id}")
+
+                return {
+                    'success': True,
+                    'order_id': order_id,
+                    'message': 'Order placed successfully',
+                    'location': location
+                }
+            else:
+                # Return response body for error details
+                error_data = response.json() if response.content else {}
+                logger.error(f"Failed to place order: {response.status_code} - {error_data}")
+                return {
+                    'success': False,
+                    'status_code': response.status_code,
+                    'error': error_data,
+                    'message': f'Order placement failed with status {response.status_code}'
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to place order for account {account_hash[:8]}...: {str(e)}")
+            return {
+                'success': False,
+                'message': f'Order placement error: {str(e)}'
+            }
+
+    def get_order_by_id(self, account_hash: str, order_id: str) -> Dict[str, Any]:
+        """
+        Get details of a specific order by ID
+
+        Args:
+            account_hash: Schwab account hash value
+            order_id: Order ID to retrieve
+
+        Returns:
+            Order details dictionary
+        """
+        try:
+            response = self._make_request(
+                'GET',
+                f'/trader/v1/accounts/{account_hash}/orders/{order_id}'
+            )
+            data = response.json()
+
+            logger.info(f"Retrieved order {order_id} for account {account_hash[:8]}...")
+            return data
+
+        except Exception as e:
+            logger.error(f"Failed to get order {order_id}: {str(e)}")
+            return {}
+
+    def cancel_order(self, account_hash: str, order_id: str) -> Dict[str, Any]:
+        """
+        Cancel a pending order
+
+        Args:
+            account_hash: Schwab account hash value
+            order_id: Order ID to cancel
+
+        Returns:
+            Cancellation result dictionary
+        """
+        try:
+            response = self._make_request(
+                'DELETE',
+                f'/trader/v1/accounts/{account_hash}/orders/{order_id}'
+            )
+
+            if response.status_code == 200:
+                logger.info(f"Successfully cancelled order {order_id} for account {account_hash[:8]}...")
+                return {
+                    'success': True,
+                    'order_id': order_id,
+                    'message': 'Order cancelled successfully'
+                }
+            else:
+                error_data = response.json() if response.content else {}
+                logger.error(f"Failed to cancel order {order_id}: {response.status_code} - {error_data}")
+                return {
+                    'success': False,
+                    'order_id': order_id,
+                    'status_code': response.status_code,
+                    'error': error_data,
+                    'message': f'Order cancellation failed with status {response.status_code}'
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to cancel order {order_id}: {str(e)}")
+            return {
+                'success': False,
+                'order_id': order_id,
+                'message': f'Order cancellation error: {str(e)}'
+            }
+
+    def replace_order(self, account_hash: str, order_id: str, new_order_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Replace (modify) an existing order
+
+        Args:
+            account_hash: Schwab account hash value
+            order_id: Order ID to replace
+            new_order_data: New order specification
+
+        Returns:
+            Replacement result with new order_id
+        """
+        try:
+            response = self._make_request(
+                'PUT',
+                f'/trader/v1/accounts/{account_hash}/orders/{order_id}',
+                json=new_order_data
+            )
+
+            if response.status_code in [200, 201]:
+                location = response.headers.get('Location', '')
+                new_order_id = location.split('/')[-1] if location else None
+
+                logger.info(f"Successfully replaced order {order_id} with {new_order_id} for account {account_hash[:8]}...")
+                return {
+                    'success': True,
+                    'old_order_id': order_id,
+                    'new_order_id': new_order_id,
+                    'message': 'Order replaced successfully',
+                    'location': location
+                }
+            else:
+                error_data = response.json() if response.content else {}
+                logger.error(f"Failed to replace order {order_id}: {response.status_code} - {error_data}")
+                return {
+                    'success': False,
+                    'order_id': order_id,
+                    'status_code': response.status_code,
+                    'error': error_data,
+                    'message': f'Order replacement failed with status {response.status_code}'
+                }
+
+        except Exception as e:
+            logger.error(f"Failed to replace order {order_id}: {str(e)}")
+            return {
+                'success': False,
+                'order_id': order_id,
+                'message': f'Order replacement error: {str(e)}'
+            }
+
+    def get_all_orders(self, account_hash: str, from_date: Optional[str] = None,
+                       to_date: Optional[str] = None, max_results: int = 100,
+                       status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Get all orders for an account with filtering options
+
+        Args:
+            account_hash: Schwab account hash value
+            from_date: Start date (ISO 8601 format: YYYY-MM-DDTHH:MM:SS.SSSZ)
+            to_date: End date (ISO 8601 format: YYYY-MM-DDTHH:MM:SS.SSSZ)
+            max_results: Maximum number of orders to return (default 100)
+            status: Filter by order status (PENDING, FILLED, CANCELLED, etc.)
+
+        Returns:
+            List of order dictionaries
+        """
+        try:
+            # Build query parameters
+            params = {'maxResults': max_results}
+
+            if from_date:
+                params['fromEnteredTime'] = from_date
+            else:
+                # Default to last 60 days if not specified
+                params['fromEnteredTime'] = (datetime.now() - timedelta(days=60)).isoformat() + 'Z'
+
+            if to_date:
+                params['toEnteredTime'] = to_date
+            else:
+                params['toEnteredTime'] = datetime.now().isoformat() + 'Z'
+
+            if status:
+                params['status'] = status
+
+            response = self._make_request(
+                'GET',
+                f'/trader/v1/accounts/{account_hash}/orders',
+                params=params
+            )
+            data = response.json()
+
+            logger.info(f"Retrieved {len(data)} orders for account {account_hash[:8]}...")
+            return data
+
+        except Exception as e:
+            logger.error(f"Failed to get orders for account {account_hash[:8]}...: {str(e)}")
+            return []
+
+    def get_order_executions(self, account_hash: str, order_id: str) -> List[Dict[str, Any]]:
+        """
+        Get execution details (fills) for a specific order
+
+        Args:
+            account_hash: Schwab account hash value
+            order_id: Order ID to get executions for
+
+        Returns:
+            List of execution/fill dictionaries
+        """
+        try:
+            # Get full order details which includes executions
+            order_details = self.get_order_by_id(account_hash, order_id)
+
+            if not order_details:
+                return []
+
+            # Extract execution legs
+            executions = []
+            order_legs = order_details.get('orderLegCollection', [])
+
+            for leg in order_legs:
+                leg_executions = leg.get('orderLegExecutions', [])
+                for execution in leg_executions:
+                    executions.append({
+                        'execution_id': execution.get('executionId'),
+                        'quantity': execution.get('quantity', 0),
+                        'price': execution.get('price', 0.0),
+                        'time': execution.get('time'),
+                        'symbol': leg.get('instrument', {}).get('symbol')
+                    })
+
+            logger.info(f"Retrieved {len(executions)} executions for order {order_id}")
+            return executions
+
+        except Exception as e:
+            logger.error(f"Failed to get executions for order {order_id}: {str(e)}")
+            return []
+
+    def get_account_transactions(self, account_hash: str, start_date: Optional[str] = None,
+                                 end_date: Optional[str] = None, transaction_type: Optional[str] = None) -> List[Dict[str, Any]]:
+        """
+        Get account transactions (trades, dividends, fees, etc.)
+
+        Args:
+            account_hash: Schwab account hash value
+            start_date: Start date (YYYY-MM-DD format)
+            end_date: End date (YYYY-MM-DD format)
+            transaction_type: Filter by type (TRADE, DIVIDEND, INTEREST, FEE, etc.)
+
+        Returns:
+            List of transaction dictionaries
+        """
+        try:
+            # Build query parameters
+            params = {}
+
+            if start_date:
+                params['startDate'] = start_date
+            else:
+                # Default to last 30 days
+                params['startDate'] = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
+
+            if end_date:
+                params['endDate'] = end_date
+            else:
+                params['endDate'] = datetime.now().strftime('%Y-%m-%d')
+
+            if transaction_type:
+                params['types'] = transaction_type
+
+            response = self._make_request(
+                'GET',
+                f'/trader/v1/accounts/{account_hash}/transactions',
+                params=params
+            )
+            data = response.json()
+
+            logger.info(f"Retrieved {len(data)} transactions for account {account_hash[:8]}...")
+            return data
+
+        except Exception as e:
+            logger.error(f"Failed to get transactions for account {account_hash[:8]}...: {str(e)}")
+            return []
+
     def test_connection(self) -> Dict[str, Any]:
         """
         Test API connection and token validity
-        
+
         Returns:
             Connection test result
         """
         try:
             # Test with a simple API call
             account_numbers = self.get_account_numbers()
-            
+
             if account_numbers:
                 return {
                     'success': True,
@@ -338,7 +643,7 @@ class SchwabAPIClient:
                     'success': False,
                     'message': 'Connected but no accounts found.'
                 }
-                
+
         except Exception as e:
             return {
                 'success': False,
