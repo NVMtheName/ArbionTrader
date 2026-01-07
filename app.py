@@ -1,11 +1,13 @@
 import os
 import logging
-from flask import Flask
+from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_migrate import Migrate
 from flask_wtf.csrf import CSRFProtect
 from flask_caching import Cache
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -21,6 +23,11 @@ login_manager = LoginManager()
 migrate = Migrate()
 csrf = CSRFProtect()
 cache = Cache()
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=["200 per day", "50 per hour"],  # Global rate limits
+    storage_uri="memory://"  # Will be overridden to use Redis in create_app
+)
 
 def create_app():
     app = Flask(__name__)
@@ -72,6 +79,17 @@ def create_app():
 
     cache.init_app(app)
     logging.info(f"✓ Redis cache configured: {redis_url}")
+
+    # Rate Limiting Configuration (uses same Redis)
+    # Use DB 2 for rate limiting (separate from cache and Celery)
+    rate_limit_redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/2').replace('/1', '/2').replace('/0', '/2')
+    limiter.init_app(app)
+    limiter.storage_uri = rate_limit_redis_url
+
+    # Exempt health checks from rate limiting
+    limiter.exempt(lambda: request.blueprint == 'health' if hasattr(request, 'blueprint') else False)
+
+    logging.info(f"✓ Rate limiting configured: {rate_limit_redis_url}")
 
     # Login manager configuration
     login_manager.login_view = 'auth.login'
