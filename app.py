@@ -30,8 +30,11 @@ def create_app():
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "pool_recycle": 300,
+        "pool_recycle": 1800,  # Increased from 300 to 1800 (30 minutes)
         "pool_pre_ping": True,
+        "pool_size": 10,  # Default connection pool size
+        "max_overflow": 20,  # Allow up to 20 connections beyond pool_size
+        "pool_timeout": 30,  # Timeout for getting connection from pool
     }
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     

@@ -11,9 +11,28 @@ from urllib.parse import urlencode
 
 logger = logging.getLogger(__name__)
 
+# Shared HTTP session for connection pooling
+_http_session = None
+
+def get_http_session():
+    """Get or create shared HTTP session with connection pooling"""
+    global _http_session
+    if _http_session is None:
+        _http_session = requests.Session()
+        # Configure connection pooling
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=10,
+            pool_maxsize=20,
+            max_retries=3,
+            pool_block=False
+        )
+        _http_session.mount('http://', adapter)
+        _http_session.mount('https://', adapter)
+    return _http_session
+
 class SchwabOAuth:
     """Schwab OAuth2 integration for secure authentication - Multi-user compatible"""
-    
+
     def __init__(self, user_id=None):
         self.user_id = user_id
         self.client_id = None
@@ -21,7 +40,8 @@ class SchwabOAuth:
         self.redirect_uri = None
         self.auth_url = 'https://api.schwabapi.com/v1/oauth/authorize'
         self.token_url = 'https://api.schwabapi.com/v1/oauth/token'
-        
+        self.session = get_http_session()  # Use shared session for connection pooling
+
         # Load client credentials from database if user_id provided
         if user_id:
             self._load_client_credentials(user_id)
@@ -190,7 +210,7 @@ class SchwabOAuth:
                 'code_verifier': code_verifier
             }
             
-            response = requests.post(self.token_url, headers=headers, data=data, timeout=30)
+            response = self.session.post(self.token_url, headers=headers, data=data, timeout=30)
             response.raise_for_status()
             
             token_data = response.json()
@@ -252,7 +272,7 @@ class SchwabOAuth:
                 'refresh_token': refresh_token
             }
             
-            response = requests.post(self.token_url, headers=headers, data=data)
+            response = self.session.post(self.token_url, headers=headers, data=data, timeout=30)
             response.raise_for_status()
             
             token_data = response.json()
@@ -362,9 +382,10 @@ class SchwabOAuth:
             }
             
             # Test with accounts endpoint
-            response = requests.get(
+            response = self.session.get(
                 'https://api.schwabapi.com/trader/v1/accounts',
-                headers=headers
+                headers=headers,
+                timeout=30
             )
             
             if response.status_code == 200:
