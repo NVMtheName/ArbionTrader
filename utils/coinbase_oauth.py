@@ -90,40 +90,49 @@ class CoinbaseOAuth:
             return False
     
     def get_authorization_url(self):
-        """Generate authorization URL with enhanced security"""
+        """Generate authorization URL with enhanced security and PKCE"""
         try:
             if not self.client_id:
                 raise ValueError("Coinbase OAuth client credentials not configured for this user. Please configure your OAuth2 client credentials first.")
-            
+
             # Enhanced security checks
             from utils.oauth_security import oauth_security
-            
+
             # Validate redirect URI security
             is_valid, message = oauth_security.validate_redirect_uri(self.redirect_uri)
             if not is_valid:
                 raise ValueError(f"Invalid redirect URI: {message}")
-            
+
+            # Generate PKCE parameters with enhanced security
+            from utils.pkce_utils import generate_pkce_pair
+            code_verifier, code_challenge = generate_pkce_pair()
+
             # Generate cryptographically secure state parameter
             state = oauth_security.generate_secure_state(self.user_id)
+
+            # Store in session with security enhancements
+            session['coinbase_code_verifier'] = code_verifier
             session['coinbase_oauth_state'] = state
             session['coinbase_oauth_timestamp'] = int(time.time())
-            
-            # Build authorization URL with required scopes and security parameters
+
+            # Build authorization URL with required scopes and security parameters including PKCE
             auth_params = {
                 'response_type': 'code',
                 'client_id': self.client_id,
                 'redirect_uri': self.redirect_uri,
                 'state': state,
-                'scope': 'wallet:user:read wallet:accounts:read wallet:addresses:read wallet:transactions:read'
+                'scope': 'wallet:user:read wallet:accounts:read wallet:addresses:read wallet:transactions:read',
+                'code_challenge': code_challenge,
+                'code_challenge_method': 'S256'
             }
-            
+
             auth_url = f"{self.auth_url}?{urlencode(auth_params)}"
-            
-            logger.info(f"Generated secure Coinbase authorization URL for user {self.user_id}")
+
+            logger.info(f"Generated secure Coinbase authorization URL with PKCE for user {self.user_id}")
             logger.info(f"Using redirect URI: {self.redirect_uri}")
-            
+
             return auth_url
-        
+
         except Exception as e:
             logger.error(f"Error generating Coinbase authorization URL: {str(e)}")
             raise
@@ -160,14 +169,22 @@ class CoinbaseOAuth:
                 logger.error("OAuth session expired - potential replay attack")
                 from utils.oauth_errors import InvalidStateError
                 raise InvalidStateError("OAuth session expired")
-            
-            # Prepare token request
+
+            # Get code verifier from session (required for PKCE)
+            code_verifier = session.get('coinbase_code_verifier')
+            if not code_verifier:
+                logger.error("Code verifier not found in session - PKCE validation failed")
+                from utils.oauth_errors import InvalidStateError
+                raise InvalidStateError("PKCE validation failed. Please try authenticating again.")
+
+            # Prepare token request with PKCE code_verifier
             token_data = {
                 'grant_type': 'authorization_code',
                 'code': auth_code,
                 'client_id': self.client_id,
                 'client_secret': self.client_secret,
-                'redirect_uri': self.redirect_uri
+                'redirect_uri': self.redirect_uri,
+                'code_verifier': code_verifier
             }
             
             # Log the exact redirect URI being used for debugging
@@ -220,9 +237,13 @@ class CoinbaseOAuth:
                     'scope': token_info.get('scope', 'wallet:accounts:read,wallet:transactions:read')
                 }
                 
-                # Enhanced session cleanup with security manager
+                # Enhanced session cleanup with security manager (including PKCE code_verifier)
                 from utils.oauth_security import oauth_security
-                oauth_security.secure_session_cleanup(['coinbase_oauth_state', 'coinbase_oauth_timestamp'])
+                oauth_security.secure_session_cleanup([
+                    'coinbase_code_verifier',
+                    'coinbase_oauth_state',
+                    'coinbase_oauth_timestamp'
+                ])
                 oauth_security.clear_successful_attempt(self.user_id, "token_exchange")
                 
                 logger.info("Successfully exchanged Coinbase OAuth code for tokens")

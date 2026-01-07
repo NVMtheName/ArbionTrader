@@ -2,12 +2,13 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from models import User
-from app import db
+from app import db, limiter
 import logging
 
 auth_bp = Blueprint('auth', __name__)
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
+@limiter.limit("5 per hour")  # Strict limit to prevent spam account creation
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('main.dashboard'))
@@ -52,6 +53,7 @@ def register():
     return render_template('register.html')
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")  # Prevent brute force login attacks
 def login():
     if request.method == 'POST':
         email = request.form.get('email')
