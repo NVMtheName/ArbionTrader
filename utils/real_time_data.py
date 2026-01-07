@@ -56,8 +56,10 @@ class RealTimeDataFetcher:
                                             total_balance += amount
                                         else:
                                             price = self._get_crypto_price(currency)
-                                            if price:
+                                            if price and price > 0:
                                                 total_balance += amount * price
+                                            else:
+                                                logger.warning(f"Could not get price for {currency}, skipping balance calculation")
                                                 
                             except Exception as network_error:
                                 # Skip this network if balance fetch fails
@@ -116,8 +118,10 @@ class RealTimeDataFetcher:
                             else:
                                 # Get current price for conversion
                                 price = self._get_crypto_price(currency)
-                                if price:
+                                if price and price > 0:
                                     total_balance += amount * price
+                                else:
+                                    logger.warning(f"Could not get price for {currency}, skipping balance calculation")
                     
                     return {
                         'success': True,

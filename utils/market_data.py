@@ -6,18 +6,56 @@ from typing import Dict, List, Optional
 import yfinance as yf
 
 class MarketDataProvider:
-    """Unified market data provider for real-time and historical data"""
-    
-    def __init__(self):
+    """Unified market data provider for real-time and historical data with caching"""
+
+    def __init__(self, cache_ttl=60):
+        """
+        Initialize provider with caching
+
+        Args:
+            cache_ttl: Cache time-to-live in seconds (default: 60)
+        """
         self.logger = logging.getLogger(__name__)
+        self.cache_ttl = cache_ttl
+        self._cache = {}  # {key: (data, timestamp)}
+
+    def _get_cached(self, cache_key):
+        """Get data from cache if not expired"""
+        if cache_key in self._cache:
+            data, timestamp = self._cache[cache_key]
+            age = (datetime.utcnow() - timestamp).total_seconds()
+            if age < self.cache_ttl:
+                self.logger.debug(f"Cache hit for {cache_key} (age: {age:.1f}s)")
+                return data
+            else:
+                # Remove expired cache entry
+                del self._cache[cache_key]
+        return None
+
+    def _set_cache(self, cache_key, data):
+        """Store data in cache with timestamp"""
+        self._cache[cache_key] = (data, datetime.utcnow())
+        # Limit cache size to prevent memory issues
+        if len(self._cache) > 1000:
+            # Remove oldest entries
+            sorted_keys = sorted(self._cache.keys(), key=lambda k: self._cache[k][1])
+            for key in sorted_keys[:100]:
+                del self._cache[key]
         
     def get_stock_quote(self, symbol: str) -> Optional[Dict]:
-        """Get real-time stock quote using yfinance"""
+        """Get real-time stock quote using yfinance with caching"""
+        cache_key = f"quote_{symbol}"
+
+        # Check cache first
+        cached_data = self._get_cached(cache_key)
+        if cached_data:
+            return cached_data
+
         try:
             ticker = yf.Ticker(symbol)
             info = ticker.info
-            
-            return {
+
+            result = {
                 'symbol': symbol,
                 'price': info.get('regularMarketPrice', 0),
                 'change': info.get('regularMarketChange', 0),
@@ -30,6 +68,11 @@ class MarketDataProvider:
                 'fifty_two_week_low': info.get('fiftyTwoWeekLow', 0),
                 'timestamp': datetime.utcnow().isoformat()
             }
+
+            # Cache the result
+            self._set_cache(cache_key, result)
+            return result
+
         except Exception as e:
             self.logger.error(f"Error fetching stock quote for {symbol}: {str(e)}")
             return None
@@ -121,7 +164,14 @@ class MarketDataProvider:
             return None
     
     def get_crypto_price(self, symbol: str) -> Optional[Dict]:
-        """Get cryptocurrency price from CoinGecko API"""
+        """Get cryptocurrency price from CoinGecko API with caching"""
+        cache_key = f"crypto_{symbol.upper()}"
+
+        # Check cache first
+        cached_data = self._get_cached(cache_key)
+        if cached_data:
+            return cached_data
+
         try:
             # Convert symbol to CoinGecko format
             crypto_map = {
@@ -134,9 +184,9 @@ class MarketDataProvider:
                 'LINK': 'chainlink',
                 'XRP': 'ripple'
             }
-            
+
             crypto_id = crypto_map.get(symbol.upper(), symbol.lower())
-            
+
             url = f"https://api.coingecko.com/api/v3/simple/price"
             params = {
                 'ids': crypto_id,
@@ -145,15 +195,15 @@ class MarketDataProvider:
                 'include_24hr_vol': 'true',
                 'include_market_cap': 'true'
             }
-            
+
             response = requests.get(url, params=params, timeout=10)
             response.raise_for_status()
-            
+
             data = response.json()
-            
+
             if crypto_id in data:
                 crypto_data = data[crypto_id]
-                return {
+                result = {
                     'symbol': symbol,
                     'price': crypto_data['usd'],
                     'change_24h': crypto_data.get('usd_24h_change', 0),
@@ -161,9 +211,13 @@ class MarketDataProvider:
                     'market_cap': crypto_data.get('usd_market_cap', 0),
                     'timestamp': datetime.utcnow().isoformat()
                 }
-            
+
+                # Cache the result
+                self._set_cache(cache_key, result)
+                return result
+
             return None
-        
+
         except Exception as e:
             self.logger.error(f"Error fetching crypto price for {symbol}: {str(e)}")
             return None

@@ -83,8 +83,6 @@ def get_account_balance():
     
     try:
         from app import db
-        # Ensure session is clean before starting
-        db.session.rollback()
         # Initialize real-time data fetcher
         fetcher = RealTimeDataFetcher(current_user.id)
         
@@ -268,11 +266,11 @@ def get_account_balance():
         
         # Update database with test results
         try:
-            from app import db
             db.session.commit()
         except Exception as e:
             logging.error(f"Error updating credential test status: {str(e)}")
             db.session.rollback()
+            # Continue anyway - balance data is still valid
         
         logging.info(f"Real-time balance fetch complete. Total: ${balance_data['total']:.2f}")
         return balance_data

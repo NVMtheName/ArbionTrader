@@ -25,22 +25,51 @@ class AutoTradingEngine:
         self.collar_strategy = CollarStrategy()
         self.ai_helper = AIStrategyHelper()
         self.options_calc = OptionsCalculator()
-        
+
+        # Batch logging for performance
+        self._log_buffer = []
+        self._log_buffer_max_size = 10
+
     def log_system_event(self, level, message, module='auto_trading', user_id=None):
-        """Log system events to database"""
+        """Log system events to database with batching for performance"""
+        try:
+            # Add to buffer
+            self._log_buffer.append({
+                'level': level,
+                'message': message,
+                'module': module,
+                'user_id': user_id
+            })
+
+            # Flush if buffer is full
+            if len(self._log_buffer) >= self._log_buffer_max_size:
+                self._flush_logs()
+
+        except Exception as e:
+            self.logger.error(f"Failed to log system event: {str(e)}")
+
+    def _flush_logs(self):
+        """Flush buffered logs to database"""
+        if not self._log_buffer:
+            return
+
         try:
             from app import app
             with app.app_context():
-                log_entry = SystemLog(
-                    level=level,
-                    message=message,
-                    module=module,
-                    user_id=user_id
-                )
-                db.session.add(log_entry)
+                for log_data in self._log_buffer:
+                    log_entry = SystemLog(
+                        level=log_data['level'],
+                        message=log_data['message'],
+                        module=log_data['module'],
+                        user_id=log_data['user_id']
+                    )
+                    db.session.add(log_entry)
                 db.session.commit()
+                self._log_buffer.clear()
         except Exception as e:
-            self.logger.error(f"Failed to log system event: {str(e)}")
+            self.logger.error(f"Failed to flush logs: {str(e)}")
+            # Clear buffer anyway to prevent memory buildup
+            self._log_buffer.clear()
     
     def run_auto_trading_cycle(self):
         """Main auto-trading cycle"""
@@ -69,12 +98,16 @@ class AutoTradingEngine:
                 # Update last run time
                 settings.last_run = datetime.utcnow()
                 db.session.commit()
-                
+
                 self.log_system_event('info', 'Auto-trading cycle completed')
-        
+
         except Exception as e:
             self.logger.error(f"Error in auto-trading cycle: {str(e)}")
             self.log_system_event('error', f'Auto-trading cycle failed: {str(e)}')
+
+        finally:
+            # Always flush remaining logs at end of cycle
+            self._flush_logs()
     
     def run_wheel_strategy(self, simulation_mode=True):
         """Run the wheel options strategy with multi-user support"""

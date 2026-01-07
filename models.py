@@ -75,37 +75,75 @@ class Trade(db.Model):
     exit_date = db.Column(db.DateTime)  # Exit timestamp
     holding_period_days = db.Column(db.Integer)  # Days held
     trade_notes = db.Column(Text)  # User or system notes
-    
+
+    # Cache for parsed execution details (not persisted to database)
+    _cached_execution_details = None
+    _cached_execution_details_raw = None
+
     def get_execution_details(self):
-        """Parse execution details JSON"""
+        """Parse execution details JSON with memoization"""
+        # Return cached version if execution_details hasn't changed
+        if (self._cached_execution_details is not None and
+            self._cached_execution_details_raw == self.execution_details):
+            return self._cached_execution_details
+
+        # Parse and cache
         if self.execution_details:
             try:
-                return json.loads(self.execution_details)
-            except:
+                self._cached_execution_details = json.loads(self.execution_details)
+                self._cached_execution_details_raw = self.execution_details
+                return self._cached_execution_details
+            except (json.JSONDecodeError, TypeError):
+                self._cached_execution_details = {}
+                self._cached_execution_details_raw = self.execution_details
                 return {}
+
+        self._cached_execution_details = {}
+        self._cached_execution_details_raw = None
         return {}
     
     def set_execution_details(self, details):
-        """Set execution details as JSON"""
+        """Set execution details as JSON and clear cache"""
         self.execution_details = json.dumps(details)
+        # Clear cache since we're setting new data
+        self._cached_execution_details = None
+        self._cached_execution_details_raw = None
     
     def calculate_pnl(self, current_price=None):
         """Calculate P&L for the trade"""
-        if not self.price or not self.quantity:
+        # Guard against None or zero values
+        if not self.price or not self.quantity or self.price == 0 or self.quantity == 0:
             return 0.0
-        
+
+        # Ensure numeric types
+        try:
+            price = float(self.price)
+            quantity = float(self.quantity)
+            fees = float(self.fees or 0)
+            commission = float(self.commission or 0)
+        except (ValueError, TypeError):
+            return 0.0
+
         if self.status == 'executed' and self.exit_price:
             # Realized P&L for closed position
-            if self.side == 'buy':
-                return (self.exit_price - self.price) * self.quantity - (self.fees or 0) - (self.commission or 0)
-            else:  # sell
-                return (self.price - self.exit_price) * self.quantity - (self.fees or 0) - (self.commission or 0)
+            try:
+                exit_price = float(self.exit_price)
+                if self.side == 'buy':
+                    return (exit_price - price) * quantity - fees - commission
+                else:  # sell
+                    return (price - exit_price) * quantity - fees - commission
+            except (ValueError, TypeError):
+                return 0.0
         elif current_price and self.status == 'executed':
             # Unrealized P&L for open position
-            if self.side == 'buy':
-                return (current_price - self.price) * self.quantity - (self.fees or 0) - (self.commission or 0)
-            else:  # sell (short position)
-                return (self.price - current_price) * self.quantity - (self.fees or 0) - (self.commission or 0)
+            try:
+                curr_price = float(current_price)
+                if self.side == 'buy':
+                    return (curr_price - price) * quantity - fees - commission
+                else:  # sell (short position)
+                    return (price - curr_price) * quantity - fees - commission
+            except (ValueError, TypeError):
+                return 0.0
         
         return 0.0
     
