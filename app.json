@@ -1,0 +1,99 @@
+{
+  "name": "ArbionTrader",
+  "description": "Advanced trading platform with automated strategies and risk management",
+  "repository": "https://github.com/NVMtheName/ArbionTrader",
+  "keywords": [
+    "trading",
+    "automation",
+    "finance",
+    "schwab",
+    "coinbase"
+  ],
+  "buildpacks": [
+    {
+      "url": "heroku/python"
+    }
+  ],
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "standard-1x"
+    },
+    "worker": {
+      "quantity": 1,
+      "size": "standard-1x"
+    },
+    "beat": {
+      "quantity": 1,
+      "size": "standard-1x"
+    }
+  },
+  "addons": [
+    {
+      "plan": "heroku-postgresql:mini",
+      "as": "DATABASE"
+    },
+    {
+      "plan": "heroku-redis:mini",
+      "as": "REDIS"
+    }
+  ],
+  "env": {
+    "ENCRYPTION_KEY": {
+      "description": "Fernet encryption key for securing credentials",
+      "generator": "secret",
+      "required": true
+    },
+    "ENCRYPTION_SALT": {
+      "description": "Salt for key derivation (32-character hex string)",
+      "required": true
+    },
+    "SESSION_SECRET": {
+      "description": "Flask session secret key",
+      "generator": "secret",
+      "required": true
+    },
+    "FLASK_ENV": {
+      "description": "Flask environment",
+      "value": "production",
+      "required": false
+    },
+    "SUPERADMIN_EMAIL": {
+      "description": "Super admin email address",
+      "required": true
+    },
+    "SUPERADMIN_PASSWORD": {
+      "description": "Super admin password",
+      "required": true
+    }
+  },
+  "environments": {
+    "test": {
+      "addons": [
+        {
+          "plan": "heroku-postgresql:mini",
+          "as": "DATABASE"
+        },
+        {
+          "plan": "heroku-redis:mini",
+          "as": "REDIS"
+        }
+      ],
+      "env": {
+        "ENCRYPTION_KEY": "0kwb-tEq_V0LDQ3a7MaZoUyhLoSpHlWT4ebwAQxxXhM=",
+        "ENCRYPTION_SALT": "ae20f0439534f3b9e5e238ab55a457e0",
+        "SESSION_SECRET": "test-session-secret-for-ci-only-do-not-use-in-production",
+        "FLASK_ENV": "testing",
+        "SUPERADMIN_EMAIL": "test@example.com",
+        "SUPERADMIN_PASSWORD": "test-password-123"
+      },
+      "scripts": {
+        "test-setup": "pip install pytest pytest-cov",
+        "test": "pytest test_smoke.py -v -m smoke --tb=short"
+      }
+    }
+  },
+  "scripts": {
+    "postdeploy": "python -m flask db upgrade"
+  }
+}
