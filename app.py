@@ -4,6 +4,7 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_migrate import Migrate
+from flask_wtf.csrf import CSRFProtect
 from sqlalchemy.orm import DeclarativeBase
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -17,6 +18,7 @@ class Base(DeclarativeBase):
 db = SQLAlchemy(model_class=Base)
 login_manager = LoginManager()
 migrate = Migrate()
+csrf = CSRFProtect()
 
 def create_app():
     app = Flask(__name__)
@@ -45,7 +47,20 @@ def create_app():
     db.init_app(app)
     login_manager.init_app(app)
     migrate.init_app(app, db)
-    
+    csrf.init_app(app)
+
+    # CSRF Protection Configuration
+    app.config['WTF_CSRF_ENABLED'] = True
+    app.config['WTF_CSRF_TIME_LIMIT'] = None  # Tokens don't expire (secured by session)
+    app.config['WTF_CSRF_SSL_STRICT'] = os.environ.get('FLASK_ENV') == 'production'  # Enforce HTTPS in production
+    app.config['WTF_CSRF_CHECK_DEFAULT'] = True  # Enable CSRF protection by default
+
+    # Exempt OAuth callback endpoints (use state parameter for CSRF protection)
+    csrf.exempt("github_routes.github_callback")
+    csrf.exempt("utils.schwabdev_routes.*")  # Schwab OAuth callbacks
+    csrf.exempt("utils.coinbase_v2_routes.*")  # Coinbase OAuth callbacks
+    csrf.exempt("utils.openai_auth_routes.*")  # OpenAI OAuth callbacks
+
     # Login manager configuration
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Please log in to access this page.'
