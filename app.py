@@ -74,6 +74,7 @@ def create_app():
     # Import and register blueprints
     from routes import main_bp
     from auth import auth_bp
+    from health import health_bp
     from github_routes import github_bp
     from utils.coinbase_v2_routes import coinbase_v2_bp
     from utils.agent_kit_routes import agent_kit_bp
@@ -82,7 +83,11 @@ def create_app():
     from utils.schwabdev_routes import schwabdev_bp
     from utils.ai_trading_bot_routes import ai_trading_bot_bp
     from utils.portfolio_routes import portfolio_bp
-    
+
+    # Register health checks first (no authentication/CSRF required)
+    app.register_blueprint(health_bp)
+    csrf.exempt(health_bp)  # Health checks don't need CSRF protection
+
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(github_bp)
