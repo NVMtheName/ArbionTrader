@@ -29,8 +29,9 @@
                 <p class="text-slate-400 text-sm mb-4">Required for AI trading features and natural language processing</p>
                 
                 <form method="POST" action="{{ url_for('main.api_settings') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="hidden" name="provider" value="openai">
-                    
+
                     <div class="mb-4">
                         <label class="block text-sm font-medium text-slate-300 mb-2">API Key</label>
                         <input 
@@ -68,6 +69,7 @@
                 <div class="space-y-3">
                     <!-- OAuth Flow (Recommended) -->
                     <form method="POST" action="{{ url_for('main.api_settings') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                         <input type="hidden" name="provider" value="schwab">
                         <input type="hidden" name="oauth_flow" value="true">
                         
@@ -81,6 +83,7 @@
                     <div class="border-t border-slate-600 pt-3">
                         <p class="text-slate-500 text-xs mb-3">Or use direct API credentials:</p>
                         <form method="POST" action="{{ url_for('main.api_settings') }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                             <input type="hidden" name="provider" value="schwab">
                             
                             <div class="mb-3">
@@ -127,6 +130,7 @@
                 
                 <!-- OAuth Client Setup -->
                 <form method="POST" action="{{ url_for('main.api_settings') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="hidden" name="provider" value="coinbase">
                     <input type="hidden" name="oauth_setup" value="true">
                     
@@ -169,6 +173,7 @@
                             <div class="mt-4 p-3 bg-slate-700 rounded-lg">
                                 <div class="text-sm text-emerald-400 mb-2">✓ OAuth configured</div>
                                 <form method="POST" action="{{ url_for('main.api_settings') }}" class="inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                                     <input type="hidden" name="provider" value="coinbase">
                                     <input type="hidden" name="oauth_flow" value="true">
                                     <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-3 rounded transition-colors text-sm">
@@ -188,8 +193,9 @@
                     E*TRADE API
                 </h2>
                 <p class="text-slate-400 text-sm mb-4">For stock and options trading</p>
-                
+
                 <form method="POST" action="{{ url_for('main.api_settings') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <input type="hidden" name="provider" value="etrade">
                     
                     <div class="mb-3">
