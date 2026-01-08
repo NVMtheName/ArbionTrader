@@ -7,10 +7,24 @@ app = create_app()
 
 # Initialize Celery
 def make_celery(app):
+    # Get Redis URL - Heroku Redis addon sets REDIS_URL
+    # Support multiple environment variable names for flexibility
+    redis_url = (
+        os.environ.get('CELERY_BROKER_URL') or
+        os.environ.get('REDIS_URL') or
+        'redis://localhost:6379/0'
+    )
+
+    backend_url = (
+        os.environ.get('CELERY_RESULT_BACKEND') or
+        os.environ.get('REDIS_URL') or
+        'redis://localhost:6379/0'
+    )
+
     celery = Celery(
         app.import_name,
-        backend=os.environ.get('REDIS_URL', 'redis://localhost:6379/0'),
-        broker=os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+        backend=backend_url,
+        broker=redis_url
     )
     celery.conf.update(app.config)
     
