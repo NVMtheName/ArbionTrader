@@ -43,6 +43,12 @@ celery.conf.beat_schedule = {
 }
 celery.conf.timezone = 'UTC'
 
+# Celery worker optimization for Heroku dyno memory limits
+celery.conf.worker_prefetch_multiplier = 1  # Reduce memory usage by processing one task at a time
+celery.conf.worker_max_tasks_per_child = 100  # Restart worker after 100 tasks to prevent memory leaks
+celery.conf.task_acks_late = True  # Only acknowledge task after completion
+celery.conf.task_reject_on_worker_lost = True  # Reject task if worker dies
+
 @celery.task
 def run_auto_trading_task():
     """Celery task for auto-trading"""
@@ -88,7 +94,14 @@ def update_api_status():
 
         for cred in credentials:
             try:
-                decrypted_creds = decrypt_credentials(cred.encrypted_credentials)
+                # Try to decrypt credentials - skip if invalid
+                try:
+                    decrypted_creds = decrypt_credentials(cred.encrypted_credentials)
+                except Exception as decrypt_err:
+                    print(f"Skipping credential {cred.id} - decryption failed: {decrypt_err}")
+                    cred.test_status = 'failed'
+                    cred.last_tested = datetime.utcnow()
+                    continue
 
                 if cred.provider == 'coinbase':
                     connector = CoinbaseConnector(
