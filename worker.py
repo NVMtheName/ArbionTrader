@@ -21,6 +21,13 @@ def make_celery(app):
         'redis://localhost:6379/0'
     )
 
+    # Fix for Heroku Redis SSL (rediss://) - Celery requires ssl_cert_reqs parameter
+    # Heroku Redis uses self-signed certs, so we set CERT_NONE
+    if redis_url.startswith('rediss://'):
+        redis_url = redis_url + ('&' if '?' in redis_url else '?') + 'ssl_cert_reqs=CERT_NONE'
+    if backend_url.startswith('rediss://'):
+        backend_url = backend_url + ('&' if '?' in backend_url else '?') + 'ssl_cert_reqs=CERT_NONE'
+
     celery = Celery(
         app.import_name,
         backend=backend_url,
