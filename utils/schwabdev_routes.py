@@ -295,6 +295,54 @@ def get_schwab_watchlists():
             'error': str(e)
         }), 500
 
+@schwabdev_bp.route('/api/schwabdev/test-connection', methods=['POST'])
+@login_required
+def test_schwab_connection():
+    """Run full connection diagnostics against the Schwab API"""
+    try:
+        manager = create_schwabdev_manager(str(current_user.id))
+        test_result = manager.test_connection()
+
+        return jsonify({
+            'success': True,
+            'test_results': test_result
+        })
+
+    except Exception as e:
+        logger.error(f"Error testing Schwab connection: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@schwabdev_bp.route('/api/schwabdev/price-history/<symbol>', methods=['GET'])
+@login_required
+def get_schwab_price_history(symbol):
+    """Get historical price data for a symbol (useful for ML training)"""
+    try:
+        period_type = request.args.get('period_type', 'month')
+        period = int(request.args.get('period', 3))
+        frequency_type = request.args.get('frequency_type', 'daily')
+        frequency = int(request.args.get('frequency', 1))
+
+        manager = create_schwabdev_manager(str(current_user.id))
+        history_result = manager.get_price_history(
+            symbol=symbol.upper(),
+            period_type=period_type,
+            period=period,
+            frequency_type=frequency_type,
+            frequency=frequency
+        )
+
+        return jsonify(history_result)
+
+    except Exception as e:
+        logger.error(f"Error getting price history for {symbol}: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @schwabdev_bp.route('/api/schwabdev/demo', methods=['POST'])
 @login_required
 def demo_schwabdev_integration():
@@ -427,7 +475,9 @@ def get_schwabdev_setup_guide():
                 'GET /api/schwabdev/orders - Get order history',
                 'POST /api/schwabdev/orders - Place order',
                 'DELETE /api/schwabdev/orders/<id> - Cancel order',
-                'GET /api/schwabdev/watchlists - Get watchlists'
+                'GET /api/schwabdev/watchlists - Get watchlists',
+                'POST /api/schwabdev/test-connection - Run connection diagnostics',
+                'GET /api/schwabdev/price-history/<symbol> - Get historical price data'
             ],
             'troubleshooting': {
                 'library_not_available': {
