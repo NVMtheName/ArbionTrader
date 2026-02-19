@@ -650,6 +650,51 @@ def api_settings():
                     flash(error_msg, 'error')
                     logging.error(f"OpenAI credential save error for user {current_user.id}: {e}")
         
+        elif provider == 'claude':
+            api_key = request.form.get('claude_api_key')
+            if not api_key:
+                flash('Claude API Key is required', 'error')
+                logging.error("Claude API key not provided in form")
+            else:
+                try:
+                    api_key = api_key.strip()
+                    if not api_key.startswith('sk-ant-'):
+                        flash('Invalid Claude API key format. Keys should start with sk-ant-', 'error')
+                    else:
+                        # Save Claude credentials
+                        credentials_data = {'api_key': api_key}
+                        encrypted_creds = encrypt_credentials(credentials_data)
+
+                        # Check if credential exists
+                        existing_cred = APICredential.query.filter_by(
+                            user_id=current_user.id,
+                            provider='claude'
+                        ).first()
+
+                        if existing_cred:
+                            existing_cred.encrypted_credentials = encrypted_creds
+                            existing_cred.updated_at = datetime.utcnow()
+                            existing_cred.is_active = True
+                            logging.info(f"Updated existing Claude credentials for user {current_user.id}")
+                        else:
+                            new_cred = APICredential()
+                            new_cred.user_id = current_user.id
+                            new_cred.provider = 'claude'
+                            new_cred.encrypted_credentials = encrypted_creds
+                            new_cred.is_active = True
+                            db.session.add(new_cred)
+                            logging.info(f"Created new Claude credentials for user {current_user.id}")
+
+                        db.session.commit()
+                        flash('Claude API credentials saved successfully!', 'success')
+                        logging.info(f"Claude credentials committed to database for user {current_user.id}")
+
+                except Exception as e:
+                    db.session.rollback()
+                    error_msg = f"Error saving Claude credentials: {str(e)}"
+                    flash(error_msg, 'error')
+                    logging.error(f"Claude credential save error for user {current_user.id}: {e}")
+
         elif provider == 'schwab':
             # Handle Schwab OAuth or direct credentials
             oauth_flow = request.form.get('oauth_flow')
@@ -866,6 +911,23 @@ def test_api_connection():
             trader = OpenAITrader(api_key=credentials['api_key'])
             result = trader.test_connection()
         
+        elif provider == 'claude':
+            # Test Claude/Anthropic API connection
+            from anthropic import Anthropic as AnthropicClient
+            claude_client = AnthropicClient(api_key=credentials['api_key'])
+            try:
+                test_response = claude_client.messages.create(
+                    model="claude-haiku-4-20250414",
+                    max_tokens=16,
+                    messages=[{"role": "user", "content": "Test. Reply OK."}]
+                )
+                if test_response and test_response.content:
+                    result = {'success': True, 'message': 'Claude API connection successful'}
+                else:
+                    result = {'success': False, 'message': 'Claude API returned empty response'}
+            except Exception as claude_err:
+                result = {'success': False, 'message': f'Claude API error: {str(claude_err)}'}
+
         elif provider == 'etrade':
             # Test E-trade OAuth 1.0a connection
             from utils.etrade_api import EtradeAPIClient

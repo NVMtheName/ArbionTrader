@@ -58,6 +58,44 @@
                 {% endif %}
             </div>
             
+            <!-- Claude API Configuration -->
+            <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
+                <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
+                    <i data-feather="cpu" class="w-5 h-5 mr-2 text-amber-400"></i>
+                    Claude API
+                </h2>
+                <p class="text-slate-400 text-sm mb-4">Anthropic Claude for advanced AI trading analysis and reasoning</p>
+
+                <form method="POST" action="{{ url_for('main.api_settings') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                    <input type="hidden" name="provider" value="claude">
+
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-slate-300 mb-2">API Key</label>
+                        <input
+                            type="password"
+                            name="claude_api_key"
+                            placeholder="sk-ant-..."
+                            class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                            required>
+                    </div>
+
+                    <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white py-2 px-4 rounded-lg transition-colors">
+                        Save Claude Credentials
+                    </button>
+                </form>
+
+                {% if credentials %}
+                    {% for cred in credentials %}
+                        {% if cred.provider == 'claude' %}
+                            <div class="mt-3 text-sm text-emerald-400">
+                                &#10003; Claude credentials configured
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                {% endif %}
+            </div>
+
             <!-- Schwab API Configuration -->
             <div class="bg-slate-800 rounded-lg p-6 border border-slate-700">
                 <h2 class="text-lg font-semibold text-white mb-4 flex items-center">
@@ -237,10 +275,11 @@
         <div class="mt-8 bg-slate-800 rounded-lg p-6 border border-slate-700">
             <h3 class="text-lg font-semibold text-white mb-4">Connection Status</h3>
             
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
                 {% set providers = [
                     ('openai', 'OpenAI', 'zap', 'blue'),
-                    ('schwab', 'Schwab', 'trending-up', 'emerald'), 
+                    ('claude', 'Claude', 'cpu', 'amber'),
+                    ('schwab', 'Schwab', 'trending-up', 'emerald'),
                     ('coinbase', 'Coinbase', 'dollar-sign', 'orange'),
                     ('etrade', 'E*TRADE', 'bar-chart', 'purple')
                 ] %}
