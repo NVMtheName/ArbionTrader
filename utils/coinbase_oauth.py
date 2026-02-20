@@ -271,54 +271,133 @@ class CoinbaseOAuth:
         try:
             if not self.client_id or not self.client_secret:
                 raise ValueError("Coinbase OAuth2 credentials not configured")
-            
+
             token_data = {
                 'grant_type': 'refresh_token',
                 'refresh_token': refresh_token,
                 'client_id': self.client_id,
                 'client_secret': self.client_secret
             }
-            
+
             headers = {
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
-            
+
             response = requests.post(
                 self.token_url,
                 headers=headers,
                 data=token_data,
                 timeout=30
             )
-            
+
             if response.status_code == 200:
                 token_info = response.json()
-                
+
                 # Calculate expiry time
                 expires_in = token_info.get('expires_in', 7200)
                 expiry_time = datetime.utcnow() + timedelta(seconds=expires_in)
-                
+
                 credentials = {
                     'access_token': token_info['access_token'],
                     'refresh_token': token_info.get('refresh_token', refresh_token),
-                    'expires_at': expiry_time.isoformat(),  # Standardized to match Schwab
+                    'expires_at': expiry_time.isoformat(),
                     'scope': token_info.get('scope', 'wallet:accounts:read,wallet:transactions:read')
                 }
-                
+
                 logger.info("Successfully refreshed Coinbase OAuth token")
                 return {
                     'success': True,
                     'credentials': credentials
                 }
-            else:
-                error_msg = f"Token refresh failed with status {response.status_code}"
-                logger.error(error_msg)
+
+            # Parse error response body for details
+            error_body = None
+            try:
+                error_body = response.json()
+            except Exception:
+                error_body = {'raw': response.text[:500] if response.text else 'No response body'}
+
+            error_detail = ''
+            if isinstance(error_body, dict):
+                # Coinbase may return errors in different formats
+                error_detail = (
+                    error_body.get('error_description')
+                    or error_body.get('error', {}).get('message', '')
+                    if isinstance(error_body.get('error'), dict)
+                    else error_body.get('error', '')
+                )
+
+            if response.status_code == 400:
+                logger.error(
+                    f"Coinbase token refresh failed (400 Bad Request): {error_detail}. "
+                    f"The refresh token may be expired or invalid. User {self.user_id} must re-authenticate with Coinbase."
+                )
                 return {
                     'success': False,
-                    'message': error_msg
+                    'message': f'Refresh token expired or invalid. Please re-authenticate with Coinbase.',
+                    'reauth_required': True
                 }
-        
+
+            if response.status_code == 401:
+                logger.error(
+                    f"Coinbase token refresh failed (401 Unauthorized): {error_detail}. "
+                    f"Client credentials may be invalid. User {self.user_id} must re-configure Coinbase OAuth."
+                )
+                return {
+                    'success': False,
+                    'message': f'Client authentication failed. Please verify your Coinbase OAuth credentials.',
+                    'reauth_required': True
+                }
+
+            if response.status_code == 403:
+                logger.error(
+                    f"Coinbase token refresh failed (403 Forbidden): {error_detail}. "
+                    f"Access has been revoked or the refresh token is no longer valid. "
+                    f"User {self.user_id} must re-authenticate with Coinbase."
+                )
+                return {
+                    'success': False,
+                    'message': f'Access revoked or refresh token invalid. Please re-authenticate with Coinbase.',
+                    'reauth_required': True
+                }
+
+            if response.status_code >= 500:
+                logger.warning(
+                    f"Coinbase token refresh failed (server error {response.status_code}): {error_detail}. "
+                    f"This may be a temporary issue - will retry."
+                )
+                return {
+                    'success': False,
+                    'message': f'Coinbase server error ({response.status_code}). Will retry automatically.',
+                    'reauth_required': False
+                }
+
+            # Other status codes
+            logger.error(
+                f"Coinbase token refresh failed (HTTP {response.status_code}): {error_detail}"
+            )
+            return {
+                'success': False,
+                'message': f'Token refresh failed with status {response.status_code}: {error_detail}',
+                'reauth_required': response.status_code in (400, 401, 403)
+            }
+
+        except requests.exceptions.Timeout:
+            logger.warning(f"Coinbase token refresh timed out for user {self.user_id} - will retry")
+            return {
+                'success': False,
+                'message': 'Token refresh request timed out. Will retry automatically.',
+                'reauth_required': False
+            }
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Coinbase token refresh network error for user {self.user_id}: {e} - will retry")
+            return {
+                'success': False,
+                'message': f'Network error during token refresh: {str(e)}. Will retry automatically.',
+                'reauth_required': False
+            }
         except Exception as e:
-            logger.error(f"Error refreshing Coinbase OAuth token: {str(e)}")
+            logger.error(f"Unexpected error refreshing Coinbase OAuth token for user {self.user_id}: {str(e)}")
             return {
                 'success': False,
                 'message': f'Token refresh failed: {str(e)}'
