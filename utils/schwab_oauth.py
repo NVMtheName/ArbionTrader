@@ -259,43 +259,128 @@ class SchwabOAuth:
         try:
             if not self.client_id or not self.client_secret:
                 raise ValueError("Schwab OAuth client credentials not configured")
-            
+
             auth_header = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
-            
+
             headers = {
                 'Authorization': f'Basic {auth_header}',
                 'Content-Type': 'application/x-www-form-urlencoded'
             }
-            
+
             data = {
                 'grant_type': 'refresh_token',
                 'refresh_token': refresh_token
             }
-            
+
             response = self.session.post(self.token_url, headers=headers, data=data, timeout=30)
-            response.raise_for_status()
-            
-            token_data = response.json()
-            
-            # Calculate expiration time
-            expires_in = token_data.get('expires_in', 3600)
-            expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
-            
-            credentials = {
-                'access_token': token_data['access_token'],
-                'refresh_token': token_data.get('refresh_token', refresh_token),
-                'expires_at': expires_at.isoformat(),
-                'scope': token_data.get('scope', 'AccountAccess')
-            }
-            
-            logger.info("Successfully refreshed Schwab OAuth token")
+
+            if response.status_code == 200:
+                token_data = response.json()
+
+                # Calculate expiration time
+                expires_in = token_data.get('expires_in', 3600)
+                expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+
+                credentials = {
+                    'access_token': token_data['access_token'],
+                    'refresh_token': token_data.get('refresh_token', refresh_token),
+                    'expires_at': expires_at.isoformat(),
+                    'scope': token_data.get('scope', 'AccountAccess')
+                }
+
+                logger.info("Successfully refreshed Schwab OAuth token")
+                return {
+                    'success': True,
+                    'credentials': credentials
+                }
+
+            # Parse error response body for details
+            error_body = None
+            try:
+                error_body = response.json()
+            except Exception:
+                error_body = {'raw': response.text[:500] if response.text else 'No response body'}
+
+            error_code = error_body.get('error', '') if isinstance(error_body, dict) else ''
+            error_desc = error_body.get('error_description', '') if isinstance(error_body, dict) else ''
+
+            # Handle specific HTTP status codes
+            if response.status_code == 400:
+                # 400 typically means invalid_grant - refresh token expired or revoked
+                logger.error(
+                    f"Schwab token refresh failed (400 Bad Request): {error_code} - {error_desc}. "
+                    f"The refresh token has likely expired. User {self.user_id} must re-authenticate with Schwab."
+                )
+                return {
+                    'success': False,
+                    'message': f'Refresh token expired or invalid ({error_code}). Please re-authenticate with Schwab.',
+                    'reauth_required': True,
+                    'error_code': error_code
+                }
+
+            if response.status_code == 401:
+                logger.error(
+                    f"Schwab token refresh failed (401 Unauthorized): {error_code} - {error_desc}. "
+                    f"Client credentials may be invalid. User {self.user_id} must re-configure Schwab OAuth."
+                )
+                return {
+                    'success': False,
+                    'message': f'Client authentication failed ({error_code}). Please verify your Schwab OAuth credentials.',
+                    'reauth_required': True,
+                    'error_code': error_code
+                }
+
+            if response.status_code == 403:
+                logger.error(
+                    f"Schwab token refresh failed (403 Forbidden): {error_code} - {error_desc}. "
+                    f"Access has been revoked. User {self.user_id} must re-authenticate with Schwab."
+                )
+                return {
+                    'success': False,
+                    'message': f'Access revoked or forbidden ({error_code}). Please re-authenticate with Schwab.',
+                    'reauth_required': True,
+                    'error_code': error_code
+                }
+
+            if response.status_code >= 500:
+                logger.warning(
+                    f"Schwab token refresh failed (server error {response.status_code}): {error_code} - {error_desc}. "
+                    f"This may be a temporary issue - will retry."
+                )
+                return {
+                    'success': False,
+                    'message': f'Schwab server error ({response.status_code}). Will retry automatically.',
+                    'reauth_required': False,
+                    'error_code': error_code
+                }
+
+            # Other status codes
+            logger.error(
+                f"Schwab token refresh failed (HTTP {response.status_code}): {error_code} - {error_desc}"
+            )
             return {
-                'success': True,
-                'credentials': credentials
+                'success': False,
+                'message': f'Token refresh failed with status {response.status_code}: {error_desc or error_code}',
+                'reauth_required': response.status_code in (400, 401, 403),
+                'error_code': error_code
             }
-            
+
+        except requests.exceptions.Timeout:
+            logger.warning(f"Schwab token refresh timed out for user {self.user_id} - will retry")
+            return {
+                'success': False,
+                'message': 'Token refresh request timed out. Will retry automatically.',
+                'reauth_required': False
+            }
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Schwab token refresh network error for user {self.user_id}: {e} - will retry")
+            return {
+                'success': False,
+                'message': f'Network error during token refresh: {str(e)}. Will retry automatically.',
+                'reauth_required': False
+            }
         except Exception as e:
-            logger.error(f"Error refreshing Schwab OAuth token: {e}")
+            logger.error(f"Unexpected error refreshing Schwab OAuth token for user {self.user_id}: {e}")
             return {
                 'success': False,
                 'message': f'Token refresh failed: {str(e)}'

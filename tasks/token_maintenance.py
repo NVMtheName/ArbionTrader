@@ -29,23 +29,44 @@ class TokenMaintenanceTask:
         try:
             logger.info("Starting token maintenance cycle")
             start_time = datetime.utcnow()
-            
+
             # Validate and refresh all tokens
-            TokenManager.validate_all_tokens()
-            
+            result = TokenManager.validate_all_tokens()
+
             # Update last run time
             self.last_run = datetime.utcnow()
-            
+
             # Log maintenance completion
             duration = (datetime.utcnow() - start_time).total_seconds()
             logger.info(f"Token maintenance completed in {duration:.2f} seconds")
-            
-            # Log to system log
-            self._log_maintenance_event(
-                level='info',
-                message=f'Token maintenance completed successfully in {duration:.2f}s'
-            )
-            
+
+            # Build summary message
+            summary = f'Token maintenance completed in {duration:.2f}s'
+            if result:
+                parts = []
+                if result.get('refreshed'):
+                    parts.append(f"{result['refreshed']} refreshed")
+                if result.get('errors'):
+                    parts.append(f"{result['errors']} errors")
+                if result.get('deactivated'):
+                    parts.append(f"{result['deactivated']} deactivated")
+                if parts:
+                    summary += f" ({', '.join(parts)})"
+
+            log_level = 'info'
+
+            # Log re-authentication requirements as warnings
+            if result and result.get('reauth_required'):
+                log_level = 'warning'
+                for reauth in result['reauth_required']:
+                    reauth_msg = (
+                        f"User {reauth['user_id']} must re-authenticate with "
+                        f"{reauth['provider']}: {reauth['reason']}"
+                    )
+                    self._log_maintenance_event(level='warning', message=reauth_msg)
+
+            self._log_maintenance_event(level=log_level, message=summary)
+
         except Exception as e:
             logger.error(f"Token maintenance failed: {str(e)}")
             self._log_maintenance_event(

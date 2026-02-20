@@ -52,16 +52,27 @@ class TokenManager:
             # Check if token needs refresh
             if TokenManager._needs_refresh(credentials):
                 logger.info(f"Token needs refresh for user {user_id}, provider {provider}")
-                
+
                 # Refresh token
                 new_credentials = TokenManager._refresh_token(user_id, provider, credentials)
-                
-                if new_credentials:
+
+                if new_credentials and isinstance(new_credentials, dict) and new_credentials.get('reauth_required'):
+                    # Permanent failure - deactivate credential
+                    credential.is_active = False
+                    credential.test_status = 'failed'
+                    credential.updated_at = datetime.utcnow()
+                    db.session.commit()
+                    logger.warning(
+                        f"Deactivated {provider} credential for user {user_id}: "
+                        f"{new_credentials.get('message')}. User must re-authenticate."
+                    )
+                    return None
+                elif new_credentials and 'access_token' in new_credentials:
                     # Update stored credentials
                     credential.encrypted_credentials = encrypt_credentials(new_credentials)
                     credential.updated_at = datetime.utcnow()
                     db.session.commit()
-                    
+
                     logger.info(f"Token refreshed successfully for user {user_id}, provider {provider}")
                     return new_credentials
                 else:
@@ -137,64 +148,70 @@ class TokenManager:
     def _refresh_schwab_token(user_id: int, credentials: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Refresh Schwab token
-        
+
         Args:
             user_id: User ID
             credentials: Current credentials
-            
+
         Returns:
-            New credentials or None
+            Dict with 'credentials' key on success, or dict with 'reauth_required' key on permanent failure, or None
         """
         try:
             refresh_token = credentials.get('refresh_token')
             if not refresh_token:
                 logger.error("No refresh token available for Schwab")
-                return None
-            
+                return {'reauth_required': True, 'message': 'No refresh token available. Please re-authenticate with Schwab.'}
+
             # Use SchwabOAuth to refresh token
             schwab_oauth = SchwabOAuth(user_id=user_id)
             refresh_result = schwab_oauth.refresh_token(refresh_token)
-            
+
             if refresh_result and refresh_result.get('success'):
                 logger.info(f"Schwab token refreshed successfully for user {user_id}")
                 return refresh_result.get('credentials')
             else:
-                logger.error(f"Failed to refresh Schwab token: {refresh_result.get('message', 'Unknown error')}")
+                error_msg = refresh_result.get('message', 'Unknown error')
+                logger.error(f"Failed to refresh Schwab token: {error_msg}")
+                if refresh_result and refresh_result.get('reauth_required'):
+                    return {'reauth_required': True, 'message': error_msg}
                 return None
-                
+
         except Exception as e:
             logger.error(f"Error refreshing Schwab token: {str(e)}")
             return None
-    
+
     @staticmethod
     def _refresh_coinbase_token(user_id: int, credentials: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Refresh Coinbase token
-        
+
         Args:
             user_id: User ID
             credentials: Current credentials
-            
+
         Returns:
-            New credentials or None
+            Dict with 'credentials' key on success, or dict with 'reauth_required' key on permanent failure, or None
         """
         try:
             refresh_token = credentials.get('refresh_token')
             if not refresh_token:
                 logger.error("No refresh token available for Coinbase")
-                return None
-            
+                return {'reauth_required': True, 'message': 'No refresh token available. Please re-authenticate with Coinbase.'}
+
             # Use CoinbaseOAuth to refresh token
             coinbase_oauth = CoinbaseOAuth(user_id=user_id)
             refresh_result = coinbase_oauth.refresh_token(refresh_token)
-            
+
             if refresh_result and refresh_result.get('success'):
                 logger.info(f"Coinbase token refreshed successfully for user {user_id}")
                 return refresh_result.get('credentials')
             else:
-                logger.error(f"Failed to refresh Coinbase token: {refresh_result.get('message', 'Unknown error')}")
+                error_msg = refresh_result.get('message', 'Unknown error')
+                logger.error(f"Failed to refresh Coinbase token: {error_msg}")
+                if refresh_result and refresh_result.get('reauth_required'):
+                    return {'reauth_required': True, 'message': error_msg}
                 return None
-                
+
         except Exception as e:
             logger.error(f"Error refreshing Coinbase token: {str(e)}")
             return None
@@ -204,54 +221,90 @@ class TokenManager:
         """
         Validate and refresh all tokens for all active users
         This method is called by background tasks
+
+        Returns:
+            dict with counts and list of credentials requiring re-authentication
         """
+        result = {
+            'refreshed': 0,
+            'errors': 0,
+            'deactivated': 0,
+            'reauth_required': []
+        }
+
         try:
             logger.info("Starting token validation for all users")
-            
+
             # Get all active API credentials
             credentials = APICredential.query.filter_by(is_active=True).all()
-            
-            refreshed_count = 0
-            error_count = 0
-            
+
             for credential in credentials:
                 try:
                     provider = credential.provider
                     user_id = credential.user_id
-                    
+
                     # Skip OpenAI as it doesn't use refresh tokens
                     if provider == 'openai':
                         continue
-                    
+
                     # Check if token needs refresh
                     current_creds = decrypt_credentials(credential.encrypted_credentials)
-                    
+
                     if TokenManager._needs_refresh(current_creds):
                         new_creds = TokenManager._refresh_token(user_id, provider, current_creds)
-                        
-                        if new_creds:
+
+                        if new_creds and isinstance(new_creds, dict) and new_creds.get('reauth_required'):
+                            # Permanent failure - deactivate to stop repeated retries
+                            credential.is_active = False
+                            credential.test_status = 'failed'
+                            credential.updated_at = datetime.utcnow()
+                            result['deactivated'] += 1
+                            result['reauth_required'].append({
+                                'user_id': user_id,
+                                'provider': provider,
+                                'reason': new_creds.get('message', 'Re-authentication required')
+                            })
+                            logger.warning(
+                                f"Deactivated {provider} credential for user {user_id}: "
+                                f"{new_creds.get('message')}. User must re-authenticate."
+                            )
+                        elif new_creds and 'access_token' in new_creds:
                             credential.encrypted_credentials = encrypt_credentials(new_creds)
                             credential.updated_at = datetime.utcnow()
                             credential.test_status = 'success'
-                            refreshed_count += 1
+                            result['refreshed'] += 1
                             logger.info(f"Refreshed token for user {user_id}, provider {provider}")
                         else:
+                            # Temporary failure - keep active for retry
                             credential.test_status = 'failed'
-                            error_count += 1
-                            logger.error(f"Failed to refresh token for user {user_id}, provider {provider}")
-                    
+                            result['errors'] += 1
+                            logger.error(f"Failed to refresh token for user {user_id}, provider {provider} (will retry)")
+
                 except Exception as e:
                     logger.error(f"Error processing credential {credential.id}: {str(e)}")
-                    error_count += 1
-            
+                    result['errors'] += 1
+
             # Commit all changes
             db.session.commit()
-            
-            logger.info(f"Token validation complete: {refreshed_count} refreshed, {error_count} errors")
-            
+
+            # Log summary
+            summary_parts = [f"{result['refreshed']} refreshed", f"{result['errors']} errors"]
+            if result['deactivated'] > 0:
+                summary_parts.append(f"{result['deactivated']} deactivated (re-auth required)")
+            logger.info(f"Token validation complete: {', '.join(summary_parts)}")
+
+            # Log each credential that needs re-authentication
+            for reauth in result['reauth_required']:
+                logger.warning(
+                    f"ACTION REQUIRED: User {reauth['user_id']} must re-authenticate with "
+                    f"{reauth['provider']}: {reauth['reason']}"
+                )
+
         except Exception as e:
             logger.error(f"Error during token validation: {str(e)}")
             db.session.rollback()
+
+        return result
     
     @staticmethod
     def get_schwab_api_client(user_id: int):
