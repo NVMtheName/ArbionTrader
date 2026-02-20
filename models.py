@@ -4,6 +4,8 @@ from datetime import datetime
 from sqlalchemy import Text, LargeBinary
 import json
 
+VALID_ROLES = ['standard', 'admin', 'superadmin']
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False)
@@ -12,18 +14,20 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(20), default='standard')  # superadmin, admin, standard
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     is_active = db.Column(db.Boolean, default=True)
-    
+    last_login = db.Column(db.DateTime)
+    password_changed_at = db.Column(db.DateTime)
+
     # Relationships
     api_credentials = db.relationship('APICredential', backref='user', lazy=True, cascade='all, delete-orphan')
     oauth_client_credentials = db.relationship('OAuthClientCredential', backref='user', lazy=True, cascade='all, delete-orphan')
     trades = db.relationship('Trade', backref='user', lazy=True, cascade='all, delete-orphan')
-    
+
     def is_superadmin(self):
         return self.role == 'superadmin'
-    
+
     def is_admin(self):
         return self.role in ['superadmin', 'admin']
-    
+
     def __repr__(self):
         return f'<User {self.username}>'
 
