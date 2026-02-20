@@ -41,9 +41,57 @@ class APICredential(db.Model):
     is_active = db.Column(db.Boolean, default=True)
     last_tested = db.Column(db.DateTime)
     test_status = db.Column(db.String(20))  # success, failed, pending
-    
-    # OAuth tokens are now handled separately in OAuthClientCredential table
-    
+
+    # Token lifecycle state machine
+    # 'api_key' credentials are stored once and never refreshed.
+    # 'oauth' credentials go through: active -> refreshing -> active (happy path)
+    #   or active -> reauth_required (hard failure from provider)
+    credential_type = db.Column(db.String(20), default='oauth')  # oauth, api_key
+    status = db.Column(db.String(30), default='active')  # active, refreshing, reauth_required, error
+    last_error = db.Column(Text)  # Human-readable error from last failure
+    last_error_at = db.Column(db.DateTime)  # When the last error occurred
+    last_refresh_at = db.Column(db.DateTime)  # Last successful token refresh
+    consecutive_failures = db.Column(db.Integer, default=0)  # Retry counter for backoff
+    provider_user_id = db.Column(db.String(256))  # Provider's user ID (for correlation)
+    token_type = db.Column(db.String(30))  # bearer, etc.
+
+    # Hard error codes that mean reauth is truly required (no point retrying)
+    HARD_ERROR_CODES = {
+        'invalid_grant', 'refresh_token_authentication_error',
+        'unsupported_token_type', 'access_denied', 'invalid_client',
+    }
+    HARD_STATUS_CODES = {400, 401, 403}
+
+    def mark_refresh_success(self):
+        """Called after a successful token refresh."""
+        self.status = 'active'
+        self.consecutive_failures = 0
+        self.last_error = None
+        self.last_error_at = None
+        self.last_refresh_at = datetime.utcnow()
+        self.test_status = 'success'
+        self.updated_at = datetime.utcnow()
+
+    def mark_refresh_failure(self, error_msg, is_hard_failure=False):
+        """Called after a failed token refresh attempt."""
+        self.last_error = str(error_msg)[:500] if error_msg else None
+        self.last_error_at = datetime.utcnow()
+        self.updated_at = datetime.utcnow()
+        if is_hard_failure:
+            self.status = 'reauth_required'
+            self.test_status = 'failed'
+            # Do NOT set is_active=False — keep the record visible for UI messaging
+        else:
+            self.consecutive_failures = (self.consecutive_failures or 0) + 1
+            self.status = 'error'
+            self.test_status = 'failed'
+
+    def needs_reauth(self):
+        return self.status == 'reauth_required'
+
+    def is_api_key(self):
+        return self.credential_type == 'api_key'
+
     def __repr__(self):
         return f'<APICredential {self.provider} for user {self.user_id}>'
 

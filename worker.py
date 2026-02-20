@@ -32,6 +32,10 @@ celery.conf.beat_schedule = {
         'task': 'worker.monitor_stop_losses',
         'schedule': 60.0,  # Run every 60 seconds (CRITICAL for position protection)
     },
+    'token-maintenance': {
+        'task': 'worker.run_token_maintenance_task',
+        'schedule': 300.0,  # Run every 5 minutes — has its own startup grace period
+    },
     'cleanup-old-logs': {
         'task': 'worker.cleanup_old_logs',
         'schedule': 86400.0,  # Run daily
@@ -48,6 +52,19 @@ celery.conf.worker_prefetch_multiplier = 1  # Reduce memory usage by processing 
 celery.conf.worker_max_tasks_per_child = 100  # Restart worker after 100 tasks to prevent memory leaks
 celery.conf.task_acks_late = True  # Only acknowledge task after completion
 celery.conf.task_reject_on_worker_lost = True  # Reject task if worker dies
+
+@celery.task
+def run_token_maintenance_task():
+    """Celery task for periodic OAuth token refresh.
+    Has a built-in startup grace period — safe to schedule on Heroku boot."""
+    try:
+        from tasks.token_maintenance import run_token_maintenance
+        run_token_maintenance()
+        return {"status": "ok"}
+    except Exception as e:
+        print(f"Token maintenance task failed: {e}")
+        return {"error": str(e)}
+
 
 @celery.task
 def run_auto_trading_task():
@@ -81,12 +98,11 @@ def cleanup_old_logs():
 
 @celery.task
 def update_api_status():
-    """Celery task for updating API connection status"""
+    """Celery task for updating API connection status.
+    Handles both OAuth and API-key credential formats."""
     try:
         from models import APICredential
         from utils.encryption import decrypt_credentials
-        from utils.coinbase_connector import CoinbaseConnector
-        from utils.openai_trader import OpenAITrader
         from datetime import datetime
 
         credentials = APICredential.query.filter_by(is_active=True).all()
@@ -94,7 +110,10 @@ def update_api_status():
 
         for cred in credentials:
             try:
-                # Try to decrypt credentials - skip if invalid
+                # Skip OAuth creds that need reauth (token_maintenance handles those)
+                if hasattr(cred, 'status') and cred.status == 'reauth_required':
+                    continue
+
                 try:
                     decrypted_creds = decrypt_credentials(cred.encrypted_credentials)
                 except Exception as decrypt_err:
@@ -103,24 +122,41 @@ def update_api_status():
                     cred.last_tested = datetime.utcnow()
                     continue
 
+                result = None
+
                 if cred.provider == 'coinbase':
-                    connector = CoinbaseConnector(
-                        decrypted_creds['api_key'],
-                        decrypted_creds['secret'],
-                        decrypted_creds['passphrase']
-                    )
-                    result = connector.test_connection()
+                    # Coinbase may be OAuth (has access_token) or API-key (has api_key)
+                    if decrypted_creds.get('access_token'):
+                        from utils.coinbase_oauth import CoinbaseOAuth
+                        oauth = CoinbaseOAuth(user_id=cred.user_id)
+                        result = oauth.test_connection(decrypted_creds['access_token'])
+                    elif decrypted_creds.get('api_key'):
+                        from utils.coinbase_connector import CoinbaseConnector
+                        connector = CoinbaseConnector(
+                            decrypted_creds['api_key'],
+                            decrypted_creds.get('secret', ''),
+                            decrypted_creds.get('passphrase', '')
+                        )
+                        result = connector.test_connection()
+
+                elif cred.provider == 'schwab':
+                    if decrypted_creds.get('access_token'):
+                        from utils.schwab_oauth import SchwabOAuth
+                        oauth = SchwabOAuth(user_id=cred.user_id)
+                        result = oauth.test_connection(decrypted_creds['access_token'])
 
                 elif cred.provider == 'openai':
+                    from utils.openai_trader import OpenAITrader
                     trader = OpenAITrader(decrypted_creds['api_key'])
                     result = trader.test_connection()
 
                 else:
                     continue
 
-                cred.test_status = 'success' if result['success'] else 'failed'
-                cred.last_tested = datetime.utcnow()
-                updated_count += 1
+                if result:
+                    cred.test_status = 'success' if result.get('success') else 'failed'
+                    cred.last_tested = datetime.utcnow()
+                    updated_count += 1
 
             except Exception as e:
                 cred.test_status = 'failed'
