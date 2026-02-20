@@ -232,10 +232,11 @@ class SchwabOAuth:
                 'access_token': token_data['access_token'],
                 'refresh_token': token_data.get('refresh_token'),
                 'expires_at': expires_at.isoformat(),
-                'scope': token_data.get('scope', 'AccountAccess')
+                'scope': token_data.get('scope', 'AccountAccess'),
+                'token_type': token_data.get('token_type', 'Bearer'),
             }
-            
-            logger.info(f"Successfully exchanged Schwab OAuth code for tokens")
+
+            logger.info("Successfully exchanged Schwab OAuth code for tokens")
             return {
                 'success': True,
                 'credentials': credentials
@@ -255,47 +256,71 @@ class SchwabOAuth:
             }
     
     def refresh_token(self, refresh_token):
-        """Refresh access token using refresh token"""
+        """
+        Refresh access token using refresh token.
+
+        Uses HTTP Basic auth (client_id:client_secret) per Schwab's OAuth spec.
+        Handles token rotation: if the response includes a new refresh_token,
+        it replaces the old one in the returned credentials.
+
+        Returns:
+            dict with keys: success, credentials|message, reauth_required, error_code, http_status
+        """
         try:
             if not self.client_id or not self.client_secret:
                 raise ValueError("Schwab OAuth client credentials not configured")
 
-            auth_header = base64.b64encode(f"{self.client_id}:{self.client_secret}".encode()).decode()
+            # Schwab requires HTTP Basic auth for the token endpoint
+            auth_header = base64.b64encode(
+                f"{self.client_id}:{self.client_secret}".encode()
+            ).decode()
 
             headers = {
                 'Authorization': f'Basic {auth_header}',
-                'Content-Type': 'application/x-www-form-urlencoded'
+                'Content-Type': 'application/x-www-form-urlencoded',
             }
 
             data = {
                 'grant_type': 'refresh_token',
-                'refresh_token': refresh_token
+                'refresh_token': refresh_token,
             }
 
             response = self.session.post(self.token_url, headers=headers, data=data, timeout=30)
 
+            # Log status + error fields only (never log tokens)
+            logger.info(
+                f"Schwab refresh response for user {self.user_id}: "
+                f"status={response.status_code}"
+            )
+
             if response.status_code == 200:
                 token_data = response.json()
 
-                # Calculate expiration time
-                expires_in = token_data.get('expires_in', 3600)
+                expires_in = token_data.get('expires_in', 1800)
                 expires_at = datetime.utcnow() + timedelta(seconds=expires_in)
+
+                # Handle token rotation: use new refresh_token if provided
+                new_refresh_token = token_data.get('refresh_token', refresh_token)
+                if new_refresh_token != refresh_token:
+                    logger.info(f"Schwab issued rotated refresh token for user {self.user_id}")
 
                 credentials = {
                     'access_token': token_data['access_token'],
-                    'refresh_token': token_data.get('refresh_token', refresh_token),
+                    'refresh_token': new_refresh_token,
                     'expires_at': expires_at.isoformat(),
-                    'scope': token_data.get('scope', 'AccountAccess')
+                    'scope': token_data.get('scope', 'AccountAccess'),
+                    'token_type': token_data.get('token_type', 'Bearer'),
+                    'last_refresh_at': datetime.utcnow().isoformat(),
                 }
 
-                logger.info("Successfully refreshed Schwab OAuth token")
+                logger.info(f"Successfully refreshed Schwab token for user {self.user_id}")
                 return {
                     'success': True,
-                    'credentials': credentials
+                    'credentials': credentials,
                 }
 
-            # Parse error response body for details
-            error_body = None
+            # --- Error handling ---
+            error_body = {}
             try:
                 error_body = response.json()
             except Exception:
@@ -304,86 +329,76 @@ class SchwabOAuth:
             error_code = error_body.get('error', '') if isinstance(error_body, dict) else ''
             error_desc = error_body.get('error_description', '') if isinstance(error_body, dict) else ''
 
-            # Handle specific HTTP status codes
-            if response.status_code == 400:
-                # 400 typically means invalid_grant - refresh token expired or revoked
-                logger.error(
-                    f"Schwab token refresh failed (400 Bad Request): {error_code} - {error_desc}. "
-                    f"The refresh token has likely expired. User {self.user_id} must re-authenticate with Schwab."
-                )
-                return {
-                    'success': False,
-                    'message': f'Refresh token expired or invalid ({error_code}). Please re-authenticate with Schwab.',
-                    'reauth_required': True,
-                    'error_code': error_code
-                }
+            # Log error details (but never token values)
+            logger.error(
+                f"Schwab token refresh failed for user {self.user_id}: "
+                f"HTTP {response.status_code}, error={error_code}, description={error_desc}"
+            )
 
-            if response.status_code == 401:
-                logger.error(
-                    f"Schwab token refresh failed (401 Unauthorized): {error_code} - {error_desc}. "
-                    f"Client credentials may be invalid. User {self.user_id} must re-configure Schwab OAuth."
-                )
-                return {
-                    'success': False,
-                    'message': f'Client authentication failed ({error_code}). Please verify your Schwab OAuth credentials.',
-                    'reauth_required': True,
-                    'error_code': error_code
-                }
-
-            if response.status_code == 403:
-                logger.error(
-                    f"Schwab token refresh failed (403 Forbidden): {error_code} - {error_desc}. "
-                    f"Access has been revoked. User {self.user_id} must re-authenticate with Schwab."
-                )
-                return {
-                    'success': False,
-                    'message': f'Access revoked or forbidden ({error_code}). Please re-authenticate with Schwab.',
-                    'reauth_required': True,
-                    'error_code': error_code
-                }
+            # Classify as hard vs. transient failure
+            from models import APICredential
+            is_hard = (
+                response.status_code in APICredential.HARD_STATUS_CODES
+                or error_code in APICredential.HARD_ERROR_CODES
+            )
 
             if response.status_code >= 500:
-                logger.warning(
-                    f"Schwab token refresh failed (server error {response.status_code}): {error_code} - {error_desc}. "
-                    f"This may be a temporary issue - will retry."
-                )
+                # Server-side errors are always transient
                 return {
                     'success': False,
                     'message': f'Schwab server error ({response.status_code}). Will retry automatically.',
                     'reauth_required': False,
-                    'error_code': error_code
+                    'error_code': error_code,
+                    'http_status': response.status_code,
+                    'transient': True,
                 }
 
-            # Other status codes
-            logger.error(
-                f"Schwab token refresh failed (HTTP {response.status_code}): {error_code} - {error_desc}"
-            )
+            if is_hard:
+                return {
+                    'success': False,
+                    'message': (
+                        f'Schwab refresh failed ({error_code or response.status_code}): '
+                        f'{error_desc or "Please reconnect your Schwab account."}'
+                    ),
+                    'reauth_required': True,
+                    'error_code': error_code,
+                    'http_status': response.status_code,
+                    'transient': False,
+                }
+
+            # Unknown non-5xx error — treat as transient on first occurrence
             return {
                 'success': False,
-                'message': f'Token refresh failed with status {response.status_code}: {error_desc or error_code}',
-                'reauth_required': response.status_code in (400, 401, 403),
-                'error_code': error_code
+                'message': f'Token refresh failed (HTTP {response.status_code}): {error_desc or error_code}',
+                'reauth_required': False,
+                'error_code': error_code,
+                'http_status': response.status_code,
+                'transient': True,
             }
 
         except requests.exceptions.Timeout:
-            logger.warning(f"Schwab token refresh timed out for user {self.user_id} - will retry")
+            logger.warning(f"Schwab token refresh timed out for user {self.user_id}")
             return {
                 'success': False,
                 'message': 'Token refresh request timed out. Will retry automatically.',
-                'reauth_required': False
+                'reauth_required': False,
+                'transient': True,
             }
         except requests.exceptions.RequestException as e:
-            logger.warning(f"Schwab token refresh network error for user {self.user_id}: {e} - will retry")
+            logger.warning(f"Schwab token refresh network error for user {self.user_id}: {e}")
             return {
                 'success': False,
-                'message': f'Network error during token refresh: {str(e)}. Will retry automatically.',
-                'reauth_required': False
+                'message': f'Network error during token refresh. Will retry automatically.',
+                'reauth_required': False,
+                'transient': True,
             }
         except Exception as e:
-            logger.error(f"Unexpected error refreshing Schwab OAuth token for user {self.user_id}: {e}")
+            logger.error(f"Unexpected error refreshing Schwab token for user {self.user_id}: {e}")
             return {
                 'success': False,
-                'message': f'Token refresh failed: {str(e)}'
+                'message': f'Token refresh failed: {str(e)}',
+                'reauth_required': False,
+                'transient': False,
             }
     
     def is_token_expired(self, credentials):
