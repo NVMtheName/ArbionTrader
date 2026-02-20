@@ -29,7 +29,7 @@
             background-color: #0d1421;
             color: #e5e7eb;
         }
-        
+
         .input-field {
             background-color: #253241;
             border: 1px solid #374151;
@@ -37,40 +37,52 @@
             border-radius: 6px;
             padding: 0.75rem;
         }
-        
+
         .input-field:focus {
             outline: none;
             border-color: #1652f0;
             box-shadow: 0 0 0 3px rgba(22, 82, 240, 0.1);
         }
-        
+
         .btn-primary {
             background-color: #1652f0;
             color: white;
             border: 1px solid #1652f0;
         }
-        
+
         .btn-primary:hover {
             background-color: #0f3cc9;
         }
-        
+
         .alert {
             padding: 1rem;
             border-radius: 6px;
             margin-bottom: 1rem;
         }
-        
+
         .alert-error {
             background-color: rgba(240, 68, 56, 0.1);
             border: 1px solid rgba(240, 68, 56, 0.3);
             color: #f04438;
         }
-        
+
+        .alert-success {
+            background-color: rgba(5, 217, 161, 0.1);
+            border: 1px solid rgba(5, 217, 161, 0.3);
+            color: #05d9a1;
+        }
+
         .card {
             background-color: #1a2332;
             border: 1px solid #374151;
             border-radius: 8px;
             padding: 2rem;
+        }
+
+        .strength-bar {
+            height: 4px;
+            border-radius: 2px;
+            transition: all 0.3s ease;
         }
     </style>
 </head>
@@ -79,8 +91,8 @@
         <div class="max-w-md w-full space-y-8">
             <div class="text-center">
                 <div class="mx-auto mb-8">
-                    <img src="{{ url_for('static', filename='arbion-logo.png') }}" 
-                         alt="Arbion Logo" 
+                    <img src="{{ url_for('static', filename='arbion-logo.png') }}"
+                         alt="Arbion Logo"
                          class="mx-auto h-32 w-auto">
                 </div>
                 <h2 class="mt-6 text-3xl font-bold text-white">
@@ -90,7 +102,7 @@
                     AI-Powered Trading Platform
                 </p>
             </div>
-            
+
             <div class="card">
                 <!-- Flash Messages -->
                 {% with messages = get_flashed_messages(with_categories=true) %}
@@ -102,8 +114,8 @@
                         {% endfor %}
                     {% endif %}
                 {% endwith %}
-                
-                <form class="space-y-6" method="POST">
+
+                <form class="space-y-6" method="POST" id="registerForm">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
                     <div>
                         <label for="username" class="block text-sm font-medium text-gray-300">
@@ -115,9 +127,13 @@
                                 name="username"
                                 type="text"
                                 required
+                                minlength="3"
+                                maxlength="64"
+                                pattern="[a-zA-Z0-9_.\-]+"
                                 class="input-field w-full"
                                 placeholder="Choose a username"
                             >
+                            <p class="text-xs text-gray-500 mt-1">3-64 characters. Letters, numbers, dots, hyphens, underscores.</p>
                         </div>
                     </div>
 
@@ -136,7 +152,7 @@
                             >
                         </div>
                     </div>
-                    
+
                     <div>
                         <label for="password" class="block text-sm font-medium text-gray-300">
                             Password
@@ -147,9 +163,28 @@
                                 name="password"
                                 type="password"
                                 required
+                                minlength="8"
                                 class="input-field w-full"
                                 placeholder="Create a password"
+                                oninput="checkPasswordStrength(this.value)"
                             >
+                        </div>
+                        <!-- Password Strength Indicator -->
+                        <div class="mt-2">
+                            <div class="flex space-x-1 mb-1">
+                                <div id="str1" class="strength-bar flex-1 bg-dark-border"></div>
+                                <div id="str2" class="strength-bar flex-1 bg-dark-border"></div>
+                                <div id="str3" class="strength-bar flex-1 bg-dark-border"></div>
+                                <div id="str4" class="strength-bar flex-1 bg-dark-border"></div>
+                            </div>
+                            <p id="strengthText" class="text-xs text-gray-500"></p>
+                        </div>
+                        <!-- Password Requirements -->
+                        <div class="mt-2 space-y-1">
+                            <p id="reqLength" class="text-xs text-gray-500">&#9675; At least 8 characters</p>
+                            <p id="reqUpper" class="text-xs text-gray-500">&#9675; One uppercase letter</p>
+                            <p id="reqLower" class="text-xs text-gray-500">&#9675; One lowercase letter</p>
+                            <p id="reqDigit" class="text-xs text-gray-500">&#9675; One digit</p>
                         </div>
                     </div>
 
@@ -163,22 +198,29 @@
                                 name="confirm_password"
                                 type="password"
                                 required
+                                minlength="8"
                                 class="input-field w-full"
                                 placeholder="Confirm your password"
+                                oninput="checkPasswordMatch()"
                             >
                         </div>
+                        <p id="matchText" class="text-xs mt-1 hidden"></p>
                     </div>
-                    
+
                     <div>
-                        <button 
-                            type="submit" 
+                        <button
+                            type="submit"
                             class="btn-primary w-full py-3 px-4 rounded-md text-sm font-medium transition-colors"
                         >
                             Sign Up
                         </button>
                     </div>
+
+                    <p class="text-xs text-gray-500 text-center">
+                        New accounts are assigned standard user permissions.
+                    </p>
                 </form>
-                
+
                 <div class="mt-6 text-center">
                     <p class="text-sm text-gray-400">
                         Secure access with role-based permissions
@@ -189,7 +231,7 @@
                     </p>
                 </div>
             </div>
-            
+
             <div class="text-center">
                 <div class="flex items-center justify-center space-x-4 text-xs text-gray-500">
                     <div class="flex items-center">
@@ -208,20 +250,91 @@
             </div>
         </div>
     </div>
-    
+
     <script>
-        // Initialize Feather icons
         feather.replace();
-        
-        // Auto-hide flash messages after 5 seconds
+
+        function checkPasswordStrength(password) {
+            var score = 0;
+            var hasLength = password.length >= 8;
+            var hasUpper = /[A-Z]/.test(password);
+            var hasLower = /[a-z]/.test(password);
+            var hasDigit = /[0-9]/.test(password);
+            var hasSpecial = /[^A-Za-z0-9]/.test(password);
+
+            if (hasLength) score++;
+            if (hasUpper) score++;
+            if (hasLower) score++;
+            if (hasDigit) score++;
+            if (hasSpecial) score++;
+
+            // Update requirement indicators
+            updateReq('reqLength', hasLength);
+            updateReq('reqUpper', hasUpper);
+            updateReq('reqLower', hasLower);
+            updateReq('reqDigit', hasDigit);
+
+            // Update strength bars
+            var colors = ['', '#f04438', '#fbbf24', '#fbbf24', '#05d9a1', '#05d9a1'];
+            var labels = ['', 'Weak', 'Fair', 'Fair', 'Strong', 'Very strong'];
+            var level = 0;
+            if (password.length > 0) {
+                if (score <= 2) level = 1;
+                else if (score === 3) level = 2;
+                else if (score === 4) level = 3;
+                else level = 4;
+            }
+
+            for (var i = 1; i <= 4; i++) {
+                var bar = document.getElementById('str' + i);
+                bar.style.backgroundColor = i <= level ? colors[level + (score >= 5 ? 1 : 0)] : '#374151';
+            }
+
+            var strengthText = document.getElementById('strengthText');
+            if (password.length === 0) {
+                strengthText.textContent = '';
+            } else {
+                strengthText.textContent = labels[level + (score >= 5 ? 1 : 0)];
+                strengthText.style.color = colors[level + (score >= 5 ? 1 : 0)];
+            }
+        }
+
+        function updateReq(id, met) {
+            var el = document.getElementById(id);
+            if (met) {
+                el.style.color = '#05d9a1';
+                el.innerHTML = el.innerHTML.replace('\u25CB', '\u25CF');
+            } else {
+                el.style.color = '#6b7280';
+                el.innerHTML = el.innerHTML.replace('\u25CF', '\u25CB');
+            }
+        }
+
+        function checkPasswordMatch() {
+            var pw = document.getElementById('password').value;
+            var confirm = document.getElementById('confirm_password').value;
+            var matchText = document.getElementById('matchText');
+            if (confirm.length === 0) {
+                matchText.classList.add('hidden');
+                return;
+            }
+            matchText.classList.remove('hidden');
+            if (pw === confirm) {
+                matchText.textContent = 'Passwords match';
+                matchText.style.color = '#05d9a1';
+            } else {
+                matchText.textContent = 'Passwords do not match';
+                matchText.style.color = '#f04438';
+            }
+        }
+
+        // Auto-hide flash messages
         setTimeout(function() {
-            const alerts = document.querySelectorAll('.alert');
+            var alerts = document.querySelectorAll('.alert');
             alerts.forEach(function(alert) {
                 alert.style.transition = 'opacity 0.5s';
                 alert.style.opacity = '0';
-                setTimeout(function() {
-                    alert.remove();
-                }, 500);
+                setTimeout(function() { alert.remove(); }, 500);
             });
         }, 5000);
     </script>

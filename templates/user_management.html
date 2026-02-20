@@ -17,7 +17,7 @@
             </button>
         </div>
     </div>
-    
+
     <!-- User Statistics -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div class="card">
@@ -31,7 +31,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="card">
             <div class="flex items-center justify-between">
                 <div>
@@ -43,7 +43,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="card">
             <div class="flex items-center justify-between">
                 <div>
@@ -55,7 +55,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="card">
             <div class="flex items-center justify-between">
                 <div>
@@ -68,23 +68,13 @@
             </div>
         </div>
     </div>
-    
+
     <!-- User List -->
     <div class="card">
         <div class="flex items-center justify-between mb-6">
             <h2 class="text-xl font-semibold text-white">User Accounts</h2>
-            <div class="flex items-center space-x-2">
-                <button class="btn-secondary px-3 py-1 rounded-md text-sm font-medium transition-colors">
-                    <i data-feather="filter" class="w-4 h-4 mr-1"></i>
-                    Filter
-                </button>
-                <button class="btn-secondary px-3 py-1 rounded-md text-sm font-medium transition-colors">
-                    <i data-feather="download" class="w-4 h-4 mr-1"></i>
-                    Export
-                </button>
-            </div>
         </div>
-        
+
         <div class="overflow-x-auto">
             <table class="w-full">
                 <thead>
@@ -123,19 +113,30 @@
                         </td>
                         <td class="py-3 px-4 text-sm text-gray-300">{{ user.created_at.strftime('%m/%d/%Y') }}</td>
                         <td class="py-3 px-4 text-sm text-gray-300">
-                            <!-- This would need to be tracked in a separate model -->
-                            Recently
+                            {% if user.last_login %}
+                                {{ user.last_login.strftime('%m/%d/%Y %H:%M') }}
+                            {% else %}
+                                <span class="text-gray-500">Never</span>
+                            {% endif %}
                         </td>
                         <td class="py-3 px-4 text-right">
                             <div class="flex items-center justify-end space-x-2">
-                                <button class="text-coinbase-blue hover:text-blue-400 transition-colors">
+                                {% if user.id != current_user.id %}
+                                <!-- Change Role -->
+                                <button onclick="showChangeRoleModal({{ user.id }}, '{{ user.username }}', '{{ user.role }}')" class="text-coinbase-blue hover:text-blue-400 transition-colors" title="Change role">
                                     <i data-feather="edit-2" class="w-4 h-4"></i>
                                 </button>
-                                
-                                {% if user.id != current_user.id %}
+
+                                <!-- Reset Password -->
+                                <button onclick="showResetPasswordModal({{ user.id }}, '{{ user.username }}')" class="text-yellow-400 hover:text-yellow-300 transition-colors" title="Reset password">
+                                    <i data-feather="key" class="w-4 h-4"></i>
+                                </button>
+
+                                <!-- Toggle Active Status -->
                                 <form method="POST" action="{{ url_for('main.toggle_user_status') }}" class="inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <input type="hidden" name="user_id" value="{{ user.id }}">
-                                    <button type="submit" class="text-gray-400 hover:text-white transition-colors">
+                                    <button type="submit" class="text-gray-400 hover:text-white transition-colors" title="{% if user.is_active %}Deactivate{% else %}Activate{% endif %} user">
                                         {% if user.is_active %}
                                             <i data-feather="user-x" class="w-4 h-4"></i>
                                         {% else %}
@@ -143,11 +144,14 @@
                                         {% endif %}
                                     </button>
                                 </form>
-                                {% endif %}
-                                
-                                <button class="text-gray-400 hover:text-coinbase-red transition-colors">
+
+                                <!-- Delete User -->
+                                <button onclick="showDeleteUserModal({{ user.id }}, '{{ user.username }}')" class="text-gray-400 hover:text-coinbase-red transition-colors" title="Delete user">
                                     <i data-feather="trash-2" class="w-4 h-4"></i>
                                 </button>
+                                {% else %}
+                                <span class="text-xs text-gray-500">Current user</span>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>
@@ -156,11 +160,11 @@
             </table>
         </div>
     </div>
-    
+
     <!-- Role Information -->
     <div class="card">
         <h3 class="text-lg font-semibold text-white mb-4">Role Permissions</h3>
-        
+
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div class="p-4 bg-dark-card rounded-lg">
                 <div class="flex items-center space-x-2 mb-3">
@@ -168,79 +172,40 @@
                     <h4 class="text-sm font-medium text-white">Superadmin</h4>
                 </div>
                 <ul class="text-xs text-gray-400 space-y-1">
-                    <li>• Full system access</li>
-                    <li>• User management</li>
-                    <li>• Auto-trading controls</li>
-                    <li>• System logs access</li>
-                    <li>• Billing management</li>
+                    <li>&#8226; Full system access</li>
+                    <li>&#8226; User management &amp; role assignment</li>
+                    <li>&#8226; Auto-trading controls</li>
+                    <li>&#8226; System logs access</li>
+                    <li>&#8226; Delete and create users</li>
                 </ul>
             </div>
-            
+
             <div class="p-4 bg-dark-card rounded-lg">
                 <div class="flex items-center space-x-2 mb-3">
                     <i data-feather="shield" class="w-5 h-5 text-coinbase-blue"></i>
                     <h4 class="text-sm font-medium text-white">Admin</h4>
                 </div>
                 <ul class="text-xs text-gray-400 space-y-1">
-                    <li>• Trading platform access</li>
-                    <li>• Strategy management</li>
-                    <li>• API configuration</li>
-                    <li>• Limited user actions</li>
-                    <li>• Trade monitoring</li>
+                    <li>&#8226; Trading platform access</li>
+                    <li>&#8226; Strategy management</li>
+                    <li>&#8226; API configuration</li>
+                    <li>&#8226; Trade monitoring</li>
+                    <li>&#8226; Analytics access</li>
                 </ul>
             </div>
-            
+
             <div class="p-4 bg-dark-card rounded-lg">
                 <div class="flex items-center space-x-2 mb-3">
                     <i data-feather="user" class="w-5 h-5 text-gray-400"></i>
                     <h4 class="text-sm font-medium text-white">Standard</h4>
                 </div>
                 <ul class="text-xs text-gray-400 space-y-1">
-                    <li>• Basic trading access</li>
-                    <li>• Personal strategies</li>
-                    <li>• API management</li>
-                    <li>• Account settings</li>
-                    <li>• Trade history</li>
+                    <li>&#8226; Basic trading access</li>
+                    <li>&#8226; Personal strategies</li>
+                    <li>&#8226; API management</li>
+                    <li>&#8226; Account settings</li>
+                    <li>&#8226; Trade history</li>
                 </ul>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Activity Log -->
-    <div class="card">
-        <h3 class="text-lg font-semibold text-white mb-4">Recent Activity</h3>
-        
-        <div class="space-y-3">
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                    <div class="w-2 h-2 bg-coinbase-green rounded-full"></div>
-                    <span class="text-sm text-gray-300">User john.doe created</span>
-                </div>
-                <span class="text-xs text-gray-400">5m ago</span>
-            </div>
-            
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                    <div class="w-2 h-2 bg-coinbase-blue rounded-full"></div>
-                    <span class="text-sm text-gray-300">User jane.smith role updated to admin</span>
-                </div>
-                <span class="text-xs text-gray-400">12m ago</span>
-            </div>
-            
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                    <div class="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                    <span class="text-sm text-gray-300">User bob.jones deactivated</span>
-                </div>
-                <span class="text-xs text-gray-400">1h ago</span>
-            </div>
-            
-            <div class="flex items-center justify-between">
-                <div class="flex items-center space-x-2">
-                    <div class="w-2 h-2 bg-purple-400 rounded-full"></div>
-                    <span class="text-sm text-gray-300">Bulk user import completed</span>
-                </div>
-                <span class="text-xs text-gray-400">2h ago</span>
             </div>
         </div>
     </div>
@@ -251,57 +216,39 @@
     <div class="bg-dark-surface p-6 rounded-lg max-w-md w-full mx-4">
         <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-white">Create New User</h3>
-            <button onclick="hideCreateUserModal()" class="text-gray-400 hover:text-white">
+            <button onclick="hideModal('createUserModal')" class="text-gray-400 hover:text-white">
                 <i data-feather="x" class="w-5 h-5"></i>
             </button>
         </div>
-        
+
         <form method="POST" action="{{ url_for('main.create_user') }}" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-1">Username</label>
-                <input 
-                    type="text" 
-                    name="username" 
-                    class="input-field w-full" 
-                    placeholder="Enter username"
-                    required
-                >
+                <input type="text" name="username" class="input-field w-full" placeholder="Enter username" required>
             </div>
-            
+
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-1">Email</label>
-                <input 
-                    type="email" 
-                    name="email" 
-                    class="input-field w-full" 
-                    placeholder="Enter email address"
-                    required
-                >
+                <input type="email" name="email" class="input-field w-full" placeholder="Enter email address" required>
             </div>
-            
+
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-1">Password</label>
-                <input 
-                    type="password" 
-                    name="password" 
-                    class="input-field w-full" 
-                    placeholder="Enter password"
-                    required
-                >
+                <input type="password" name="password" class="input-field w-full" placeholder="Min 8 chars, uppercase, lowercase, digit" required minlength="8">
             </div>
-            
+
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-1">Role</label>
                 <select name="role" class="input-field w-full" required>
-                    <option value="">Select a role</option>
-                    <option value="standard">Standard User</option>
+                    <option value="standard" selected>Standard User</option>
                     <option value="admin">Admin</option>
                     <option value="superadmin">Superadmin</option>
                 </select>
             </div>
-            
+
             <div class="flex justify-end space-x-2 pt-4">
-                <button type="button" onclick="hideCreateUserModal()" class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                <button type="button" onclick="hideModal('createUserModal')" class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors">
                     Cancel
                 </button>
                 <button type="submit" class="btn-primary px-4 py-2 rounded-md text-sm font-medium transition-colors">
@@ -311,23 +258,161 @@
         </form>
     </div>
 </div>
+
+<!-- Change Role Modal -->
+<div id="changeRoleModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-dark-surface p-6 rounded-lg max-w-md w-full mx-4">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-white">Change User Role</h3>
+            <button onclick="hideModal('changeRoleModal')" class="text-gray-400 hover:text-white">
+                <i data-feather="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <p class="text-gray-400 text-sm mb-4">Change role for <span id="changeRoleUsername" class="text-white font-medium"></span></p>
+
+        <form method="POST" action="{{ url_for('main.change_user_role') }}" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="user_id" id="changeRoleUserId">
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">New Role</label>
+                <select name="role" id="changeRoleSelect" class="input-field w-full" required>
+                    <option value="standard">Standard User</option>
+                    <option value="admin">Admin</option>
+                    <option value="superadmin">Superadmin</option>
+                </select>
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-4">
+                <button type="button" onclick="hideModal('changeRoleModal')" class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" class="btn-primary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    Update Role
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Reset Password Modal -->
+<div id="resetPasswordModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-dark-surface p-6 rounded-lg max-w-md w-full mx-4">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-white">Reset User Password</h3>
+            <button onclick="hideModal('resetPasswordModal')" class="text-gray-400 hover:text-white">
+                <i data-feather="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <p class="text-gray-400 text-sm mb-4">Reset password for <span id="resetPasswordUsername" class="text-white font-medium"></span></p>
+
+        <form method="POST" action="{{ url_for('main.reset_user_password') }}" class="space-y-4">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="user_id" id="resetPasswordUserId">
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">New Password</label>
+                <input type="password" name="new_password" class="input-field w-full" placeholder="Min 8 characters" required minlength="8">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-1">Confirm Password</label>
+                <input type="password" name="confirm_password" class="input-field w-full" placeholder="Confirm new password" required minlength="8">
+            </div>
+
+            <div class="flex justify-end space-x-2 pt-4">
+                <button type="button" onclick="hideModal('resetPasswordModal')" class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" class="btn-primary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    Reset Password
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Delete User Confirmation Modal -->
+<div id="deleteUserModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-dark-surface p-6 rounded-lg max-w-md w-full mx-4">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-lg font-semibold text-white">Delete User</h3>
+            <button onclick="hideModal('deleteUserModal')" class="text-gray-400 hover:text-white">
+                <i data-feather="x" class="w-5 h-5"></i>
+            </button>
+        </div>
+
+        <div class="p-4 bg-coinbase-red bg-opacity-10 border border-coinbase-red border-opacity-30 rounded-lg mb-4">
+            <p class="text-coinbase-red text-sm">
+                This action cannot be undone. All data associated with <span id="deleteUserUsername" class="font-medium"></span> will be permanently removed, including trades, API credentials, and strategies.
+            </p>
+        </div>
+
+        <form method="POST" action="{{ url_for('main.delete_user') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <input type="hidden" name="user_id" id="deleteUserUserId">
+
+            <div class="flex justify-end space-x-2">
+                <button type="button" onclick="hideModal('deleteUserModal')" class="btn-secondary px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" class="btn-danger px-4 py-2 rounded-md text-sm font-medium transition-colors">
+                    Delete User
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Initialize Feather icons
     feather.replace();
-    
-    function showCreateUserModal() {
-        const modal = document.getElementById('createUserModal');
+
+    function showModal(id) {
+        var modal = document.getElementById(id);
         modal.classList.remove('hidden');
         modal.classList.add('flex');
     }
-    
-    function hideCreateUserModal() {
-        const modal = document.getElementById('createUserModal');
+
+    function hideModal(id) {
+        var modal = document.getElementById(id);
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
+
+    function showCreateUserModal() {
+        showModal('createUserModal');
+    }
+
+    function showChangeRoleModal(userId, username, currentRole) {
+        document.getElementById('changeRoleUserId').value = userId;
+        document.getElementById('changeRoleUsername').textContent = username;
+        document.getElementById('changeRoleSelect').value = currentRole;
+        showModal('changeRoleModal');
+    }
+
+    function showResetPasswordModal(userId, username) {
+        document.getElementById('resetPasswordUserId').value = userId;
+        document.getElementById('resetPasswordUsername').textContent = username;
+        showModal('resetPasswordModal');
+    }
+
+    function showDeleteUserModal(userId, username) {
+        document.getElementById('deleteUserUserId').value = userId;
+        document.getElementById('deleteUserUsername').textContent = username;
+        showModal('deleteUserModal');
+    }
+
+    // Close modals when clicking outside
+    document.querySelectorAll('[id$="Modal"]').forEach(function(modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                hideModal(modal.id);
+            }
+        });
+    });
 </script>
 {% endblock %}

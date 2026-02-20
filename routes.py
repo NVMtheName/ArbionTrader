@@ -6,7 +6,7 @@ import logging
 import json
 import os
 from datetime import datetime, timedelta
-from models import User, Strategy, AutoTradingSettings, APICredential, Trade, SystemLog
+from models import User, Strategy, AutoTradingSettings, APICredential, Trade, SystemLog, VALID_ROLES
 from app import db
 
 main_bp = Blueprint('main', __name__)
@@ -1327,6 +1327,93 @@ def toggle_user_status():
     status = 'activated' if user.is_active else 'deactivated'
     flash(f'User {user.username} {status} successfully.', 'success')
     logging.info(f"User {user.username} {status} by {current_user.email}")
+    return redirect(url_for('main.user_management'))
+
+@main_bp.route('/change-user-role', methods=['POST'])
+@login_required
+@superadmin_required
+def change_user_role():
+    user_id = request.form.get('user_id')
+    new_role = request.form.get('role')
+
+    if not user_id or not new_role:
+        flash('User ID and role are required.', 'error')
+        return redirect(url_for('main.user_management'))
+
+    if new_role not in VALID_ROLES:
+        flash('Invalid role selected.', 'error')
+        return redirect(url_for('main.user_management'))
+
+    user = User.query.get(user_id)
+    if not user:
+        flash('User not found.', 'error')
+        return redirect(url_for('main.user_management'))
+
+    if user.id == current_user.id:
+        flash('You cannot change your own role.', 'error')
+        return redirect(url_for('main.user_management'))
+
+    old_role = user.role
+    user.role = new_role
+    db.session.commit()
+
+    flash(f'User {user.username} role changed from {old_role} to {new_role}.', 'success')
+    logging.info(f"User {user.username} role changed from {old_role} to {new_role} by {current_user.email}")
+    return redirect(url_for('main.user_management'))
+
+@main_bp.route('/delete-user', methods=['POST'])
+@login_required
+@superadmin_required
+def delete_user():
+    user_id = request.form.get('user_id')
+    user = User.query.get(user_id)
+
+    if not user:
+        flash('User not found.', 'error')
+        return redirect(url_for('main.user_management'))
+
+    if user.id == current_user.id:
+        flash('You cannot delete your own account.', 'error')
+        return redirect(url_for('main.user_management'))
+
+    username = user.username
+    db.session.delete(user)
+    db.session.commit()
+
+    flash(f'User {username} deleted successfully.', 'success')
+    logging.info(f"User {username} deleted by {current_user.email}")
+    return redirect(url_for('main.user_management'))
+
+@main_bp.route('/reset-user-password', methods=['POST'])
+@login_required
+@superadmin_required
+def reset_user_password():
+    user_id = request.form.get('user_id')
+    new_password = request.form.get('new_password')
+    confirm_password = request.form.get('confirm_password')
+
+    if not all([user_id, new_password, confirm_password]):
+        flash('All fields are required.', 'error')
+        return redirect(url_for('main.user_management'))
+
+    if new_password != confirm_password:
+        flash('Passwords do not match.', 'error')
+        return redirect(url_for('main.user_management'))
+
+    if len(new_password) < 8:
+        flash('Password must be at least 8 characters long.', 'error')
+        return redirect(url_for('main.user_management'))
+
+    user = User.query.get(user_id)
+    if not user:
+        flash('User not found.', 'error')
+        return redirect(url_for('main.user_management'))
+
+    user.password_hash = generate_password_hash(new_password)
+    db.session.commit()
+
+    flash(f'Password reset for user {user.username}.', 'success')
+    logging.info(f"Password reset for user {user.username} by {current_user.email}")
     return redirect(url_for('main.user_management'))
 
 @main_bp.route('/account')
