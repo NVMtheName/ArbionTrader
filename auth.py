@@ -57,26 +57,32 @@ def register():
             flash(error_msg, 'error')
             return render_template('register.html')
 
-        if User.query.filter_by(email=email).first():
-            flash('Email already registered.', 'error')
-            return render_template('register.html')
+        try:
+            if User.query.filter_by(email=email).first():
+                flash('Email already registered.', 'error')
+                return render_template('register.html')
 
-        if User.query.filter_by(username=username).first():
-            flash('Username already taken.', 'error')
-            return render_template('register.html')
+            if User.query.filter_by(username=username).first():
+                flash('Username already taken.', 'error')
+                return render_template('register.html')
 
-        # New users are always assigned the 'standard' role
-        new_user = User(
-            username=username,
-            email=email,
-            password_hash=generate_password_hash(password),
-            role='standard'
-        )
-        db.session.add(new_user)
-        db.session.commit()
-        flash('Registration successful. Please log in.', 'success')
-        logging.info(f"New user registered: {email} (role: standard)")
-        return redirect(url_for('auth.login'))
+            # New users are always assigned the 'standard' role
+            new_user = User(
+                username=username,
+                email=email,
+                password_hash=generate_password_hash(password),
+                role='standard'
+            )
+            db.session.add(new_user)
+            db.session.commit()
+            flash('Registration successful. Please log in.', 'success')
+            logging.info(f"New user registered: {email} (role: standard)")
+            return redirect(url_for('auth.login'))
+        except Exception as e:
+            logging.error(f"Database error during registration: {e}")
+            db.session.rollback()
+            flash('A server error occurred. Please try again in a moment.', 'error')
+            return render_template('register.html')
 
     return render_template('register.html')
 
@@ -95,13 +101,23 @@ def login():
             flash('Please enter both email and password.', 'error')
             return render_template('login.html')
 
-        user = User.query.filter_by(email=email).first()
+        try:
+            user = User.query.filter_by(email=email).first()
+        except Exception as e:
+            logging.error(f"Database error during login query: {e}")
+            db.session.rollback()
+            flash('A server error occurred. Please try again in a moment.', 'error')
+            return render_template('login.html')
 
         if user and check_password_hash(user.password_hash, password):
             if user.is_active:
                 login_user(user)
-                user.last_login = datetime.utcnow()
-                db.session.commit()
+                try:
+                    user.last_login = datetime.utcnow()
+                    db.session.commit()
+                except Exception as e:
+                    logging.error(f"Failed to update last_login for {email}: {e}")
+                    db.session.rollback()
                 logging.info(f"User {user.email} logged in successfully")
                 next_page = request.args.get('next')
                 try:

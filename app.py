@@ -1,6 +1,6 @@
 import os
 import logging
-from flask import Flask, request
+from flask import Flask, request, render_template
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager
 from flask_migrate import Migrate
@@ -72,19 +72,24 @@ def create_app():
 
     # Redis Cache Configuration
     redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/1')  # Use DB 1 for cache (DB 0 for Celery)
-    app.config['CACHE_TYPE'] = 'redis'
-    app.config['CACHE_REDIS_URL'] = redis_url
-    app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutes default
-    app.config['CACHE_KEY_PREFIX'] = 'arbion_cache_'
-
-    cache.init_app(app)
-    logging.info(f"✓ Redis cache configured: {redis_url}")
+    try:
+        app.config['CACHE_TYPE'] = 'redis'
+        app.config['CACHE_REDIS_URL'] = redis_url
+        app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutes default
+        app.config['CACHE_KEY_PREFIX'] = 'arbion_cache_'
+        cache.init_app(app)
+        logging.info(f"✓ Redis cache configured: {redis_url}")
+    except Exception as e:
+        logging.warning(f"Redis cache unavailable ({e}), falling back to simple cache")
+        app.config['CACHE_TYPE'] = 'SimpleCache'
+        cache.init_app(app)
 
     # Rate Limiting Configuration (uses same Redis)
     # Use DB 2 for rate limiting (separate from cache and Celery)
     rate_limit_redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/2').replace('/1', '/2').replace('/0', '/2')
+    app.config['RATELIMIT_STORAGE_URI'] = rate_limit_redis_url
+    app.config['RATELIMIT_SWALLOW_ERRORS'] = True  # Don't crash if Redis is unavailable
     limiter.init_app(app)
-    limiter.storage_uri = rate_limit_redis_url
 
     # Exempt health checks from rate limiting
     limiter.exempt(lambda: request.blueprint == 'health' if hasattr(request, 'blueprint') else False)
@@ -95,11 +100,15 @@ def create_app():
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Please log in to access this page.'
     login_manager.login_message_category = 'info'
-    
+
     @login_manager.user_loader
     def load_user(user_id):
-        from models import User
-        return User.query.get(int(user_id))
+        try:
+            from models import User
+            return db.session.get(User, int(user_id))
+        except Exception as e:
+            logging.error(f"Error loading user {user_id}: {e}")
+            return None
     
     # Import and register blueprints
     from routes import main_bp
@@ -155,40 +164,52 @@ def create_app():
         # Import models to ensure they're registered
         import models
 
-        db.create_all()
+        try:
+            db.create_all()
+        except Exception as e:
+            logging.error(f"Database table creation failed (tables may already exist): {e}")
 
         # Create default superadmin user (only if configured via environment)
         admin_email = os.environ.get("SUPERADMIN_EMAIL")
         admin_password = os.environ.get("SUPERADMIN_PASSWORD")
 
         if admin_email and admin_password:
-            from models import User
-            from werkzeug.security import generate_password_hash
+            try:
+                from models import User
+                from werkzeug.security import generate_password_hash
 
-            existing_admin = User.query.filter_by(email=admin_email).first()
-            if not existing_admin:
-                admin_user = User(
-                    username="superadmin",
-                    email=admin_email,
-                    password_hash=generate_password_hash(admin_password),
-                    role="superadmin"
-                )
-                db.session.add(admin_user)
-                db.session.commit()
-                logging.info(f"Created default superadmin user: {admin_email}")
+                existing_admin = User.query.filter_by(email=admin_email).first()
+                if not existing_admin:
+                    admin_user = User(
+                        username="superadmin",
+                        email=admin_email,
+                        password_hash=generate_password_hash(admin_password),
+                        role="superadmin"
+                    )
+                    db.session.add(admin_user)
+                    db.session.commit()
+                    logging.info(f"Created default superadmin user: {admin_email}")
+            except Exception as e:
+                logging.error(f"Failed to create superadmin user: {e}")
+                db.session.rollback()
         else:
             logging.info("No SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD set - skipping superadmin creation")
 
+    # Register error handlers
+    @app.errorhandler(500)
+    def internal_error(error):
+        db.session.rollback()
+        logging.error(f"500 Internal Server Error: {error}")
+        return render_template('login.html'), 500
+
     return app
 
-app = create_app()
-
-# Start the background scheduler
-try:
-    from utils.scheduler import start_scheduler
-    start_scheduler()
-except Exception as e:
-    logging.error(f"Failed to start scheduler: {str(e)}")
-
 if __name__ == '__main__':
+    app = create_app()
+    # Start the background scheduler
+    try:
+        from utils.scheduler import start_scheduler
+        start_scheduler()
+    except Exception as e:
+        logging.error(f"Failed to start scheduler: {str(e)}")
     app.run(host='0.0.0.0', port=5000, debug=True)
