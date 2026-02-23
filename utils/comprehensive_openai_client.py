@@ -3,13 +3,17 @@ Comprehensive OpenAI API Integration for Arbion Trading Platform
 Complete implementation of OpenAI's API reference for advanced AI trading capabilities.
 
 Features from OpenAI API Reference:
-- Chat Completions (GPT-4o, GPT-4o-mini, O1-preview/mini)
+- Responses API (current recommended interface)
+- Chat Completions (GPT-4o, GPT-4o-mini, O1/O3 series)
 - Function Calling & Tools
 - Assistants API & Threads
 - Files & Vector Stores
 - Embeddings & Moderation
 - Audio (Speech-to-Text/Text-to-Speech)
 - Streaming Responses
+- Structured Outputs
+
+References: https://github.com/openai/openai-python
 """
 
 import os
@@ -23,7 +27,16 @@ from dataclasses import dataclass, field
 import uuid
 from io import BytesIO
 
+import httpx
 from openai import OpenAI, AsyncOpenAI
+from openai import (
+    APIError,
+    APIConnectionError,
+    RateLimitError,
+    AuthenticationError,
+    BadRequestError,
+    APITimeoutError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -70,38 +83,44 @@ class ComprehensiveOpenAIClient:
     def __init__(self, user_id: str = None, api_key: str = None):
         self.user_id = user_id
         self.api_key = api_key or self._load_api_key(user_id)
-        
+
         if not self.api_key:
             raise ValueError("OpenAI API key is required")
-        
-        # Initialize clients
-        self.client = OpenAI(api_key=self.api_key)
-        self.async_client = AsyncOpenAI(api_key=self.api_key)
-        
-        # Model configuration
+
+        # Initialize clients with proper timeouts and retries
+        client_kwargs = {
+            "api_key": self.api_key,
+            "timeout": httpx.Timeout(120.0, connect=10.0),
+            "max_retries": 3,
+        }
+
+        org_id = os.environ.get("OPENAI_ORG_ID")
+        if org_id:
+            client_kwargs["organization"] = org_id
+
+        self.client = OpenAI(**client_kwargs)
+        self.async_client = AsyncOpenAI(**client_kwargs)
+
+        # Model configuration - updated with latest models
         self.models = {
             "gpt-4o": "gpt-4o",                    # Latest GPT-4 Omni
             "gpt-4o-mini": "gpt-4o-mini",          # Fast & efficient
-            "o1-preview": "o1-preview",            # Reasoning model
-            "o1-mini": "o1-mini",                  # Fast reasoning
+            "o1": "o1",                            # Reasoning model
+            "o3-mini": "o3-mini",                  # Fast reasoning
             "gpt-4-turbo": "gpt-4-turbo",          # Previous generation
-            "gpt-3.5-turbo": "gpt-3.5-turbo",     # Cost-effective
             "dall-e-3": "dall-e-3",               # Image generation
             "whisper-1": "whisper-1",             # Speech-to-text
             "tts-1": "tts-1",                     # Text-to-speech
             "text-embedding-3-large": "text-embedding-3-large"  # Best embeddings
         }
-        
+
         # Trading function definitions
         self.trading_tools = self._define_trading_tools()
-        
+
         # Assistant management
         self.assistants = {}
         self.threads = {}
-        
-        # Token counter
-        self.encoding = tiktoken.encoding_for_model("gpt-4o")
-        
+
         logger.info(f"Comprehensive OpenAI client initialized for user {user_id}")
     
     def _load_api_key(self, user_id: str) -> Optional[str]:
@@ -213,7 +232,52 @@ class ComprehensiveOpenAIClient:
             }
         ]
     
-    # CHAT COMPLETIONS API
+    # RESPONSES API (Current recommended interface)
+    async def create_response(
+        self,
+        input_text: str,
+        instructions: str = None,
+        model: str = "gpt-4o",
+        tools: Optional[List[Dict]] = None,
+        temperature: float = 0.1,
+        max_output_tokens: Optional[int] = None,
+        stream: bool = False,
+    ):
+        """Create a response using the Responses API (recommended over Chat Completions)"""
+        try:
+            params = {
+                "model": model,
+                "input": input_text,
+                "temperature": temperature,
+            }
+
+            if instructions:
+                params["instructions"] = instructions
+            if tools:
+                params["tools"] = tools
+            if max_output_tokens:
+                params["max_output_tokens"] = max_output_tokens
+            if stream:
+                params["stream"] = True
+
+            response = await self.async_client.responses.create(**params)
+            logger.info(f"Response created successfully with model {model}")
+            return response
+
+        except AuthenticationError as e:
+            logger.error(f"Authentication failed: {e}")
+            raise
+        except RateLimitError as e:
+            logger.error(f"Rate limit exceeded: {e}")
+            raise
+        except APIConnectionError as e:
+            logger.error(f"Connection error: {e}")
+            raise
+        except APIError as e:
+            logger.error(f"API error: {e}")
+            raise
+
+    # CHAT COMPLETIONS API (Legacy, still fully supported)
     async def create_chat_completion(
         self,
         messages: List[Dict[str, str]],
@@ -224,13 +288,11 @@ class ComprehensiveOpenAIClient:
         max_tokens: Optional[int] = None,
         response_format: Optional[Dict] = None,
         **kwargs
-    ) -> Union[ChatCompletion, AsyncGenerator]:
-        """Enhanced chat completion with full OpenAI API support"""
+    ):
+        """Chat completion with full OpenAI API support"""
         try:
-            # Token counting for optimization
-            total_tokens = sum(len(self.encoding.encode(msg.get('content', ''))) for msg in messages)
-            logger.info(f"Creating chat completion: {total_tokens} tokens, model: {model}")
-            
+            logger.info(f"Creating chat completion with model: {model}")
+
             params = {
                 "model": model,
                 "messages": messages,
@@ -238,23 +300,39 @@ class ComprehensiveOpenAIClient:
                 "stream": stream,
                 **kwargs
             }
-            
+
             if max_tokens:
                 params["max_tokens"] = max_tokens
             if tools:
                 params["tools"] = tools
             if response_format:
                 params["response_format"] = response_format
-            
+
             if stream:
                 return await self.async_client.chat.completions.create(**params)
             else:
                 response = await self.async_client.chat.completions.create(**params)
-                logger.info(f"Chat completion successful: {response.usage.total_tokens} tokens used")
+                if response.usage:
+                    logger.info(f"Chat completion successful: {response.usage.total_tokens} tokens used")
                 return response
-                
-        except Exception as e:
-            logger.error(f"Chat completion failed: {e}")
+
+        except AuthenticationError as e:
+            logger.error(f"Authentication failed: {e}")
+            raise
+        except RateLimitError as e:
+            logger.error(f"Rate limit exceeded: {e}")
+            raise
+        except BadRequestError as e:
+            logger.error(f"Bad request: {e}")
+            raise
+        except APIConnectionError as e:
+            logger.error(f"Connection error: {e}")
+            raise
+        except APITimeoutError as e:
+            logger.error(f"Request timed out: {e}")
+            raise
+        except APIError as e:
+            logger.error(f"API error: {e}")
             raise
     
     def create_trading_assistant(self, name: str = "Trading Assistant") -> str:
@@ -766,8 +844,8 @@ class ComprehensiveOpenAIClient:
     
     # UTILITY METHODS
     def count_tokens(self, text: str) -> int:
-        """Count tokens in text"""
-        return len(self.encoding.encode(text))
+        """Estimate token count in text (approximate: ~4 chars per token)"""
+        return len(text) // 4
     
     async def test_connection(self) -> Dict[str, Any]:
         """Test OpenAI API connection with comprehensive checks"""

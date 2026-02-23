@@ -3,6 +3,8 @@ Enhanced OpenAI API Client for Arbion AI Trading Platform
 Comprehensive integration of OpenAI's latest capabilities for advanced trading automation.
 
 Features:
+- Responses API (current recommended interface)
+- Chat Completions API (legacy, fully supported)
 - Function calling for direct trading execution
 - Assistant API for persistent trading conversations
 - Advanced prompt engineering for market analysis
@@ -10,6 +12,9 @@ Features:
 - Risk assessment and portfolio management
 - Multi-modal analysis (text, data, patterns)
 - Streaming responses for real-time interaction
+- Structured outputs
+
+References: https://github.com/openai/openai-python
 """
 
 import os
@@ -20,6 +25,14 @@ from typing import Dict, List, Any, Optional, Union, AsyncGenerator
 from datetime import datetime, timedelta
 from openai import OpenAI, AsyncOpenAI
 from openai.types.chat import ChatCompletion
+from openai import (
+    APIError,
+    APIConnectionError,
+    RateLimitError,
+    AuthenticationError,
+    BadRequestError,
+    APITimeoutError,
+)
 from dataclasses import dataclass
 import re
 from utils.openai_auth_manager import OpenAIAuthManager, create_auth_manager
@@ -66,12 +79,13 @@ class EnhancedOpenAIClient:
         self.client = self.auth_manager.get_sync_client()
         self.async_client = self.auth_manager.get_async_client()
         
-        # Enhanced model selection
+        # Enhanced model selection - updated with latest models
         self.models = {
-            "primary": "gpt-4o",  # Latest GPT-4 Omni model
-            "analysis": "gpt-4o",  # For detailed market analysis
-            "fast": "gpt-4o-mini",  # For quick responses
-            "reasoning": "o1-preview"  # For complex reasoning (when available)
+            "primary": "gpt-4o",       # Latest GPT-4 Omni model
+            "analysis": "gpt-4o",      # For detailed market analysis
+            "fast": "gpt-4o-mini",     # For quick responses
+            "reasoning": "o1",         # For complex reasoning
+            "reasoning_fast": "o3-mini" # For fast reasoning tasks
         }
         
         # Trading function definitions for function calling
@@ -318,6 +332,125 @@ class EnhancedOpenAIClient:
         • Timeline and monitoring requirements
         """
     
+    async def create_response(
+        self,
+        input_text: str,
+        instructions: str = None,
+        model: str = None,
+        tools: Optional[List[Dict]] = None,
+        temperature: float = 0.1,
+        max_output_tokens: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """
+        Create a response using the Responses API (recommended interface).
+
+        Uses `input` instead of `messages` and `instructions` instead of system messages.
+        """
+        try:
+            await self.auth_manager.ensure_connection()
+            client = self.get_async_client()
+
+            params = {
+                "model": model or self.models["primary"],
+                "input": input_text,
+                "temperature": temperature,
+            }
+
+            if instructions:
+                params["instructions"] = instructions
+            if tools:
+                params["tools"] = tools
+            if max_output_tokens:
+                params["max_output_tokens"] = max_output_tokens
+
+            response = await client.responses.create(**params)
+
+            return {
+                "success": True,
+                "output_text": response.output_text,
+                "response_id": response.id,
+                "model": response.model,
+                "usage": {
+                    "input_tokens": response.usage.input_tokens,
+                    "output_tokens": response.usage.output_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                } if response.usage else None,
+            }
+
+        except AuthenticationError as e:
+            logger.error(f"Authentication failed: {e}")
+            return {"success": False, "error": "authentication_failed", "message": str(e)}
+        except RateLimitError as e:
+            logger.error(f"Rate limit exceeded: {e}")
+            return {"success": False, "error": "rate_limited", "message": str(e)}
+        except APIConnectionError as e:
+            logger.error(f"Connection error: {e}")
+            return {"success": False, "error": "connection_error", "message": str(e)}
+        except Exception as e:
+            logger.error(f"Response creation failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def process_command_with_responses_api(self, command: str, context: Dict = None) -> Dict[str, Any]:
+        """Process trading commands using the modern Responses API"""
+        try:
+            market_context = context or {}
+
+            detected_symbols = self._extract_symbols(command)
+            if detected_symbols:
+                try:
+                    from utils.enhanced_market_data import EnhancedMarketDataProvider
+                    market_provider = EnhancedMarketDataProvider()
+
+                    for symbol in detected_symbols[:3]:
+                        if '-USD' in symbol:
+                            crypto_symbol = symbol.replace('-USD', '')
+                            market_data = market_provider.get_crypto_price(crypto_symbol)
+                        else:
+                            market_data = market_provider.get_stock_quote(symbol)
+
+                        if market_data:
+                            market_context[symbol] = market_data
+                except Exception as data_err:
+                    logger.warning(f"Market data fetch failed: {data_err}")
+
+            input_text = f"""TRADING COMMAND: "{command}"
+
+Market Context: {json.dumps(market_context, indent=2) if market_context else 'None available'}
+
+Analyze this command and provide:
+1. The specific trading action requested
+2. Symbols involved and appropriate broker (crypto -> coinbase, stocks -> schwab)
+3. Risk assessment and confidence level
+4. Actionable recommendation with reasoning"""
+
+            instructions = self._get_assistant_instructions("professional")
+
+            result = await self.create_response(
+                input_text=input_text,
+                instructions=instructions,
+                model=self.models["primary"],
+                temperature=0.3,
+                max_output_tokens=4000,
+            )
+
+            return {
+                "success": result.get("success", False),
+                "original_command": command,
+                "response": result.get("output_text", ""),
+                "symbols_detected": detected_symbols,
+                "market_context": market_context,
+                "api_version": "responses",
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+
+        except Exception as e:
+            logger.error(f"Responses API command processing failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "original_command": command,
+            }
+
     async def process_natural_language_command(self, command: str, context: Dict = None) -> Dict[str, Any]:
         """Process natural language trading commands with enhanced understanding"""
         try:
@@ -788,7 +921,13 @@ def get_openai_enhancement_info() -> Dict[str, Any]:
     """Get information about OpenAI enhancements"""
     return {
         'description': 'Enhanced OpenAI API integration for advanced trading automation',
+        'api_versions': {
+            'responses_api': 'Current recommended interface (client.responses.create)',
+            'chat_completions': 'Legacy but fully supported (client.chat.completions.create)',
+        },
         'new_features': [
+            'Responses API with simplified input/output interface',
+            'Chat Completions API for multi-turn conversations',
             'Function calling for direct trading execution',
             'Assistant API for persistent conversations',
             'Advanced natural language command processing',
@@ -796,24 +935,36 @@ def get_openai_enhancement_info() -> Dict[str, Any]:
             'AI-powered trading strategy generation',
             'Streaming conversational interface',
             'Multi-modal analysis capabilities',
-            'Risk assessment and portfolio optimization'
+            'Risk assessment and portfolio optimization',
+            'Structured JSON outputs',
+            'Automatic retries with exponential backoff',
+            'Proper timeout configuration',
         ],
         'supported_models': {
             'gpt-4o': 'Latest GPT-4 Omni for comprehensive analysis',
             'gpt-4o-mini': 'Fast responses for real-time interaction',
-            'o1-preview': 'Advanced reasoning for complex strategies'
+            'o1': 'Advanced reasoning for complex strategies',
+            'o3-mini': 'Fast reasoning for quick analysis',
         },
         'trading_functions': [
             'execute_trade',
             'analyze_market',
             'manage_portfolio',
-            'set_alerts'
+            'set_alerts',
         ],
         'analysis_capabilities': [
             'Technical analysis with indicators',
             'Fundamental analysis with metrics',
             'Sentiment analysis from multiple sources',
             'Risk assessment and volatility analysis',
-            'Portfolio optimization recommendations'
-        ]
+            'Portfolio optimization recommendations',
+        ],
+        'sdk_features': [
+            'Automatic retries (configurable max_retries)',
+            'Granular timeouts (connect, read, write)',
+            'Typed responses with Pydantic models',
+            'Streaming with server-sent events',
+            'Raw response access for debugging',
+            'Request ID tracking for support',
+        ],
     }

@@ -1,6 +1,9 @@
 """
 Enhanced OpenAI API Routes for Arbion Trading Platform
-Flask endpoints for advanced AI trading capabilities and natural language processing
+Flask endpoints for advanced AI trading capabilities and natural language processing.
+
+Supports both the Responses API (current) and Chat Completions API (legacy).
+References: https://github.com/openai/openai-python
 """
 
 from flask import Blueprint, request, jsonify, Response, stream_template
@@ -10,6 +13,11 @@ import json
 import logging
 from typing import AsyncGenerator
 from utils.enhanced_openai_client import EnhancedOpenAIClient, get_openai_enhancement_info
+from utils.openai_responses_client import (
+    OpenAIResponsesClient,
+    create_responses_client,
+    get_responses_api_info,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -515,6 +523,399 @@ def demo_natural_language_trading():
     
     except Exception as e:
         logger.error(f"Error in natural language demo: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+# ---- RESPONSES API ROUTES (Modern OpenAI interface) ----
+
+@enhanced_openai_bp.route('/api/openai/responses/info', methods=['GET'])
+@login_required
+def get_responses_info():
+    """Get information about the Responses API integration"""
+    try:
+        info = get_responses_api_info()
+        return jsonify({
+            'success': True,
+            'responses_api_info': info
+        })
+    except Exception as e:
+        logger.error(f"Error getting Responses API info: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@enhanced_openai_bp.route('/api/openai/responses/create', methods=['POST'])
+@login_required
+def create_openai_response():
+    """
+    Create a response using the Responses API.
+
+    Request body:
+        input: str - The input text/prompt
+        instructions: str (optional) - System instructions
+        model: str (optional) - Model to use (default: gpt-4o)
+        temperature: float (optional) - Temperature (default: 0.1)
+        max_output_tokens: int (optional) - Max output tokens
+    """
+    try:
+        data = request.get_json()
+        input_text = data.get('input', '').strip()
+
+        if not input_text:
+            return jsonify({'success': False, 'error': 'Input text is required'}), 400
+
+        client = create_responses_client(user_id=str(current_user.id))
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            result = loop.run_until_complete(
+                client.create_response(
+                    input_text=input_text,
+                    instructions=data.get('instructions'),
+                    model=data.get('model', 'gpt-4o'),
+                    temperature=data.get('temperature', 0.1),
+                    max_output_tokens=data.get('max_output_tokens'),
+                )
+            )
+
+            return jsonify({
+                'success': True,
+                'result': result
+            })
+
+        finally:
+            loop.close()
+
+    except Exception as e:
+        logger.error(f"Error creating response: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@enhanced_openai_bp.route('/api/openai/responses/trading-command', methods=['POST'])
+@login_required
+def responses_trading_command():
+    """
+    Process a trading command using the Responses API with tool use.
+
+    Request body:
+        command: str - Natural language trading command
+    """
+    try:
+        data = request.get_json()
+        command = data.get('command', '').strip()
+
+        if not command:
+            return jsonify({'success': False, 'error': 'Command is required'}), 400
+
+        client = create_responses_client(user_id=str(current_user.id))
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            result = loop.run_until_complete(
+                client.process_trading_command(command)
+            )
+
+            return jsonify({
+                'success': True,
+                'command_result': result
+            })
+
+        finally:
+            loop.close()
+
+    except Exception as e:
+        logger.error(f"Error processing trading command via Responses API: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@enhanced_openai_bp.route('/api/openai/responses/market-analysis', methods=['POST'])
+@login_required
+def responses_market_analysis():
+    """
+    Perform market analysis using the Responses API with tools.
+
+    Request body:
+        symbols: list[str] - Symbols to analyze
+        analysis_type: str (optional) - Type of analysis (default: comprehensive)
+    """
+    try:
+        data = request.get_json()
+        symbols = data.get('symbols', [])
+        analysis_type = data.get('analysis_type', 'comprehensive')
+
+        if not symbols:
+            return jsonify({'success': False, 'error': 'At least one symbol is required'}), 400
+
+        client = create_responses_client(user_id=str(current_user.id))
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            result = loop.run_until_complete(
+                client.analyze_market(symbols, analysis_type)
+            )
+
+            return jsonify({
+                'success': True,
+                'analysis': result
+            })
+
+        finally:
+            loop.close()
+
+    except Exception as e:
+        logger.error(f"Error in Responses API market analysis: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@enhanced_openai_bp.route('/api/openai/responses/strategy', methods=['POST'])
+@login_required
+def responses_generate_strategy():
+    """
+    Generate a trading strategy using the Responses API.
+
+    Request body:
+        strategy_type: str - Type of strategy
+        risk_tolerance: str (optional) - Risk level (conservative/moderate/aggressive)
+        time_horizon: str (optional) - Time horizon (short/medium/long)
+        capital: float (optional) - Available capital
+    """
+    try:
+        data = request.get_json()
+        strategy_type = data.get('strategy_type', 'balanced')
+        risk_tolerance = data.get('risk_tolerance', 'moderate')
+        time_horizon = data.get('time_horizon', 'medium')
+        capital = float(data.get('capital', 10000))
+
+        client = create_responses_client(user_id=str(current_user.id))
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            result = loop.run_until_complete(
+                client.generate_trading_strategy(
+                    strategy_type, risk_tolerance, time_horizon, capital
+                )
+            )
+
+            return jsonify({
+                'success': True,
+                'strategy': result
+            })
+
+        finally:
+            loop.close()
+
+    except Exception as e:
+        logger.error(f"Error generating strategy via Responses API: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@enhanced_openai_bp.route('/api/openai/responses/risk-assessment', methods=['POST'])
+@login_required
+def responses_risk_assessment():
+    """
+    Assess trade risk using the Responses API.
+
+    Request body:
+        trade_details: dict - Details of the proposed trade
+        portfolio_context: dict (optional) - Current portfolio context
+    """
+    try:
+        data = request.get_json()
+        trade_details = data.get('trade_details', {})
+        portfolio_context = data.get('portfolio_context')
+
+        if not trade_details:
+            return jsonify({'success': False, 'error': 'Trade details are required'}), 400
+
+        client = create_responses_client(user_id=str(current_user.id))
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            result = loop.run_until_complete(
+                client.assess_trade_risk(trade_details, portfolio_context)
+            )
+
+            return jsonify({
+                'success': True,
+                'risk_assessment': result
+            })
+
+        finally:
+            loop.close()
+
+    except Exception as e:
+        logger.error(f"Error in Responses API risk assessment: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@enhanced_openai_bp.route('/api/openai/responses/portfolio-optimize', methods=['POST'])
+@login_required
+def responses_portfolio_optimize():
+    """
+    Optimize portfolio using the Responses API with tool calls.
+
+    Request body:
+        positions: list[dict] - Current portfolio positions
+        goal: str (optional) - Optimization goal
+    """
+    try:
+        data = request.get_json()
+        positions = data.get('positions', [])
+        goal = data.get('goal', 'risk_adjusted_return')
+
+        if not positions:
+            return jsonify({'success': False, 'error': 'Portfolio positions are required'}), 400
+
+        client = create_responses_client(user_id=str(current_user.id))
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            result = loop.run_until_complete(
+                client.portfolio_optimization(positions, goal)
+            )
+
+            return jsonify({
+                'success': True,
+                'optimization': result
+            })
+
+        finally:
+            loop.close()
+
+    except Exception as e:
+        logger.error(f"Error in Responses API portfolio optimization: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@enhanced_openai_bp.route('/api/openai/responses/chat', methods=['POST'])
+@login_required
+def responses_chat():
+    """
+    Interactive trading chat using the Responses API client.
+
+    Request body:
+        message: str - User message
+        history: list[dict] (optional) - Conversation history
+        stream: bool (optional) - Enable streaming (default: false)
+    """
+    try:
+        data = request.get_json()
+        message = data.get('message', '').strip()
+        history = data.get('history', [])
+        stream = data.get('stream', False)
+
+        if not message:
+            return jsonify({'success': False, 'error': 'Message is required'}), 400
+
+        client = create_responses_client(user_id=str(current_user.id))
+
+        if stream:
+            def generate_stream():
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+                try:
+                    async def run_stream():
+                        result = await client.chat_with_trader(message, history, stream=True)
+                        async for chunk in result:
+                            yield f"data: {json.dumps({'chunk': chunk})}\n\n"
+
+                    gen = run_stream()
+                    while True:
+                        try:
+                            chunk = loop.run_until_complete(gen.__anext__())
+                            yield chunk
+                        except StopAsyncIteration:
+                            break
+                finally:
+                    loop.close()
+
+                yield f"data: {json.dumps({'done': True})}\n\n"
+
+            return Response(
+                generate_stream(),
+                mimetype='text/event-stream',
+                headers={
+                    'Cache-Control': 'no-cache',
+                    'Connection': 'keep-alive',
+                    'X-Accel-Buffering': 'no'
+                }
+            )
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            result = loop.run_until_complete(
+                client.chat_with_trader(message, history, stream=False)
+            )
+
+            return jsonify({
+                'success': True,
+                'chat_result': result
+            })
+
+        finally:
+            loop.close()
+
+    except Exception as e:
+        logger.error(f"Error in Responses API chat: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@enhanced_openai_bp.route('/api/openai/responses/test-connection', methods=['GET'])
+@login_required
+def responses_test_connection():
+    """Test OpenAI connection via the Responses API"""
+    try:
+        client = create_responses_client(user_id=str(current_user.id))
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+        try:
+            result = loop.run_until_complete(client.test_connection())
+            return jsonify(result)
+        finally:
+            loop.close()
+
+    except Exception as e:
+        logger.error(f"Error testing Responses API connection: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@enhanced_openai_bp.route('/api/openai/responses/status', methods=['GET'])
+@login_required
+def responses_client_status():
+    """Get Responses API client status and capabilities"""
+    try:
+        client = create_responses_client(user_id=str(current_user.id))
+        status = client.get_status()
+
+        return jsonify({
+            'success': True,
+            'status': status
+        })
+
+    except Exception as e:
+        logger.error(f"Error getting Responses API status: {e}")
         return jsonify({
             'success': False,
             'error': str(e)
