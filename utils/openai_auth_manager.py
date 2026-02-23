@@ -2,6 +2,9 @@
 OpenAI Authentication Manager for Arbion Trading Platform
 Enhanced authentication system for reliable OpenAI API connections with retry logic,
 rate limiting, error handling, and connection monitoring.
+
+Supports both the Responses API (current) and Chat Completions API (legacy).
+References: https://github.com/openai/openai-python
 """
 
 import os
@@ -12,8 +15,19 @@ from typing import Optional, Dict, Any, List
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 import json
+import httpx
 from openai import OpenAI, AsyncOpenAI
-from openai._exceptions import APIError, APIConnectionError, RateLimitError, AuthenticationError
+from openai import (
+    APIError,
+    APIConnectionError,
+    RateLimitError,
+    AuthenticationError,
+    BadRequestError,
+    APITimeoutError,
+    NotFoundError,
+    PermissionDeniedError,
+    UnprocessableEntityError,
+)
 import requests
 from functools import wraps
 
@@ -125,28 +139,36 @@ class RetryManager:
         return delay
     
     def should_retry(self, error: Exception, attempt: int) -> bool:
-        """Determine if request should be retried"""
+        """Determine if request should be retried based on error type"""
         if attempt >= self.retry_config['max_retries']:
             return False
-        
-        # Retry on specific error types
+
+        # Never retry these - they won't succeed on retry
+        no_retry_errors = (
+            AuthenticationError,
+            PermissionDeniedError,
+            NotFoundError,
+            BadRequestError,
+            UnprocessableEntityError,
+        )
+
+        if isinstance(error, no_retry_errors):
+            return False
+
+        # Always retry these - transient errors
         retry_errors = (
             APIConnectionError,
             RateLimitError,
-            APIError
+            APITimeoutError,
         )
-        
+
         if isinstance(error, retry_errors):
             return True
-        
-        # Don't retry authentication errors
-        if isinstance(error, AuthenticationError):
-            return False
-        
+
         # Retry on 5xx server errors
-        if hasattr(error, 'status_code'):
+        if isinstance(error, APIError) and hasattr(error, 'status_code'):
             return 500 <= error.status_code < 600
-        
+
         return False
 
 def retry_with_backoff(retry_manager: RetryManager = None):
@@ -253,22 +275,22 @@ class OpenAIAuthManager:
         )
     
     def _create_client_kwargs(self) -> Dict[str, Any]:
-        """Create standardized client configuration"""
+        """Create standardized client configuration with proper timeouts"""
         kwargs = {
             "api_key": self.credentials.api_key,
-            "timeout": 60.0,  # Increased timeout for trading operations
+            "timeout": httpx.Timeout(120.0, connect=10.0, read=60.0, write=30.0),
             "max_retries": 0  # We handle retries manually
         }
-        
+
         if self.credentials.organization_id:
             kwargs["organization"] = self.credentials.organization_id
-        
+
         if self.credentials.project_id:
             kwargs["project"] = self.credentials.project_id
-        
+
         if self.credentials.base_url:
             kwargs["base_url"] = self.credentials.base_url
-        
+
         return kwargs
     
     def get_sync_client(self) -> OpenAI:
@@ -397,32 +419,54 @@ class OpenAIAuthManager:
         return self.connection_status.is_connected
     
     @retry_with_backoff()
+    async def make_response(self, **kwargs) -> Any:
+        """Make authenticated Responses API call with rate limiting and retry"""
+        if not await self.ensure_connection():
+            raise APIConnectionError("OpenAI connection is not healthy")
+
+        if not self.rate_limit_manager.can_make_request():
+            wait_time = self.rate_limit_manager.get_wait_time()
+            logger.info(f"Rate limit reached, waiting {wait_time:.2f} seconds")
+            await asyncio.sleep(wait_time)
+
+        try:
+            client = self.get_async_client()
+            self.rate_limit_manager.record_request()
+            response = await client.responses.create(**kwargs)
+            self.connection_status.request_count += 1
+            return response
+
+        except Exception as e:
+            self._update_connection_error(str(e))
+            raise
+
+    @retry_with_backoff()
     async def make_chat_completion(self, **kwargs) -> Any:
         """Make authenticated chat completion with rate limiting and retry"""
         # Ensure connection is healthy
         if not await self.ensure_connection():
             raise APIConnectionError("OpenAI connection is not healthy")
-        
+
         # Check rate limits
         if not self.rate_limit_manager.can_make_request():
             wait_time = self.rate_limit_manager.get_wait_time()
             logger.info(f"Rate limit reached, waiting {wait_time:.2f} seconds")
             await asyncio.sleep(wait_time)
-        
+
         try:
             client = self.get_async_client()
-            
+
             # Record the request
             self.rate_limit_manager.record_request()
-            
+
             # Make the API call
             response = await client.chat.completions.create(**kwargs)
-            
+
             # Update success metrics
             self.connection_status.request_count += 1
-            
+
             return response
-            
+
         except Exception as e:
             self._update_connection_error(str(e))
             raise

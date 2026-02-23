@@ -1,6 +1,9 @@
 """
 OpenAI Trading Engine - Advanced AI Trading Implementation
-Integrates with the comprehensive OpenAI client to provide intelligent trading capabilities.
+Integrates with the comprehensive OpenAI client and Responses API client
+to provide intelligent trading capabilities.
+
+References: https://github.com/openai/openai-python
 """
 
 import asyncio
@@ -11,11 +14,12 @@ from dataclasses import dataclass
 import json
 
 from utils.comprehensive_openai_client import (
-    ComprehensiveOpenAIClient, 
-    TradingDecision, 
-    MarketInsight, 
+    ComprehensiveOpenAIClient,
+    TradingDecision,
+    MarketInsight,
     PortfolioRecommendation
 )
+from utils.openai_responses_client import OpenAIResponsesClient
 from models import Trade, APICredential
 from app import db
 
@@ -49,23 +53,50 @@ class TradingSignal:
 
 class OpenAITradingEngine:
     """Advanced AI-powered trading engine using OpenAI"""
-    
+
     def __init__(self, user_id: str):
         self.user_id = user_id
         self.openai_client = ComprehensiveOpenAIClient(user_id=user_id)
-        
+
+        # Initialize Responses API client for modern operations
+        try:
+            self.responses_client = OpenAIResponsesClient(user_id=user_id)
+        except Exception as e:
+            logger.warning(f"Responses client init failed, using legacy only: {e}")
+            self.responses_client = None
+
         # Initialize trading assistant
         self.assistant_id = self.openai_client.create_trading_assistant("Arbion Trading AI")
         self.thread_id = self.openai_client.create_conversation_thread(self.assistant_id)
-        
+
         # Trading parameters
         self.risk_tolerance = "moderate"  # conservative, moderate, aggressive
         self.max_position_size = 0.05  # Max 5% of portfolio per position
         self.stop_loss_pct = 0.02  # 2% stop loss
         self.take_profit_pct = 0.06  # 6% take profit
-        
+
         logger.info(f"OpenAI Trading Engine initialized for user {user_id}")
     
+    async def process_command_with_responses_api(self, command: str) -> Dict[str, Any]:
+        """
+        Process a trading command using the modern Responses API.
+
+        This leverages the Responses API for simplified input/output and
+        automatic tool call handling for market analysis and trade execution.
+        """
+        if not self.responses_client:
+            return {
+                "success": False,
+                "message": "Responses API client not available, use process_natural_language_trade instead"
+            }
+
+        try:
+            result = await self.responses_client.process_trading_command(command)
+            return result
+        except Exception as e:
+            logger.error(f"Responses API command failed: {e}")
+            return {"success": False, "message": str(e)}
+
     async def process_natural_language_trade(self, command: str, is_simulation: bool = True) -> Dict[str, Any]:
         """Process natural language trading commands"""
         try:

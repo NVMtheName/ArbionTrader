@@ -2,7 +2,16 @@ import os
 import json
 import logging
 from datetime import datetime
+import httpx
 from openai import OpenAI
+from openai import (
+    APIError,
+    APIConnectionError,
+    RateLimitError,
+    AuthenticationError,
+    BadRequestError,
+    APITimeoutError,
+)
 from models import Trade
 from app import db
 from utils.coinbase_connector import CoinbaseConnector
@@ -25,9 +34,13 @@ class OpenAITrader:
         if user_id and not api_key:
             self.api_key = self._load_api_key(user_id)
         
-        # Initialize OpenAI client if we have an API key
+        # Initialize OpenAI client with proper timeouts and retries
         if self.api_key:
-            self.client = OpenAI(api_key=self.api_key)
+            self.client = OpenAI(
+                api_key=self.api_key,
+                timeout=httpx.Timeout(120.0, connect=10.0),
+                max_retries=3,
+            )
     
     def _load_api_key(self, user_id):
         """Load OpenAI API key from database for the user"""

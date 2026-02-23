@@ -1,6 +1,9 @@
 """
 Comprehensive OpenAI Integration for Arbion Trading Platform
 Simplified but complete implementation of OpenAI capabilities for trading.
+
+Supports both the Responses API (current recommended) and Chat Completions API.
+References: https://github.com/openai/openai-python
 """
 
 import os
@@ -11,7 +14,16 @@ from typing import Dict, List, Any, Optional, Union
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 
+import httpx
 from openai import OpenAI, AsyncOpenAI
+from openai import (
+    APIError,
+    APIConnectionError,
+    RateLimitError,
+    AuthenticationError,
+    BadRequestError,
+    APITimeoutError,
+)
 from models import APICredential
 from utils.encryption import decrypt_credentials
 
@@ -42,22 +54,31 @@ class ComprehensiveOpenAIClient:
     def __init__(self, user_id: Optional[str] = None, api_key: Optional[str] = None):
         self.user_id = user_id
         self.api_key = api_key or self._load_api_key(user_id)
-        
+
         if not self.api_key:
             raise ValueError("OpenAI API key is required")
-        
-        self.client = OpenAI(api_key=self.api_key)
-        self.async_client = AsyncOpenAI(api_key=self.api_key)
-        
-        # Model configuration
+
+        # Initialize with proper timeouts and retries
+        client_kwargs = {
+            "api_key": self.api_key,
+            "timeout": httpx.Timeout(120.0, connect=10.0),
+            "max_retries": 3,
+        }
+
+        self.client = OpenAI(**client_kwargs)
+        self.async_client = AsyncOpenAI(**client_kwargs)
+
+        # Model configuration - updated with latest models
         self.models = {
             "gpt-4o": "gpt-4o",
-            "gpt-4o-mini": "gpt-4o-mini", 
+            "gpt-4o-mini": "gpt-4o-mini",
+            "o1": "o1",
+            "o3-mini": "o3-mini",
             "whisper-1": "whisper-1",
             "tts-1": "tts-1",
             "text-embedding-3-large": "text-embedding-3-large"
         }
-        
+
         logger.info(f"OpenAI client initialized for user {user_id}")
     
     def _load_api_key(self, user_id: Optional[str]) -> Optional[str]:
@@ -80,7 +101,52 @@ class ComprehensiveOpenAIClient:
         
         return None
     
-    # CHAT COMPLETIONS
+    # RESPONSES API (Current recommended interface)
+    async def create_response(
+        self,
+        input_text: str,
+        instructions: str = None,
+        model: str = "gpt-4o",
+        temperature: float = 0.1,
+        max_output_tokens: Optional[int] = None,
+    ) -> Dict[str, Any]:
+        """Create a response using the Responses API"""
+        try:
+            params = {
+                "model": model,
+                "input": input_text,
+                "temperature": temperature,
+            }
+
+            if instructions:
+                params["instructions"] = instructions
+            if max_output_tokens:
+                params["max_output_tokens"] = max_output_tokens
+
+            response = await self.async_client.responses.create(**params)
+
+            return {
+                "success": True,
+                "response": response.output_text,
+                "response_id": response.id,
+                "usage": {
+                    "input_tokens": response.usage.input_tokens,
+                    "output_tokens": response.usage.output_tokens,
+                    "total_tokens": response.usage.total_tokens,
+                } if response.usage else None,
+            }
+
+        except AuthenticationError as e:
+            logger.error(f"Authentication failed: {e}")
+            return {"success": False, "error": f"Authentication failed: {e}"}
+        except RateLimitError as e:
+            logger.error(f"Rate limit: {e}")
+            return {"success": False, "error": f"Rate limit exceeded: {e}"}
+        except Exception as e:
+            logger.error(f"Response creation failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    # CHAT COMPLETIONS (Legacy, still fully supported)
     async def create_chat_completion(
         self,
         messages: List[Dict[str, str]],
