@@ -68,6 +68,8 @@ def create_app():
     csrf.exempt("github_routes.github_callback")
     csrf.exempt("utils.schwabdev_routes.*")  # Schwab OAuth callbacks
     csrf.exempt("utils.coinbase_v2_routes.*")  # Coinbase OAuth callbacks
+    csrf.exempt("coinbase_advanced_trade.*")  # AT API (JSON, JWT-authenticated)
+    csrf.exempt("coinbase_payments.*")  # Payments API (JSON, JWT-authenticated)
     csrf.exempt("utils.openai_auth_routes.*")  # OpenAI OAuth callbacks
 
     # Redis Cache Configuration
@@ -116,6 +118,8 @@ def create_app():
     from health import health_bp
     from github_routes import github_bp
     from utils.coinbase_v2_routes import coinbase_v2_bp
+    from utils.coinbase_advanced_trade_routes import coinbase_at_bp
+    from utils.coinbase_payments_routes import coinbase_payments_bp
     from utils.agent_kit_routes import agent_kit_bp
     from utils.enhanced_openai_routes import enhanced_openai_bp
     from utils.openai_auth_routes import openai_auth_bp
@@ -132,6 +136,8 @@ def create_app():
     app.register_blueprint(auth_bp, url_prefix='/auth')
     app.register_blueprint(github_bp)
     app.register_blueprint(coinbase_v2_bp)
+    app.register_blueprint(coinbase_at_bp)
+    app.register_blueprint(coinbase_payments_bp)
     app.register_blueprint(agent_kit_bp)
     app.register_blueprint(enhanced_openai_bp)
     app.register_blueprint(openai_auth_bp)
