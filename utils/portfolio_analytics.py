@@ -6,6 +6,7 @@ from sqlalchemy import func, and_, or_
 from models import User, Trade, APICredential
 from app import db
 import numpy as np
+import yfinance as yf
 
 logger = logging.getLogger(__name__)
 
@@ -219,19 +220,10 @@ class PortfolioAnalytics:
                 max_position_exposure = max([abs(pos['exposure']) for pos in positions.values()]) if positions else 0
                 concentration_risk = (max_position_exposure / total_exposure * 100) if total_exposure > 0 else 0
                 
-                # Sector exposure (simplified mapping)
-                sector_map = {
-                    'AAPL': 'Technology', 'MSFT': 'Technology', 'GOOGL': 'Technology', 'NVDA': 'Technology',
-                    'AMZN': 'Consumer Discretionary', 'TSLA': 'Consumer Discretionary',
-                    'JPM': 'Financial', 'BAC': 'Financial', 'WFC': 'Financial',
-                    'JNJ': 'Healthcare', 'PFE': 'Healthcare', 'UNH': 'Healthcare',
-                    'SPY': 'ETF', 'QQQ': 'ETF', 'IWM': 'ETF',
-                    'BTC-USD': 'Cryptocurrency', 'ETH-USD': 'Cryptocurrency'
-                }
-                
+                # Sector exposure using yfinance for dynamic sector lookup
                 sector_exposure = {}
                 for symbol, position in positions.items():
-                    sector = sector_map.get(symbol, 'Other')
+                    sector = self._get_sector(symbol)
                     if sector not in sector_exposure:
                         sector_exposure[sector] = 0
                     sector_exposure[sector] += abs(position['exposure'])
@@ -345,11 +337,22 @@ class PortfolioAnalytics:
         try:
             if not returns:
                 return 0
-            
+
             cumulative = np.cumsum(returns)
             peak = np.maximum.accumulate(cumulative)
             drawdown = (cumulative - peak)
-            
+
             return float(np.min(drawdown))
         except:
             return 0
+
+    def _get_sector(self, symbol: str) -> str:
+        """Get sector for a symbol using yfinance"""
+        try:
+            if symbol.endswith('-USD'):
+                return 'Cryptocurrency'
+            ticker = yf.Ticker(symbol)
+            info = ticker.info
+            return info.get('sector', 'Other')
+        except Exception:
+            return 'Other'
