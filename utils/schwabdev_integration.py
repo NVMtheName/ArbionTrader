@@ -33,6 +33,14 @@ except ImportError:
     SCHWABDEV_AVAILABLE = False
     schwabdev = None
 
+# Import schwab-py library
+try:
+    import schwab
+    from utils.schwab_py_client import SchwabPyClientWrapper, create_schwab_py_client, SCHWAB_PY_AVAILABLE
+except ImportError:
+    SCHWAB_PY_AVAILABLE = False
+    schwab = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -105,6 +113,7 @@ class SchwabdevManager:
         self.user_id = user_id
         self.credentials = None
         self.client = None
+        self.schwab_py_client = None  # schwab-py client wrapper
         self.last_token_refresh = None
         self._account_hashes = {}  # Cache: account_number -> account_hash
 
@@ -114,9 +123,11 @@ class SchwabdevManager:
         # Initialize schwabdev client if possible
         if self.credentials and self.credentials.app_key:
             self._initialize_client()
+            self._initialize_schwab_py_client()
 
-        logger.info(f"SchwabdevManager v2 initialized for user {user_id} | "
-                     f"has_token={bool(self.credentials and self.credentials.access_token)}")
+        logger.info(f"SchwabdevManager v3 initialized for user {user_id} | "
+                     f"has_token={bool(self.credentials and self.credentials.access_token)} | "
+                     f"schwab_py={self.schwab_py_client is not None and self.schwab_py_client.is_available}")
 
     # ─── Credential Loading (THE FIX) ───────────────────────────────────────────
 
@@ -233,6 +244,26 @@ class SchwabdevManager:
         except Exception as e:
             logger.error(f"Failed to initialize schwabdev client: {e}")
             self.client = None
+
+    def _initialize_schwab_py_client(self):
+        """Initialize schwab-py client alongside schwabdev"""
+        try:
+            if not SCHWAB_PY_AVAILABLE:
+                logger.info("schwab-py not available - using schwabdev only")
+                return
+
+            if not self.user_id:
+                return
+
+            self.schwab_py_client = create_schwab_py_client(int(self.user_id))
+            if self.schwab_py_client and self.schwab_py_client.is_available:
+                logger.info(f"schwab-py client initialized for user {self.user_id}")
+            else:
+                logger.info(f"schwab-py client could not initialize for user {self.user_id}")
+
+        except Exception as e:
+            logger.warning(f"Failed to initialize schwab-py client: {e}")
+            self.schwab_py_client = None
 
     # ─── Token Management (UNIFIED) ─────────────────────────────────────────────
 
@@ -835,12 +866,276 @@ class SchwabdevManager:
             logger.error(f"Failed to get option chain for {symbol}: {e}")
             return {'success': False, 'error': str(e)}
 
+    # ─── schwab-py Enhanced Features ────────────────────────────────────────────
+
+    def get_movers(self, index: str = 'SPX', sort_order: str = None,
+                   frequency: int = None) -> Dict[str, Any]:
+        """Get top movers using schwab-py (or schwabdev fallback)"""
+        # Try schwab-py first (type-safe enums)
+        if self.schwab_py_client and self.schwab_py_client.is_available:
+            result = self.schwab_py_client.get_movers(index, sort_order, frequency)
+            if result.get('success'):
+                return result
+
+        # Fallback to schwabdev
+        try:
+            if self.client and hasattr(self.client, 'movers'):
+                resp = self.client.movers(index)
+                if hasattr(resp, 'json'):
+                    return {'success': True, 'movers': resp.json()}
+                return {'success': True, 'movers': resp}
+        except Exception as e:
+            logger.warning(f"schwabdev movers failed: {e}")
+
+        # Fallback to direct REST
+        try:
+            data = self._api_get(f"{self.MARKET_DATA_BASE}/movers/{index}")
+            if data:
+                return {'success': True, 'movers': data}
+            return {'success': False, 'error': 'No movers data returned'}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def get_market_hours(self, markets: List[str] = None,
+                         date: str = None) -> Dict[str, Any]:
+        """Get market hours using schwab-py (or schwabdev fallback)"""
+        if not markets:
+            markets = ['EQUITY', 'OPTION']
+
+        # Try schwab-py first
+        if self.schwab_py_client and self.schwab_py_client.is_available:
+            result = self.schwab_py_client.get_market_hours(markets, date)
+            if result.get('success'):
+                return result
+
+        # Fallback to schwabdev
+        try:
+            if self.client and hasattr(self.client, 'market_hours'):
+                resp = self.client.market_hours(markets)
+                if hasattr(resp, 'json'):
+                    return {'success': True, 'market_hours': resp.json()}
+                return {'success': True, 'market_hours': resp}
+        except Exception as e:
+            logger.warning(f"schwabdev market_hours failed: {e}")
+
+        # Fallback to direct REST
+        try:
+            markets_str = ','.join(markets)
+            params = {'markets': markets_str}
+            if date:
+                params['date'] = date
+            data = self._api_get(f"{self.MARKET_DATA_BASE}/markets", params=params)
+            if data:
+                return {'success': True, 'market_hours': data}
+            return {'success': False, 'error': 'No market hours data'}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def search_instruments(self, query: str,
+                           projection: str = 'SYMBOL_SEARCH') -> Dict[str, Any]:
+        """Search for instruments using schwab-py (or schwabdev fallback)"""
+        # Try schwab-py first
+        if self.schwab_py_client and self.schwab_py_client.is_available:
+            result = self.schwab_py_client.search_instruments(query, projection)
+            if result.get('success'):
+                return result
+
+        # Fallback to schwabdev
+        try:
+            if self.client and hasattr(self.client, 'instruments'):
+                resp = self.client.instruments(query, projection)
+                if hasattr(resp, 'json'):
+                    return {'success': True, 'instruments': resp.json()}
+                return {'success': True, 'instruments': resp}
+        except Exception as e:
+            logger.warning(f"schwabdev instruments search failed: {e}")
+
+        # Fallback to direct REST
+        try:
+            params = {'symbol': query, 'projection': projection}
+            data = self._api_get(f"{self.MARKET_DATA_BASE}/instruments", params=params)
+            if data:
+                return {'success': True, 'instruments': data}
+            return {'success': False, 'error': 'No instruments found'}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def get_transactions(self, account_number: str = None,
+                         start_date: datetime = None,
+                         end_date: datetime = None,
+                         transaction_type: str = None) -> Dict[str, Any]:
+        """Get transaction history using schwab-py (or schwabdev fallback)"""
+        try:
+            # Need account hash
+            if not self._account_hashes:
+                self.get_account_numbers()
+
+            if account_number:
+                account_hash = self._account_hashes.get(account_number)
+                if not account_hash:
+                    return {'success': False, 'error': f'Account {account_number} not found'}
+            else:
+                # Use first account
+                if not self._account_hashes:
+                    return {'success': False, 'error': 'No linked accounts'}
+                account_hash = list(self._account_hashes.values())[0]
+
+            # Try schwab-py first
+            if self.schwab_py_client and self.schwab_py_client.is_available:
+                result = self.schwab_py_client.get_transactions(
+                    account_hash, start_date, end_date, transaction_type
+                )
+                if result.get('success'):
+                    return result
+
+            # Fallback to schwabdev
+            try:
+                if self.client and hasattr(self.client, 'transactions'):
+                    if start_date and end_date:
+                        resp = self.client.transactions(
+                            account_hash,
+                            start_date.strftime('%Y-%m-%dT00:00:00.000Z'),
+                            end_date.strftime('%Y-%m-%dT23:59:59.000Z'),
+                            transaction_type or 'TRADE'
+                        )
+                    else:
+                        resp = self.client.transactions(account_hash)
+                    if hasattr(resp, 'json'):
+                        return {'success': True, 'transactions': resp.json()}
+                    return {'success': True, 'transactions': resp}
+            except Exception as e:
+                logger.warning(f"schwabdev transactions failed: {e}")
+
+            # Fallback to direct REST
+            if not start_date:
+                start_date = datetime.utcnow() - timedelta(days=60)
+            if not end_date:
+                end_date = datetime.utcnow()
+
+            params = {
+                'startDate': start_date.strftime('%Y-%m-%dT00:00:00.000Z'),
+                'endDate': end_date.strftime('%Y-%m-%dT23:59:59.000Z'),
+            }
+            if transaction_type:
+                params['types'] = transaction_type
+
+            data = self._api_get(
+                f"{self.TRADER_API_BASE}/accounts/{account_hash}/transactions",
+                params=params
+            )
+            return {
+                'success': True,
+                'transactions': data or [],
+            }
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def get_user_preferences(self) -> Dict[str, Any]:
+        """Get user preferences using schwab-py (or schwabdev fallback)"""
+        # Try schwab-py first
+        if self.schwab_py_client and self.schwab_py_client.is_available:
+            result = self.schwab_py_client.get_user_preferences()
+            if result.get('success'):
+                return result
+
+        # Fallback to schwabdev
+        try:
+            if self.client and hasattr(self.client, 'preferences'):
+                resp = self.client.preferences()
+                if hasattr(resp, 'json'):
+                    return {'success': True, 'preferences': resp.json()}
+                return {'success': True, 'preferences': resp}
+        except Exception as e:
+            logger.warning(f"schwabdev preferences failed: {e}")
+
+        # Fallback to direct REST
+        try:
+            data = self._api_get(f"{self.TRADER_API_BASE}/userPreference")
+            if data:
+                return {'success': True, 'preferences': data}
+            return {'success': False, 'error': 'No preferences data'}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def replace_order(self, account_number: str, order_id: str,
+                      order_data: Dict) -> Dict[str, Any]:
+        """Replace an existing order"""
+        try:
+            if not self._account_hashes:
+                self.get_account_numbers()
+            account_hash = self._account_hashes.get(account_number)
+            if not account_hash:
+                return {'success': False, 'error': f'Account {account_number} not found'}
+
+            # Try schwab-py first
+            if self.schwab_py_client and self.schwab_py_client.is_available:
+                result = self.schwab_py_client.replace_order(
+                    account_hash, order_id, order_data
+                )
+                if result.get('success'):
+                    return result
+
+            # Fallback to schwabdev
+            try:
+                if self.client and hasattr(self.client, 'replace_order'):
+                    resp = self.client.replace_order(account_hash, order_id, order_data)
+                    if hasattr(resp, 'status_code') and resp.status_code in (200, 201):
+                        new_id = None
+                        location = resp.headers.get('Location', '')
+                        if location:
+                            new_id = location.split('/')[-1]
+                        return {'success': True, 'new_order_id': new_id, 'message': 'Order replaced'}
+            except Exception as e:
+                logger.warning(f"schwabdev replace_order failed: {e}")
+
+            # Fallback to direct REST
+            if not self.ensure_valid_token():
+                return {'success': False, 'error': 'Invalid access token'}
+
+            url = f"{self.TRADER_API_BASE}/accounts/{account_hash}/orders/{order_id}"
+            import requests as req
+            response = req.put(url, headers=self._get_auth_headers(),
+                              json=order_data, timeout=30)
+            response.raise_for_status()
+
+            new_id = None
+            location = response.headers.get('Location', '')
+            if location:
+                new_id = location.split('/')[-1]
+            return {'success': True, 'new_order_id': new_id, 'message': 'Order replaced'}
+
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
+    def preview_order(self, account_number: str, order_data: Dict) -> Dict[str, Any]:
+        """Preview an order (schwabdev only)"""
+        try:
+            if not self._account_hashes:
+                self.get_account_numbers()
+            account_hash = self._account_hashes.get(account_number)
+            if not account_hash:
+                return {'success': False, 'error': f'Account {account_number} not found'}
+
+            if self.client and hasattr(self.client, 'preview_order'):
+                resp = self.client.preview_order(account_hash, order_data)
+                if hasattr(resp, 'json'):
+                    return {'success': True, 'preview': resp.json()}
+                return {'success': True, 'preview': resp}
+
+            return {'success': False, 'error': 'Order preview not available'}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+
     # ─── Diagnostics ─────────────────────────────────────────────────────────────
 
     def get_connection_status(self) -> Dict[str, Any]:
         """Get comprehensive connection status with diagnostics"""
         status = {
             'schwabdev_available': SCHWABDEV_AVAILABLE,
+            'schwab_py_available': SCHWAB_PY_AVAILABLE,
+            'schwab_py_client_ready': bool(self.schwab_py_client and self.schwab_py_client.is_available),
+            'schwabdev_version': getattr(schwabdev, '__version__', 'unknown') if SCHWABDEV_AVAILABLE else None,
+            'schwab_py_version': getattr(schwab, '__version__', 'unknown') if SCHWAB_PY_AVAILABLE else None,
             'client_initialized': self.client is not None,
             'credentials_loaded': self.credentials is not None,
             'has_app_key': bool(self.credentials and self.credentials.app_key),
@@ -850,7 +1145,7 @@ class SchwabdevManager:
             'token_expiry': self.credentials.expires_at.isoformat() if self.credentials and self.credentials.expires_at else None,
             'last_token_refresh': self.last_token_refresh.isoformat() if self.last_token_refresh else None,
             'user_id': self.user_id,
-            'auth_version': 'v2_unified'
+            'auth_version': 'v3_dual_library'
         }
 
         # Diagnose issues
@@ -928,28 +1223,44 @@ def create_schwabdev_manager(user_id: str = None) -> SchwabdevManager:
 
 
 def get_schwabdev_info() -> Dict[str, Any]:
-    """Get information about Schwabdev integration"""
+    """Get information about Schwab integration (dual-library)"""
     return {
-        'library_available': SCHWABDEV_AVAILABLE,
-        'library_version': getattr(schwabdev, '__version__', 'unknown') if SCHWABDEV_AVAILABLE else None,
-        'auth_version': 'v2_unified',
-        'description': 'Schwab API integration with unified token management (v2)',
-        'fixes': [
-            'Tokens now read/write exclusively from APICredential table (encrypted)',
-            'Uses SchwabOAuth for token refresh (single source of truth)',
-            'Direct REST API calls with auto-retry on 401',
-            'Proper account hash management for Schwab Trader API',
-            'Added price history and options chain endpoints for ML'
-        ],
+        'schwabdev_available': SCHWABDEV_AVAILABLE,
+        'schwabdev_version': getattr(schwabdev, '__version__', 'unknown') if SCHWABDEV_AVAILABLE else None,
+        'schwab_py_available': SCHWAB_PY_AVAILABLE,
+        'schwab_py_version': getattr(schwab, '__version__', 'unknown') if SCHWAB_PY_AVAILABLE else None,
+        'auth_version': 'v3_dual_library',
+        'description': 'Schwab API integration using both schwab-py and schwabdev libraries (v3)',
+        'libraries': {
+            'schwab_py': {
+                'purpose': 'Type-safe API calls, order templates, streaming client',
+                'url': 'https://pypi.org/project/schwab-py/',
+                'features': ['Enum-based parameters', 'Order builder templates',
+                             'Equity/options/spread orders', 'Async streaming',
+                             'Movers, market hours, instruments, transactions'],
+            },
+            'schwabdev': {
+                'purpose': 'Market-hours aware streaming, auto-recovery, simple API',
+                'url': 'https://pypi.org/project/schwabdev/',
+                'features': ['Auto token management', 'Streaming with recovery',
+                             'Market-hours awareness', 'Order preview',
+                             'Sync and async support'],
+            },
+        },
         'features': [
+            'Dual-library architecture (schwab-py + schwabdev with fallback)',
             'OAuth 2.0 with PKCE via SchwabOAuth',
             'Automatic token refresh with 5-min buffer',
             'Account data, positions, balances',
             'Real-time quotes and market data',
-            'Historical price data (for ML training)',
-            'Options chain data',
-            'Order placement, tracking, cancellation',
+            'Historical price data (multiple frequencies)',
+            'Options chain data with strategy analysis',
+            'Order builder: equity, options, spreads, brackets, OCO',
+            'Real-time streaming: L1 quotes, L2 books, charts, account activity',
+            'Market movers, market hours, instrument search',
+            'Transaction history',
+            'Order placement, replacement, tracking, cancellation',
             'Watchlist management',
-            'Connection diagnostics and health checks'
+            'Connection diagnostics and health checks',
         ]
     }
