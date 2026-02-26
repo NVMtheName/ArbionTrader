@@ -548,6 +548,21 @@ class AutoTradingEngine:
                     # Analyze market conditions using AI helper
                     analysis = self.ai_helper.analyze_market_conditions(symbol, market_data)
 
+                    # Fetch FinBERT sentiment features
+                    sentiment_score = 0.0
+                    sentiment_momentum = 0.0
+                    try:
+                        from sentiment.sentiment_engine import SentimentEngine
+                        from sentiment.sentiment_aggregator import SentimentAggregator
+                        _sent_engine = SentimentEngine()
+                        _sent_agg = SentimentAggregator()
+                        _sent_analysis = _sent_engine.analyze_ticker(symbol)
+                        _sent_signal = _sent_agg.aggregate(_sent_analysis)
+                        sentiment_score = _sent_signal.score
+                        sentiment_momentum = _sent_signal.momentum
+                    except Exception as se:
+                        self.logger.debug(f"Sentiment unavailable for {symbol}: {se}")
+
                     # Use OpenAI to generate trading strategy recommendation
                     strategy_prompt = f"""Analyze {symbol} trading opportunity:
 
@@ -555,6 +570,8 @@ Current Price: ${stock_price:.2f}
 Trend: {analysis['trend']}
 Volume Signal: {analysis['volume_signal']}
 Momentum Score: {analysis['momentum_score']}
+FinBERT Sentiment Score: {sentiment_score:.4f} (-1 bearish to +1 bullish)
+Sentiment Momentum (4h): {sentiment_momentum:.4f}
 
 Provide a trading recommendation (BUY/SELL/HOLD) with reasoning."""
 
@@ -582,7 +599,9 @@ Provide a trading recommendation (BUY/SELL/HOLD) with reasoning."""
                                 'market_analysis': analysis,
                                 'ai_reasoning': instruction.get('conditions', ''),
                                 'trend': analysis['trend'],
-                                'momentum_score': analysis['momentum_score']
+                                'momentum_score': analysis['momentum_score'],
+                                'sentiment_score': sentiment_score,
+                                'sentiment_momentum': sentiment_momentum,
                             }
 
                             # Create AI-driven trade record
