@@ -207,21 +207,54 @@ class AITradingBot:
                 'error': str(e)
             }
     
+    def _get_sentiment_features(self, symbol: str) -> Dict[str, Any]:
+        """Fetch FinBERT sentiment score and momentum for a ticker.
+
+        Returns {"sentiment_score": float, "sentiment_momentum": float,
+                 "sentiment_confidence": float, "sources_count": int}
+        Falls back to neutral values if the sentiment module is unavailable.
+        """
+        try:
+            from sentiment.sentiment_engine import SentimentEngine
+            from sentiment.sentiment_aggregator import SentimentAggregator
+
+            engine = SentimentEngine()
+            aggregator = SentimentAggregator()
+            analysis = engine.analyze_ticker(symbol)
+            signal = aggregator.aggregate(analysis)
+            return {
+                "sentiment_score": signal.score,
+                "sentiment_momentum": signal.momentum,
+                "sentiment_confidence": signal.confidence,
+                "sources_count": signal.sources_count,
+            }
+        except Exception as e:
+            logger.warning(f"Sentiment analysis unavailable for {symbol}: {e}")
+            return {
+                "sentiment_score": 0.0,
+                "sentiment_momentum": 0.0,
+                "sentiment_confidence": 0.0,
+                "sources_count": 0,
+            }
+
     async def analyze_market_with_ai(self, symbol: str) -> MarketAnalysis:
         """Comprehensive market analysis using OpenAI"""
         try:
             # Get current market data
             market_data = self.schwab_manager.get_market_data(symbol)
-            
+
             if not market_data.get('success'):
                 raise ValueError(f"Failed to get market data for {symbol}")
-            
+
             quote = market_data['market_data']
-            
+
+            # Get FinBERT sentiment features
+            sentiment = self._get_sentiment_features(symbol)
+
             # Prepare comprehensive analysis prompt
             analysis_prompt = f"""
             As an expert financial analyst and trader, provide a comprehensive analysis of {symbol}:
-            
+
             Current Market Data:
             - Price: ${quote['price']:.2f}
             - Change: {quote['change']:.2f} ({quote['change_percent']:.2f}%)
@@ -229,16 +262,22 @@ class AITradingBot:
             - High: ${quote['high']:.2f}
             - Low: ${quote['low']:.2f}
             - Bid/Ask: ${quote['bid']:.2f}/${quote['ask']:.2f}
-            
+
+            FinBERT Sentiment Analysis (from news & social media):
+            - Sentiment Score: {sentiment['sentiment_score']:.4f} (-1 bearish to +1 bullish)
+            - Sentiment Momentum (4h): {sentiment['sentiment_momentum']:.4f}
+            - Confidence: {sentiment['sentiment_confidence']:.4f}
+            - Sources Analyzed: {sentiment['sources_count']}
+
             Please analyze:
             1. Technical indicators and price action
-            2. Market sentiment and momentum
+            2. Market sentiment and momentum (incorporate the FinBERT scores above)
             3. Volume analysis and liquidity
             4. Support and resistance levels
             5. Short-term and medium-term outlook
             6. Risk assessment
             7. Trading recommendation with confidence level
-            
+
             Provide your analysis in JSON format with:
             {{
                 "trend_direction": "BULLISH/BEARISH/NEUTRAL",
@@ -254,7 +293,7 @@ class AITradingBot:
                 "key_factors": ["factor1", "factor2", "factor3"]
             }}
             """
-            
+
             # Get AI analysis
             response = await self.openai_manager.make_chat_completion(
                 model="gpt-4o",
@@ -262,29 +301,47 @@ class AITradingBot:
                 response_format={"type": "json_object"},
                 max_tokens=1500
             )
-            
+
             ai_analysis = json.loads(response.choices[0].message.content)
-            
+
+            # Blend AI sentiment with FinBERT — prefer FinBERT when available
+            blended_sentiment = ai_analysis.get('sentiment_score', 0.0)
+            if sentiment['sources_count'] > 0:
+                finbert_weight = min(0.6, sentiment['sentiment_confidence'])
+                ai_weight = 1.0 - finbert_weight
+                blended_sentiment = (
+                    sentiment['sentiment_score'] * finbert_weight
+                    + ai_analysis.get('sentiment_score', 0.0) * ai_weight
+                )
+
+            # Determine news sentiment label from FinBERT score
+            if sentiment['sentiment_score'] > 0.15:
+                news_label = 'BULLISH'
+            elif sentiment['sentiment_score'] < -0.15:
+                news_label = 'BEARISH'
+            else:
+                news_label = 'NEUTRAL'
+
             # Create market analysis object
             market_analysis = MarketAnalysis(
                 symbol=symbol,
                 current_price=quote['price'],
                 trend_direction=ai_analysis.get('trend_direction', 'NEUTRAL'),
-                sentiment_score=ai_analysis.get('sentiment_score', 0.0),
+                sentiment_score=round(blended_sentiment, 4),
                 technical_indicators=ai_analysis.get('technical_indicators', {}),
                 fundamental_analysis=ai_analysis.get('fundamental_analysis', ''),
-                news_sentiment='NEUTRAL',  # Could be enhanced with news API
+                news_sentiment=news_label,
                 ai_recommendation=ai_analysis.get('ai_recommendation', ''),
                 confidence_level=ai_analysis.get('confidence_level', 0.0),
                 timestamp=datetime.utcnow()
             )
-            
+
             # Store analysis
             self.market_analysis_history.append(market_analysis)
-            
+
             logger.info(f"Market analysis completed for {symbol}")
             return market_analysis
-            
+
         except Exception as e:
             logger.error(f"Market analysis failed for {symbol}: {e}")
             # Return neutral analysis on error
@@ -304,20 +361,25 @@ class AITradingBot:
     async def generate_trading_signal(self, symbol: str) -> TradingSignal:
         """Generate trading signal based on AI analysis"""
         try:
-            # Get market analysis
+            # Get market analysis (already includes FinBERT sentiment)
             analysis = await self.analyze_market_with_ai(symbol)
-            
+
+            # Fetch standalone sentiment features for the prompt
+            sentiment = self._get_sentiment_features(symbol)
+
             # Generate trading signal based on analysis
             signal_prompt = f"""
             Based on the following market analysis for {symbol}, generate a specific trading signal:
-            
+
             Analysis Summary:
             - Current Price: ${analysis.current_price:.2f}
             - Trend: {analysis.trend_direction}
-            - Sentiment Score: {analysis.sentiment_score}
+            - Blended Sentiment Score: {analysis.sentiment_score}
+            - News Sentiment (FinBERT): {analysis.news_sentiment}
+            - Sentiment Momentum (4h): {sentiment['sentiment_momentum']:.4f}
             - AI Confidence: {analysis.confidence_level}
             - Recommendation: {analysis.ai_recommendation}
-            
+
             Risk Management Parameters:
             - Max Position Size: ${self.risk_params.max_position_size:,.2f}
             - Stop Loss: {self.risk_params.stop_loss_percentage*100:.1f}%
