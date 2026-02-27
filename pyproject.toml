@@ -38,4 +38,5 @@ dependencies = [
     "transformers>=4.40.0",
     "torch>=2.2.0",
     "praw>=7.7.0",
+    "pandas-ta>=0.3.14b1",
 ]

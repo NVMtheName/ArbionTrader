@@ -128,6 +128,7 @@ def create_app():
     from utils.portfolio_routes import portfolio_bp
     from utils.claude_routes import claude_bp
     from sentiment.routes import sentiment_bp
+    from analysis.routes import analysis_bp
 
     # Register health checks first (no authentication/CSRF required)
     app.register_blueprint(health_bp)
@@ -147,6 +148,7 @@ def create_app():
     app.register_blueprint(portfolio_bp)
     app.register_blueprint(claude_bp)
     app.register_blueprint(sentiment_bp)
+    app.register_blueprint(analysis_bp)
 
     # Register simple OpenAI integration routes
     from utils.simple_openai_routes import simple_openai_bp

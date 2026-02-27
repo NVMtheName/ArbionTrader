@@ -244,8 +244,29 @@ class CoinbaseAdvancedTradeClient:
 
     def create_market_order(self, product_id: str, side: str,
                             quote_size: str = None, base_size: str = None,
-                            user_id: int = None, is_simulation: bool = False) -> Dict:
+                            user_id: int = None, is_simulation: bool = False,
+                            skip_confluence: bool = False) -> Dict:
         """Convenience: place a market order and record in Trade table."""
+        # --- Multi-timeframe confluence gate ---
+        if not skip_confluence:
+            try:
+                from analysis.multi_timeframe import MultiTimeframeAnalyzer
+                from analysis.confluence_filter import ConfluenceFilter
+                mtf = MultiTimeframeAnalyzer(user_id=str(user_id or self.user_id))
+                tf_signals = mtf.analyze(product_id)
+                confluence = ConfluenceFilter().evaluate(tf_signals)
+                if not confluence.should_trade:
+                    logger.info("Market order rejected by confluence filter for %s: score=%s",
+                                product_id, confluence.score)
+                    return {
+                        'success': False,
+                        'error': 'rejected by confluence filter',
+                        'confluence_score': confluence.score,
+                        'confluence_reasoning': confluence.reasoning,
+                    }
+            except Exception as e:
+                logger.warning("Confluence filter unavailable, proceeding: %s", e)
+
         client_order_id = str(uuid.uuid4())
         config: Dict[str, Any] = {}
         if side.upper() == "BUY":
@@ -298,8 +319,29 @@ class CoinbaseAdvancedTradeClient:
     def create_limit_order(self, product_id: str, side: str, base_size: str,
                            limit_price: str, post_only: bool = False,
                            end_time: str = None, user_id: int = None,
-                           is_simulation: bool = False) -> Dict:
+                           is_simulation: bool = False,
+                           skip_confluence: bool = False) -> Dict:
         """Convenience: place a limit order (GTC or GTD) and record in Trade table."""
+        # --- Multi-timeframe confluence gate ---
+        if not skip_confluence:
+            try:
+                from analysis.multi_timeframe import MultiTimeframeAnalyzer
+                from analysis.confluence_filter import ConfluenceFilter
+                mtf = MultiTimeframeAnalyzer(user_id=str(user_id or self.user_id))
+                tf_signals = mtf.analyze(product_id)
+                confluence = ConfluenceFilter().evaluate(tf_signals)
+                if not confluence.should_trade:
+                    logger.info("Limit order rejected by confluence filter for %s: score=%s",
+                                product_id, confluence.score)
+                    return {
+                        'success': False,
+                        'error': 'rejected by confluence filter',
+                        'confluence_score': confluence.score,
+                        'confluence_reasoning': confluence.reasoning,
+                    }
+            except Exception as e:
+                logger.warning("Confluence filter unavailable, proceeding: %s", e)
+
         client_order_id = str(uuid.uuid4())
         if end_time:
             config = {
