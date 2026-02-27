@@ -489,7 +489,7 @@ class AITradingBot:
         try:
             # Validate signal first
             validation = self.validate_trading_signal(signal)
-            
+
             if not validation['valid']:
                 return {
                     'success': False,
@@ -497,14 +497,44 @@ class AITradingBot:
                     'validation_errors': validation['errors'],
                     'signal': asdict(signal)
                 }
-            
+
+            # --- Multi-timeframe confluence gate ---
+            try:
+                from analysis.multi_timeframe import MultiTimeframeAnalyzer
+                from analysis.confluence_filter import ConfluenceFilter
+
+                mtf_analyzer = MultiTimeframeAnalyzer(user_id=self.user_id)
+                tf_signals = mtf_analyzer.analyze(signal.symbol)
+                confluence = ConfluenceFilter().evaluate(tf_signals)
+
+                if not confluence.should_trade:
+                    logger.info(
+                        "Trade rejected by confluence filter for %s: score=%s, reason=%s",
+                        signal.symbol, confluence.score, confluence.reasoning,
+                    )
+                    return {
+                        'success': False,
+                        'error': 'rejected by confluence filter',
+                        'confluence_score': confluence.score,
+                        'confluence_direction': confluence.direction,
+                        'confluence_reasoning': confluence.reasoning,
+                        'signal': asdict(signal),
+                    }
+                logger.info(
+                    "Confluence filter passed for %s: score=%s direction=%s",
+                    signal.symbol, confluence.score, confluence.direction,
+                )
+            except Exception as e:
+                # If the confluence module is unavailable, log and proceed
+                logger.warning("Confluence filter unavailable, proceeding without: %s", e)
+
             # Check if paper trading
             if self.config.get('paper_trading', True):
                 return await self._execute_paper_trade(signal)
-            
+
             # Execute across all connected accounts
             execution_results = await self._execute_multi_account_signal(signal)
-            
+
             return execution_results
             
         except Exception as e:
