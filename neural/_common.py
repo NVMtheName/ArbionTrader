@@ -235,6 +235,30 @@ usage_tracker = UsageTracker()
 # JSON extraction — strips code fences that some providers emit despite asks
 # ---------------------------------------------------------------------------
 
+def coerce_optional_float(value: Any) -> Optional[float]:
+    """Best-effort float coercion. Returns None for missing or non-numeric input.
+
+    LLMs occasionally emit numeric fields as strings (e.g. ``"1.5"``) or with
+    stray characters (``"1.5%"``). Downstream consumers — notably the consensus
+    engine's median merge — assume real floats, so we normalise here.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):  # bool is a subclass of int — reject explicitly
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if isinstance(value, str):
+        cleaned = value.strip().rstrip("%").strip()
+        if not cleaned:
+            return None
+        try:
+            return float(cleaned)
+        except ValueError:
+            return None
+    return None
+
+
 def extract_json(text: str) -> Dict[str, Any]:
     """Best-effort JSON parse that tolerates markdown fencing and stray prose."""
     stripped = text.strip()

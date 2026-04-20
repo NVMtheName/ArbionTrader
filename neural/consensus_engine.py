@@ -233,8 +233,13 @@ class ConsensusNeuralEngine(BaseNeuralEngine):
         # For sizing, take the smaller of the agreeing providers to stay conservative.
         size = min(a.suggested_position_size for a in top_group)
         # Risk: escalate to the highest risk tier among agreeing providers.
+        # Unknown values are treated as EXTREME so a malformed LLM response can
+        # never *reduce* the consensus risk rating.
         risk_order = ["LOW", "MEDIUM", "HIGH", "EXTREME"]
-        risk = max((a.risk_assessment for a in top_group), key=lambda r: risk_order.index(r) if r in risk_order else 0)
+        risk = max(
+            (a.risk_assessment for a in top_group),
+            key=lambda r: risk_order.index(r) if r in risk_order else len(risk_order) - 1,
+        )
 
         # Merge suggested SL/TP: use median where present
         sls = [a.suggested_sl_pct for a in top_group if a.suggested_sl_pct is not None]

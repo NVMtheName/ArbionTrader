@@ -9,9 +9,9 @@ from collections import deque
 from typing import Any, Deque, Dict
 
 from flask import Blueprint, jsonify, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
-from .base_engine import AIProvider
+from .base_engine import NeuralAnalysis
 from .consensus_engine import accuracy_ledger, record_outcome
 from .engine_factory import NeuralEngineFactory
 from ._common import usage_tracker
@@ -20,10 +20,21 @@ logger = logging.getLogger(__name__)
 
 neural_bp = Blueprint("neural", __name__, url_prefix="/api/neural")
 
+# Providers that may be recorded against the accuracy ledger. Bounding this
+# prevents unbounded ledger growth from arbitrary user-supplied strings.
+_KNOWN_PROVIDERS = frozenset({"claude", "openai", "consensus"})
+
 
 # In-memory history of the most recent analyses (bounded)
 _HISTORY_MAX = 50
 _history: Deque[Dict[str, Any]] = deque(maxlen=_HISTORY_MAX)
+
+
+def _require_admin():
+    """Return a (response, status) tuple if the current user is not an admin."""
+    if not getattr(current_user, "is_authenticated", False) or not current_user.is_admin():
+        return jsonify({"error": "admin privileges required"}), 403
+    return None
 
 
 def _mask_key(env_var: str) -> str:
@@ -107,7 +118,15 @@ def analyze(ticker: str):
 @neural_bp.route("/config", methods=["POST"])
 @login_required
 def config():
-    """Swap provider / model at runtime. Body: {provider, model, consensus_mode?}."""
+    """Swap provider / model at runtime. Body: {provider, model, consensus_mode?}.
+
+    Admin-only: this endpoint mutates a process-wide default that affects every
+    user's trade analyses, so a non-admin caller must not be able to flip it.
+    """
+    denied = _require_admin()
+    if denied is not None:
+        return denied
+
     body = request.get_json(silent=True) or {}
     provider = body.get("provider")
     model = body.get("model")
@@ -156,11 +175,20 @@ def accuracy_record():
     if not provider or outcome not in ("WIN", "LOSS", "SCRATCH") or not analysis:
         return jsonify({"error": "provider, outcome in {WIN,LOSS,SCRATCH}, and analysis required"}), 400
 
-    from .base_engine import NeuralAnalysis
+    # Constrain provider to a known set so callers can't expand the in-memory
+    # ledger keyspace arbitrarily.
+    if provider not in _KNOWN_PROVIDERS:
+        return jsonify({"error": f"provider must be one of {sorted(_KNOWN_PROVIDERS)}"}), 400
+
     try:
         na = NeuralAnalysis(**{k: v for k, v in analysis.items() if k in NeuralAnalysis.__dataclass_fields__})
     except Exception as e:
         return jsonify({"error": f"invalid analysis: {e}"}), 400
+
+    # The supplied provider must agree with the analysis's recorded provider —
+    # otherwise a caller could attribute outcomes to the wrong engine.
+    if na.provider and na.provider != provider:
+        return jsonify({"error": "provider does not match analysis.provider"}), 400
 
     record_outcome(provider, na, outcome, pnl_pct)
     return jsonify({"ok": True})

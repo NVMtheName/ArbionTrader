@@ -16,12 +16,14 @@ from ._common import (
     cache_get,
     cache_set,
     call_with_retry,
+    coerce_optional_float,
     estimate_cost_usd,
     extract_json,
     usage_tracker,
 )
 from .prompts import (
-    TRADING_SYSTEM_PROMPT,
+    TRADING_SYSTEM_PROMPT_JSON,
+    TRADING_SYSTEM_PROMPT_PROSE,
     build_market_brief_prompt,
     build_portfolio_review_prompt,
     build_strategy_optimization_prompt,
@@ -122,7 +124,9 @@ class OpenAINeuralEngine(BaseNeuralEngine):
         cached_raw = cache_get(self.provider.value, self.model, "trade", cache_payload)
         if cached_raw:
             try:
-                parsed = json.loads(cached_raw)
+                # Use extract_json so legacy raw entries (potentially fenced) and
+                # the normalised JSON we now write both round-trip cleanly.
+                parsed = extract_json(cached_raw)
                 result = {"raw_response": cached_raw, "tokens_used": 0, "latency_ms": 0.0,
                           "input_tokens": 0, "output_tokens": 0}
                 self._record("trade", result, success=True, cached=True)
@@ -131,7 +135,7 @@ class OpenAINeuralEngine(BaseNeuralEngine):
                 pass
 
         try:
-            result = self._call(TRADING_SYSTEM_PROMPT, user_prompt, json_mode=True)
+            result = self._call(TRADING_SYSTEM_PROMPT_JSON, user_prompt, json_mode=True)
         except Exception as e:
             logger.error("OpenAI analyze_trade API error: %s", e)
             self._record("trade", {"tokens_used": 0, "latency_ms": 0.0}, success=False, cached=False, error=str(e))
@@ -151,7 +155,10 @@ class OpenAINeuralEngine(BaseNeuralEngine):
             )
 
         cost = self._record("trade", result, success=True, cached=False)
-        cache_set(self.provider.value, self.model, "trade", cache_payload, raw, ttl=self.cache_ttl)
+        cache_set(
+            self.provider.value, self.model, "trade", cache_payload,
+            json.dumps(parsed), ttl=self.cache_ttl,
+        )
         analysis = self._to_analysis(parsed, raw, result, cached=False)
         analysis.cost_usd = cost
         return analysis
@@ -163,14 +170,14 @@ class OpenAINeuralEngine(BaseNeuralEngine):
         cached_raw = cache_get(self.provider.value, self.model, "portfolio", cache_payload)
         if cached_raw:
             try:
-                parsed = json.loads(cached_raw)
+                parsed = extract_json(cached_raw)
                 self._record("portfolio", {"tokens_used": 0, "latency_ms": 0.0}, success=True, cached=True)
                 return {**parsed, "_meta": {"cached": True, "provider": self.provider.value, "model": self.model}}
             except Exception:
                 pass
 
         try:
-            result = self._call(TRADING_SYSTEM_PROMPT, user_prompt, json_mode=True)
+            result = self._call(TRADING_SYSTEM_PROMPT_JSON, user_prompt, json_mode=True)
         except Exception as e:
             logger.error("OpenAI analyze_portfolio API error: %s", e)
             self._record("portfolio", {"tokens_used": 0, "latency_ms": 0.0}, success=False, cached=False, error=str(e))
@@ -185,7 +192,10 @@ class OpenAINeuralEngine(BaseNeuralEngine):
             raise ValueError(f"OpenAI portfolio review returned invalid JSON: {e}")
 
         cost = self._record("portfolio", result, success=True, cached=False)
-        cache_set(self.provider.value, self.model, "portfolio", cache_payload, raw, ttl=self.cache_ttl)
+        cache_set(
+            self.provider.value, self.model, "portfolio", cache_payload,
+            json.dumps(parsed), ttl=self.cache_ttl,
+        )
         return {
             **parsed,
             "_meta": {
@@ -208,7 +218,7 @@ class OpenAINeuralEngine(BaseNeuralEngine):
             return cached_raw
 
         try:
-            result = self._call(TRADING_SYSTEM_PROMPT, user_prompt, json_mode=False)
+            result = self._call(TRADING_SYSTEM_PROMPT_PROSE, user_prompt, json_mode=False)
         except Exception as e:
             logger.error("OpenAI explain_trade API error: %s", e)
             self._record("explain", {"tokens_used": 0, "latency_ms": 0.0}, success=False, cached=False, error=str(e))
@@ -228,7 +238,7 @@ class OpenAINeuralEngine(BaseNeuralEngine):
             return cached_raw
 
         try:
-            result = self._call(TRADING_SYSTEM_PROMPT, user_prompt, json_mode=False)
+            result = self._call(TRADING_SYSTEM_PROMPT_PROSE, user_prompt, json_mode=False)
         except Exception as e:
             logger.error("OpenAI generate_market_brief API error: %s", e)
             self._record("brief", {"tokens_used": 0, "latency_ms": 0.0}, success=False, cached=False, error=str(e))
@@ -241,7 +251,7 @@ class OpenAINeuralEngine(BaseNeuralEngine):
     def optimize_strategy(self, backtest_results: Dict, current_params: Dict) -> Dict:
         user_prompt = build_strategy_optimization_prompt(backtest_results, current_params)
         try:
-            result = self._call(TRADING_SYSTEM_PROMPT, user_prompt, json_mode=True)
+            result = self._call(TRADING_SYSTEM_PROMPT_JSON, user_prompt, json_mode=True)
         except Exception as e:
             logger.error("OpenAI optimize_strategy API error: %s", e)
             self._record("optimize", {"tokens_used": 0, "latency_ms": 0.0}, success=False, cached=False, error=str(e))
@@ -276,15 +286,26 @@ class OpenAINeuralEngine(BaseNeuralEngine):
         result: Dict[str, Any],
         cached: bool,
     ) -> NeuralAnalysis:
+        try:
+            confidence = float(parsed.get("confidence", 0.0))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        try:
+            position_size = float(parsed.get("suggested_position_size", 0.0))
+        except (TypeError, ValueError):
+            position_size = 0.0
         return NeuralAnalysis(
             direction=parsed.get("direction", "NEUTRAL"),
-            confidence=float(parsed.get("confidence", 0.0)),
+            confidence=confidence,
             reasoning=parsed.get("reasoning", ""),
             key_factors=list(parsed.get("key_factors", [])),
             risk_assessment=parsed.get("risk_assessment", "HIGH"),
-            suggested_position_size=float(parsed.get("suggested_position_size", 0.0)),
-            suggested_sl_pct=parsed.get("suggested_sl_pct"),
-            suggested_tp_pct=parsed.get("suggested_tp_pct"),
+            suggested_position_size=position_size,
+            # LLMs sometimes emit numeric fields as strings ("1.5") or with
+            # trailing units ("1.5%"); coerce defensively so the consensus
+            # engine's median merge never sees a non-float.
+            suggested_sl_pct=coerce_optional_float(parsed.get("suggested_sl_pct")),
+            suggested_tp_pct=coerce_optional_float(parsed.get("suggested_tp_pct")),
             market_context=parsed.get("market_context", ""),
             contrarian_view=parsed.get("contrarian_view", ""),
             raw_response=raw,
