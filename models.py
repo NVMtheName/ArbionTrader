@@ -369,3 +369,65 @@ class PerformanceBenchmark(db.Model):
     
     def __repr__(self):
         return f'<PerformanceBenchmark {self.benchmark_symbol} {self.period} for user {self.user_id}>'
+
+
+class NeuralAnalysisLog(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    provider = db.Column(db.String(30), nullable=False)
+    model = db.Column(db.String(100), nullable=False)
+    ticker = db.Column(db.String(20), nullable=False)
+    direction = db.Column(db.String(20), nullable=False)
+    confidence = db.Column(db.Float, default=0.0)
+    reasoning = db.Column(Text)
+    tokens_used = db.Column(db.Integer, default=0)
+    latency_ms = db.Column(db.Float, default=0.0)
+    won = db.Column(db.Boolean)  # Nullable until outcome known
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'provider': self.provider,
+            'model': self.model,
+            'ticker': self.ticker,
+            'direction': self.direction,
+            'confidence': self.confidence,
+            'reasoning': self.reasoning,
+            'tokens_used': self.tokens_used,
+            'latency_ms': self.latency_ms,
+            'won': self.won,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+        }
+
+
+class NeuralProviderStats(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    provider = db.Column(db.String(30), unique=True, nullable=False)
+    analyses = db.Column(db.Integer, default=0)
+    wins = db.Column(db.Integer, default=0)
+    losses = db.Column(db.Integer, default=0)
+    disagreements = db.Column(db.Integer, default=0)
+    total_confidence = db.Column(db.Float, default=0.0)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def register(self, confidence: float, won: bool = None, disagreement: bool = False):
+        self.analyses = (self.analyses or 0) + 1
+        self.total_confidence = (self.total_confidence or 0.0) + float(confidence or 0.0)
+        if won is True:
+            self.wins = (self.wins or 0) + 1
+        elif won is False:
+            self.losses = (self.losses or 0) + 1
+        if disagreement:
+            self.disagreements = (self.disagreements or 0) + 1
+
+    def to_dict(self):
+        analyses = self.analyses or 0
+        return {
+            'provider': self.provider,
+            'analyses': analyses,
+            'wins': self.wins or 0,
+            'losses': self.losses or 0,
+            'win_rate': ((self.wins or 0) / analyses) if analyses else 0.0,
+            'avg_confidence': ((self.total_confidence or 0.0) / analyses) if analyses else 0.0,
+            'disagreements': self.disagreements or 0,
+        }

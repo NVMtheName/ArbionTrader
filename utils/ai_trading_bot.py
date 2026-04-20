@@ -18,6 +18,7 @@ from flask_login import current_user
 from utils.openai_auth_manager import create_auth_manager
 from utils.schwabdev_integration import create_schwabdev_manager
 from utils.enhanced_openai_client import EnhancedOpenAIClient
+from neural import NeuralEngineFactory
 
 logger = logging.getLogger(__name__)
 
@@ -527,6 +528,48 @@ class AITradingBot:
             except Exception as e:
                 # If the confluence module is unavailable, log and proceed
                 logger.warning("Confluence filter unavailable, proceeding without: %s", e)
+
+            # --- Optional neural AI confirmation layer ---
+            if self.config.get('NEURAL_ENGINE_ENABLED', False):
+                try:
+                    neural_engine = NeuralEngineFactory.create(
+                        provider=self.config.get('AI_PROVIDER'),
+                        model=self.config.get('AI_MODEL'),
+                    )
+                    neural_analysis = neural_engine.analyze_trade(
+                        ticker=signal.symbol,
+                        market_data={
+                            'current_price': signal.price_target,
+                            'asset_class': 'EQUITY',
+                        },
+                        signals=asdict(signal),
+                        sentiment=None,
+                        regime=self.config.get('market_regime'),
+                    )
+                    confidence_threshold = float(self.config.get('NEURAL_CONFIDENCE_THRESHOLD', 0.4))
+                    if neural_analysis.direction == 'NEUTRAL' or neural_analysis.confidence < confidence_threshold:
+                        logger.info(
+                            "Trade vetoed by neural engine for %s: direction=%s confidence=%.3f",
+                            signal.symbol,
+                            neural_analysis.direction,
+                            neural_analysis.confidence,
+                        )
+                        return {
+                            'success': False,
+                            'error': 'neural engine vetoed trade',
+                            'neural_analysis': neural_analysis.to_dict(),
+                            'signal': asdict(signal),
+                        }
+
+                    adjusted_qty = max(0, int(signal.quantity * neural_analysis.suggested_position_size))
+                    signal.quantity = adjusted_qty
+                except Exception as e:
+                    logger.warning("Neural engine unavailable, vetoing trade for safety: %s", e)
+                    return {
+                        'success': False,
+                        'error': f'neural engine unavailable: {e}',
+                        'signal': asdict(signal),
+                    }
 
             # Check if paper trading
             if self.config.get('paper_trading', True):
