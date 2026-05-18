@@ -94,10 +94,10 @@ def login():
 
         normalized_identifier = normalize_email(identifier)
 
+        user = None
         try:
-            # Load the minimum required authentication fields first so login still
-            # works on partially-migrated databases that might be missing newer
-            # columns such as `is_active` or `last_login`.
+            # Primary lookup supports both email and username.
+            # This can fail on older databases that don't have a username column.
             user = User.query.options(
                 load_only(
                     User.id,
@@ -109,10 +109,22 @@ def login():
                 (User.email == normalized_identifier) | (User.username == normalize_username(identifier))
             ).first()
         except Exception as e:
-            logging.error(f"Database error during login query: {e}")
+            logging.warning(f"Primary login query failed, trying email-only fallback: {e}")
             db.session.rollback()
-            flash('A server error occurred. Please try again in a moment.', 'error')
-            return render_template('login.html')
+            try:
+                # Fallback for legacy schemas: authenticate by email only.
+                user = User.query.options(
+                    load_only(
+                        User.id,
+                        User.email,
+                        User.password_hash,
+                    )
+                ).filter(User.email == normalized_identifier).first()
+            except Exception as fallback_error:
+                logging.error(f"Database error during login query fallback: {fallback_error}")
+                db.session.rollback()
+                flash('A server error occurred. Please try again in a moment.', 'error')
+                return render_template('login.html')
 
         if user and verify_password(user.password_hash, password):
             # Some legacy databases may not have `is_active` yet. Treat missing
