@@ -95,12 +95,14 @@ def login():
         return redirect(url_for('main.dashboard'))
 
     if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
+        identifier = request.form.get('email', '').strip()
         password = request.form.get('password')
 
-        if not email or not password:
-            flash('Please enter both email and password.', 'error')
+        if not identifier or not password:
+            flash('Please enter both email/username and password.', 'error')
             return render_template('login.html')
+
+        normalized_identifier = identifier.lower()
 
         try:
             # Load the minimum required authentication fields first so login still
@@ -113,7 +115,9 @@ def login():
                     User.email,
                     User.password_hash,
                 )
-            ).filter_by(email=email).first()
+            ).filter(
+                (User.email == normalized_identifier) | (User.username == identifier)
+            ).first()
         except Exception as e:
             logging.error(f"Database error during login query: {e}")
             db.session.rollback()
@@ -126,7 +130,7 @@ def login():
             try:
                 is_user_active = bool(user.is_active)
             except Exception as active_error:
-                logging.warning(f"Unable to read is_active for {email}: {active_error}. Defaulting to active.")
+                logging.warning(f"Unable to read is_active for {identifier}: {active_error}. Defaulting to active.")
                 db.session.rollback()
                 is_user_active = True
 
@@ -136,7 +140,7 @@ def login():
                     user.last_login = datetime.utcnow()
                     db.session.commit()
                 except Exception as e:
-                    logging.error(f"Failed to update last_login for {email}: {e}")
+                    logging.error(f"Failed to update last_login for {identifier}: {e}")
                     db.session.rollback()
                 logging.info(f"User {user.email} logged in successfully")
                 next_page = request.args.get('next')
@@ -148,10 +152,10 @@ def login():
                     return redirect('/')
             else:
                 flash('Your account has been deactivated. Please contact an administrator.', 'error')
-                logging.warning(f"Deactivated user attempted login: {email}")
+                logging.warning(f"Deactivated user attempted login: {identifier}")
         else:
             flash('Invalid email or password.', 'error')
-            logging.warning(f"Failed login attempt for: {email}")
+            logging.warning(f"Failed login attempt for: {identifier}")
 
     return render_template('login.html')
 
