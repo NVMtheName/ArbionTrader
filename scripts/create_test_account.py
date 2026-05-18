@@ -8,13 +8,14 @@ Usage:
 import sys
 from pathlib import Path
 
+from werkzeug.security import generate_password_hash
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from app import create_app, db
 from models import User
-from werkzeug.security import generate_password_hash
 
 TEST_EMAIL = "test@test.com"
 TEST_PASSWORD = "arbiontrader"
@@ -22,6 +23,7 @@ TEST_PASSWORD = "arbiontrader"
 
 def main() -> None:
     app = create_app()
+
     with app.app_context():
         user = User.query.filter_by(email=TEST_EMAIL).first()
 

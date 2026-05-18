@@ -5,6 +5,7 @@ from flask_login import login_user, logout_user, login_required, current_user
 from werkzeug.security import check_password_hash, generate_password_hash
 from models import User
 from app import db, limiter
+from sqlalchemy.orm import load_only
 import logging
 
 auth_bp = Blueprint('auth', __name__)
@@ -102,7 +103,18 @@ def login():
             return render_template('login.html')
 
         try:
-            user = User.query.filter_by(email=email).first()
+            # Load only fields required for authentication to tolerate
+            # partially-migrated databases missing newer columns.
+            user = User.query.options(
+                load_only(
+                    User.id,
+                    User.username,
+                    User.email,
+                    User.password_hash,
+                    User.is_active,
+                    User.last_login,
+                )
+            ).filter_by(email=email).first()
         except Exception as e:
             logging.error(f"Database error during login query: {e}")
             db.session.rollback()
