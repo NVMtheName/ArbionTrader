@@ -128,7 +128,11 @@ def login():
             # Some legacy databases may not have `is_active` yet. Treat missing
             # column as active to avoid blocking valid logins.
             try:
-                is_user_active = bool(user.is_active)
+                raw_is_active = user.is_active
+                # Legacy rows may have NULL is_active values even when the column
+                # exists. Treat NULL as active so valid historical accounts are
+                # not blocked from logging in.
+                is_user_active = True if raw_is_active is None else bool(raw_is_active)
             except Exception as active_error:
                 logging.warning(f"Unable to read is_active for {identifier}: {active_error}. Defaulting to active.")
                 db.session.rollback()
