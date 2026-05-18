@@ -1,28 +1,20 @@
-import re
 from datetime import datetime
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
-from werkzeug.security import check_password_hash, generate_password_hash
 from models import User
 from app import db, limiter
 from sqlalchemy.orm import load_only
+from utils.auth_security import (
+    hash_password,
+    normalize_email,
+    normalize_username,
+    validate_password_strength,
+    validate_username,
+    verify_password,
+)
 import logging
 
 auth_bp = Blueprint('auth', __name__)
-
-
-def validate_password_strength(password):
-    """Validate password meets strength requirements.
-    Returns (is_valid, error_message)."""
-    if len(password) < 8:
-        return False, 'Password must be at least 8 characters long.'
-    if not re.search(r'[A-Z]', password):
-        return False, 'Password must contain at least one uppercase letter.'
-    if not re.search(r'[a-z]', password):
-        return False, 'Password must contain at least one lowercase letter.'
-    if not re.search(r'[0-9]', password):
-        return False, 'Password must contain at least one digit.'
-    return True, ''
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
@@ -32,8 +24,8 @@ def register():
         return redirect(url_for('main.dashboard'))
 
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
-        email = request.form.get('email', '').strip().lower()
+        username = normalize_username(request.form.get('username', ''))
+        email = normalize_email(request.form.get('email', ''))
         password = request.form.get('password')
         confirm = request.form.get('confirm_password')
 
@@ -41,13 +33,11 @@ def register():
             flash('All fields are required.', 'error')
             return render_template('register.html')
 
-        if len(username) < 3 or len(username) > 64:
-            flash('Username must be between 3 and 64 characters.', 'error')
+        is_username_valid, username_err = validate_username(username)
+        if not is_username_valid:
+            flash(username_err, 'error')
             return render_template('register.html')
 
-        if not re.match(r'^[a-zA-Z0-9_.-]+$', username):
-            flash('Username can only contain letters, numbers, dots, hyphens, and underscores.', 'error')
-            return render_template('register.html')
 
         if password != confirm:
             flash('Passwords do not match.', 'error')
@@ -71,7 +61,7 @@ def register():
             new_user = User(
                 username=username,
                 email=email,
-                password_hash=generate_password_hash(password),
+                password_hash=hash_password(password),
                 role='standard'
             )
             db.session.add(new_user)
@@ -102,7 +92,7 @@ def login():
             flash('Please enter both email/username and password.', 'error')
             return render_template('login.html')
 
-        normalized_identifier = identifier.lower()
+        normalized_identifier = normalize_email(identifier)
 
         try:
             # Load the minimum required authentication fields first so login still
@@ -116,7 +106,7 @@ def login():
                     User.password_hash,
                 )
             ).filter(
-                (User.email == normalized_identifier) | (User.username == identifier)
+                (User.email == normalized_identifier) | (User.username == normalize_username(identifier))
             ).first()
         except Exception as e:
             logging.error(f"Database error during login query: {e}")
@@ -124,7 +114,7 @@ def login():
             flash('A server error occurred. Please try again in a moment.', 'error')
             return render_template('login.html')
 
-        if user and check_password_hash(user.password_hash, password):
+        if user and verify_password(user.password_hash, password):
             # Some legacy databases may not have `is_active` yet. Treat missing
             # column as active to avoid blocking valid logins.
             try:
@@ -183,7 +173,7 @@ def change_password():
         flash('All password fields are required.', 'error')
         return redirect(url_for('main.account'))
 
-    if not check_password_hash(current_user.password_hash, current_password):
+    if not verify_password(current_user.password_hash, current_password):
         flash('Current password is incorrect.', 'error')
         return redirect(url_for('main.account'))
 
@@ -196,7 +186,7 @@ def change_password():
         flash(error_msg, 'error')
         return redirect(url_for('main.account'))
 
-    current_user.password_hash = generate_password_hash(new_password)
+    current_user.password_hash = hash_password(new_password)
     current_user.password_changed_at = datetime.utcnow()
     db.session.commit()
 

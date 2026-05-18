@@ -1,6 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from flask_login import login_required, current_user
-from werkzeug.security import generate_password_hash
 from functools import wraps
 import logging
 import json
@@ -1271,13 +1270,23 @@ def user_management():
 @login_required
 @superadmin_required
 def create_user():
-    username = request.form.get('username')
-    email = request.form.get('email')
+    username = normalize_username(request.form.get('username'))
+    email = normalize_email(request.form.get('email'))
     password = request.form.get('password')
     role = request.form.get('role')
     
     if not all([username, email, password, role]):
         flash('All fields are required.', 'error')
+        return redirect(url_for('main.user_management'))
+
+    is_username_valid, username_error = validate_username(username)
+    if not is_username_valid:
+        flash(username_error, 'error')
+        return redirect(url_for('main.user_management'))
+
+    is_password_valid, password_error = validate_password_strength(password)
+    if not is_password_valid:
+        flash(password_error, 'error')
         return redirect(url_for('main.user_management'))
     
     if role not in ['standard', 'admin', 'superadmin']:
@@ -1296,7 +1305,7 @@ def create_user():
     new_user = User()
     new_user.username = username
     new_user.email = email
-    new_user.password_hash = generate_password_hash(password or '')
+    new_user.password_hash = hash_password(password or '')
     new_user.role = role
     
     db.session.add(new_user)
@@ -1400,8 +1409,9 @@ def reset_user_password():
         flash('Passwords do not match.', 'error')
         return redirect(url_for('main.user_management'))
 
-    if len(new_password) < 8:
-        flash('Password must be at least 8 characters long.', 'error')
+    is_valid, password_error = validate_password_strength(new_password)
+    if not is_valid:
+        flash(password_error, 'error')
         return redirect(url_for('main.user_management'))
 
     user = User.query.get(user_id)
@@ -1409,7 +1419,7 @@ def reset_user_password():
         flash('User not found.', 'error')
         return redirect(url_for('main.user_management'))
 
-    user.password_hash = generate_password_hash(new_password)
+    user.password_hash = hash_password(new_password)
     db.session.commit()
 
     flash(f'Password reset for user {user.username}.', 'success')
