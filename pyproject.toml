@@ -35,7 +35,12 @@ dependencies = [
     "flask-caching>=2.3.0",
     "flask-limiter>=3.8.0",
     "pytest>=8.4.1",
+    "praw>=7.7.0",
+]
+
+
+[project.optional-dependencies]
+ai = [
     "transformers>=4.40.0",
     "torch>=2.2.0",
-    "praw>=7.7.0",
 ]

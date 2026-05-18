@@ -1476,11 +1476,15 @@ dependencies = [
     { name = "schwabdev" },
     { name = "scikit-learn" },
     { name = "sqlalchemy" },
-    { name = "torch" },
-    { name = "transformers" },
     { name = "websockets" },
     { name = "werkzeug" },
     { name = "yfinance" },
+]
+
+[package.optional-dependencies]
+ai = [
+    { name = "torch" },
+    { name = "transformers" },
 ]
 
 [package.metadata]
@@ -1514,12 +1518,13 @@ requires-dist = [
     { name = "schwabdev", specifier = ">=2.5.0" },
     { name = "scikit-learn", specifier = ">=1.7.0" },
     { name = "sqlalchemy", specifier = ">=2.0.41" },
-    { name = "torch", specifier = ">=2.2.0" },
-    { name = "transformers", specifier = ">=4.40.0" },
+    { name = "torch", marker = "extra == 'ai'", specifier = ">=2.2.0" },
+    { name = "transformers", marker = "extra == 'ai'", specifier = ">=4.40.0" },
     { name = "websockets", specifier = ">=11.0" },
     { name = "werkzeug", specifier = ">=3.1.3" },
     { name = "yfinance", specifier = ">=0.2.65" },
 ]
+provides-extras = ["ai"]
 
 [[package]]
 name = "requests"
