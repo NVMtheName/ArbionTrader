@@ -103,16 +103,15 @@ def login():
             return render_template('login.html')
 
         try:
-            # Load only fields required for authentication to tolerate
-            # partially-migrated databases missing newer columns.
+            # Load the minimum required authentication fields first so login still
+            # works on partially-migrated databases that might be missing newer
+            # columns such as `is_active` or `last_login`.
             user = User.query.options(
                 load_only(
                     User.id,
                     User.username,
                     User.email,
                     User.password_hash,
-                    User.is_active,
-                    User.last_login,
                 )
             ).filter_by(email=email).first()
         except Exception as e:
@@ -122,7 +121,16 @@ def login():
             return render_template('login.html')
 
         if user and check_password_hash(user.password_hash, password):
-            if user.is_active:
+            # Some legacy databases may not have `is_active` yet. Treat missing
+            # column as active to avoid blocking valid logins.
+            try:
+                is_user_active = bool(user.is_active)
+            except Exception as active_error:
+                logging.warning(f"Unable to read is_active for {email}: {active_error}. Defaulting to active.")
+                db.session.rollback()
+                is_user_active = True
+
+            if is_user_active:
                 login_user(user)
                 try:
                     user.last_login = datetime.utcnow()
