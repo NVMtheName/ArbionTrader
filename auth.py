@@ -11,6 +11,7 @@ from utils.auth_security import (
     validate_password_strength,
     validate_username,
     verify_password,
+    verify_password_with_legacy_support,
 )
 import logging
 
@@ -126,7 +127,12 @@ def login():
                 flash('A server error occurred. Please try again in a moment.', 'error')
                 return render_template('login.html')
 
-        if user and verify_password(user.password_hash, password):
+        if user:
+            is_password_valid, used_legacy_hash = verify_password_with_legacy_support(user.password_hash, password)
+        else:
+            is_password_valid, used_legacy_hash = (False, False)
+
+        if user and is_password_valid:
             # Some legacy databases may not have `is_active` yet. Treat missing
             # column as active to avoid blocking valid logins.
             try:
@@ -141,6 +147,14 @@ def login():
                 is_user_active = True
 
             if is_user_active:
+                if used_legacy_hash:
+                    try:
+                        user.password_hash = hash_password(password)
+                        db.session.commit()
+                        logging.info(f"Legacy hash migrated for user: {user.email}")
+                    except Exception as migration_error:
+                        logging.warning(f"Legacy hash migration failed for {identifier}: {migration_error}")
+                        db.session.rollback()
                 login_user(user)
                 try:
                     user.last_login = datetime.utcnow()
@@ -161,7 +175,7 @@ def login():
                 logging.warning(f"Deactivated user attempted login: {identifier}")
         else:
             flash('Invalid email or password.', 'error')
-            logging.warning(f"Failed login attempt for: {identifier}")
+            logging.warning(f"Failed verification for: {identifier}")
 
     return render_template('login.html')
 

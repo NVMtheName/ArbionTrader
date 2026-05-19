@@ -48,3 +48,18 @@ def hash_password(password: str) -> str:
 
 def verify_password(stored_hash: str, password: str) -> bool:
     return check_password_hash(stored_hash, f"{password}{PASSWORD_PEPPER}")
+
+
+def verify_password_with_legacy_support(stored_hash: str, password: str) -> Tuple[bool, bool]:
+    """Verify password and indicate whether a legacy (unpeppered) hash matched.
+
+    Returns:
+        (is_valid, used_legacy_hash)
+    """
+    if check_password_hash(stored_hash, f"{password}{PASSWORD_PEPPER}"):
+        return True, False
+
+    if check_password_hash(stored_hash, password):
+        return True, True
+
+    return False, False
