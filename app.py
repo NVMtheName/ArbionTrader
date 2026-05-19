@@ -188,19 +188,33 @@ def create_app():
         if admin_email and admin_password:
             try:
                 from models import User
-                from werkzeug.security import generate_password_hash
+                from utils.auth_security import hash_password, verify_password
+                from werkzeug.security import check_password_hash
 
                 existing_admin = User.query.filter_by(email=admin_email).first()
                 if not existing_admin:
                     admin_user = User(
                         username="superadmin",
                         email=admin_email,
-                        password_hash=generate_password_hash(admin_password),
+                        password_hash=hash_password(admin_password),
                         role="superadmin"
                     )
                     db.session.add(admin_user)
                     db.session.commit()
                     logging.info(f"Created default superadmin user: {admin_email}")
+                else:
+                    stored_hash = existing_admin.password_hash
+                    if verify_password(stored_hash, admin_password):
+                        logging.info(f"Superadmin credentials verified for {admin_email}")
+                    elif check_password_hash(stored_hash, admin_password):
+                        existing_admin.password_hash = hash_password(admin_password)
+                        db.session.commit()
+                        logging.info(f"Migrated legacy superadmin password hash for {admin_email}")
+                    else:
+                        logging.warning(
+                            "SUPERADMIN_PASSWORD does not match existing DB hash for "
+                            f"{admin_email}; skipping superadmin password mutation"
+                        )
             except Exception as e:
                 logging.error(f"Failed to create superadmin user: {e}")
                 db.session.rollback()
