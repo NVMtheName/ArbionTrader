@@ -172,45 +172,51 @@ flask run
 ```
 
 
-## Emergency Admin Recovery
+## Emergency Superadmin Recovery (Ops Only)
 
-Use the emergency recovery utility to reset a locked-out `superadmin` account safely.
+Use `scripts/recover_superadmin.py` only during break-glass incidents where no superadmin can access the system.
 
-### Authorization Guard
+### Hard Safeguards (Required)
 
-This tool is blocked unless `ALLOW_ADMIN_RESET=true` is set in the environment.
+The script refuses execution unless all of the following are present:
 
-### Reset by Email
+- `ALLOW_SUPERADMIN_RECOVERY=true`
+- `SUPERADMIN_RECOVERY_CONFIRM_TOKEN` environment variable
+- `--confirm-token <token>` argument that exactly matches the environment token
+
+### Usage
 
 ```bash
-export ALLOW_ADMIN_RESET=true
-python scripts/reset_superadmin.py \
+export ALLOW_SUPERADMIN_RECOVERY=true
+export SUPERADMIN_RECOVERY_CONFIRM_TOKEN='<one-time-token>'
+python scripts/recover_superadmin.py \
   --email <superadmin-email> \
-  --new-password '<NewStrongPassword!>'
+  --confirm-token '<one-time-token>' \
+  --set-active \
+  --rotate-password
 ```
 
-### Reset by Username
+### Operation Modes
 
-```bash
-export ALLOW_ADMIN_RESET=true
-python scripts/reset_superadmin.py \
-  --username <superadmin-username> \
-  --new-password '<NewStrongPassword!>'
-```
+- Always ensures the target account role is `superadmin`
+- `--set-active` optionally forces `is_active=True`
+- `--rotate-password` optionally rotates the password hash to a cryptographically random value for force-reset flow
 
-### Optional Username Normalization
+### Audit Logging
 
-Add `--normalize-username` to force lowercase normalized username storage during recovery.
+Each run writes a structured JSON audit event to logs including:
 
-```bash
-export ALLOW_ADMIN_RESET=true
-python scripts/reset_superadmin.py \
-  --email <superadmin-email> \
-  --new-password '<NewStrongPassword!>' \
-  --normalize-username
-```
+- who ran it (`USER`/`SUDO_USER`, OS user, hostname)
+- when (UTC timestamp)
+- target account identity
+- exact fields changed
 
-The utility updates password hashes via `hash_password()`, sets `is_active=True`, and writes a timestamped audit log entry with the target account identity (never the plaintext password).
+### Post-Recovery Checklist
+
+1. Validate superadmin login via approved credentials-reset path.
+2. Rotate related secrets and credentials (session secret, OAuth/API secrets as applicable).
+3. Review and archive the recovery audit log event.
+4. Unset `ALLOW_SUPERADMIN_RECOVERY` and `SUPERADMIN_RECOVERY_CONFIRM_TOKEN` immediately.
 
 ## User Registration
 
