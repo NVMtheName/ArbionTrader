@@ -28,6 +28,13 @@ def superadmin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
+def _count_active_superadmins(lock_rows=False):
+    query = User.query.filter_by(role='superadmin', is_active=True)
+    if lock_rows:
+        query = query.with_for_update()
+    return query.count()
+
 def get_dashboard_market_data():
     """Get real-time market data for dashboard display with entire market coverage"""
     try:
@@ -1320,22 +1327,32 @@ def create_user():
 @superadmin_required
 def toggle_user_status():
     user_id = request.form.get('user_id')
-    user = User.query.get(user_id)
-    
-    if not user:
-        flash('User not found.', 'error')
-        return redirect(url_for('main.user_management'))
-    
-    if user.id == current_user.id:
-        flash('You cannot deactivate your own account.', 'error')
-        return redirect(url_for('main.user_management'))
-    
-    user.is_active = not user.is_active
-    db.session.commit()
-    
-    status = 'activated' if user.is_active else 'deactivated'
-    flash(f'User {user.username} {status} successfully.', 'success')
-    logging.info(f"User {user.username} {status} by {current_user.email}")
+    try:
+        with db.session.begin():
+            user = User.query.filter_by(id=user_id).with_for_update().first()
+
+            if not user:
+                flash('User not found.', 'error')
+                return redirect(url_for('main.user_management'))
+
+            if user.id == current_user.id:
+                flash('You cannot deactivate your own account.', 'error')
+                return redirect(url_for('main.user_management'))
+
+            user.is_active = not user.is_active
+
+            # Re-check invariant in the same transaction just before commit.
+            if user.role == 'superadmin' and not user.is_active and _count_active_superadmins(lock_rows=True) < 1:
+                flash('Cannot deactivate the last active superadmin.', 'error')
+                return redirect(url_for('main.user_management'))
+
+        status = 'activated' if user.is_active else 'deactivated'
+        flash(f'User {user.username} {status} successfully.', 'success')
+        logging.info(f"User {user.username} {status} by {current_user.email}")
+    except Exception as e:
+        db.session.rollback()
+        flash('Unable to update user at this time. Please try again.', 'error')
+        logging.exception(f"toggle_user_status failed for user_id={user_id}: {e}")
     return redirect(url_for('main.user_management'))
 
 @main_bp.route('/change-user-role', methods=['POST'])
@@ -1353,21 +1370,31 @@ def change_user_role():
         flash('Invalid role selected.', 'error')
         return redirect(url_for('main.user_management'))
 
-    user = User.query.get(user_id)
-    if not user:
-        flash('User not found.', 'error')
-        return redirect(url_for('main.user_management'))
+    try:
+        with db.session.begin():
+            user = User.query.filter_by(id=user_id).with_for_update().first()
+            if not user:
+                flash('User not found.', 'error')
+                return redirect(url_for('main.user_management'))
 
-    if user.id == current_user.id:
-        flash('You cannot change your own role.', 'error')
-        return redirect(url_for('main.user_management'))
+            if user.id == current_user.id:
+                flash('You cannot change your own role.', 'error')
+                return redirect(url_for('main.user_management'))
 
-    old_role = user.role
-    user.role = new_role
-    db.session.commit()
+            old_role = user.role
+            user.role = new_role
 
-    flash(f'User {user.username} role changed from {old_role} to {new_role}.', 'success')
-    logging.info(f"User {user.username} role changed from {old_role} to {new_role} by {current_user.email}")
+            # Re-check invariant in the same transaction just before commit.
+            if old_role == 'superadmin' and new_role != 'superadmin' and _count_active_superadmins(lock_rows=True) < 1:
+                flash('Cannot remove role from the last active superadmin.', 'error')
+                return redirect(url_for('main.user_management'))
+
+        flash(f'User {user.username} role changed from {old_role} to {new_role}.', 'success')
+        logging.info(f"User {user.username} role changed from {old_role} to {new_role} by {current_user.email}")
+    except Exception as e:
+        db.session.rollback()
+        flash('Unable to update user at this time. Please try again.', 'error')
+        logging.exception(f"change_user_role failed for user_id={user_id}, role={new_role}: {e}")
     return redirect(url_for('main.user_management'))
 
 @main_bp.route('/delete-user', methods=['POST'])
@@ -1375,22 +1402,34 @@ def change_user_role():
 @superadmin_required
 def delete_user():
     user_id = request.form.get('user_id')
-    user = User.query.get(user_id)
+    try:
+        with db.session.begin():
+            user = User.query.filter_by(id=user_id).with_for_update().first()
 
-    if not user:
-        flash('User not found.', 'error')
-        return redirect(url_for('main.user_management'))
+            if not user:
+                flash('User not found.', 'error')
+                return redirect(url_for('main.user_management'))
 
-    if user.id == current_user.id:
-        flash('You cannot delete your own account.', 'error')
-        return redirect(url_for('main.user_management'))
+            if user.id == current_user.id:
+                flash('You cannot delete your own account.', 'error')
+                return redirect(url_for('main.user_management'))
 
-    username = user.username
-    db.session.delete(user)
-    db.session.commit()
+            username = user.username
+            user_role = user.role
+            user_is_active = user.is_active
+            db.session.delete(user)
 
-    flash(f'User {username} deleted successfully.', 'success')
-    logging.info(f"User {username} deleted by {current_user.email}")
+            # Re-check invariant in the same transaction just before commit.
+            if user_role == 'superadmin' and user_is_active and _count_active_superadmins(lock_rows=True) < 1:
+                flash('Cannot delete the last active superadmin.', 'error')
+                return redirect(url_for('main.user_management'))
+
+        flash(f'User {username} deleted successfully.', 'success')
+        logging.info(f"User {username} deleted by {current_user.email}")
+    except Exception as e:
+        db.session.rollback()
+        flash('Unable to update user at this time. Please try again.', 'error')
+        logging.exception(f"delete_user failed for user_id={user_id}: {e}")
     return redirect(url_for('main.user_management'))
 
 @main_bp.route('/reset-user-password', methods=['POST'])
@@ -2835,4 +2874,3 @@ def api_export_report():
     except Exception as e:
         logging.error(f"Error exporting report: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
-
