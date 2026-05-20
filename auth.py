@@ -1,9 +1,11 @@
 from datetime import datetime
+import os
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from models import User
 from app import db, limiter
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import load_only
 from utils.auth_security import (
     hash_password,
@@ -16,6 +18,33 @@ from utils.auth_security import (
 import logging
 
 auth_bp = Blueprint('auth', __name__)
+
+
+def _legacy_is_active_compat_enabled() -> bool:
+    return normalize_username(str(os.environ.get("AUTH_LEGACY_IS_ACTIVE_COMPAT", ""))) in {"1", "true", "yes", "on"}
+
+
+def resolve_user_active_status(user, identifier):
+    """Return (is_active, reason). reason in: active, deactivated, legacy_compat, db_error."""
+    try:
+        raw_is_active = user.is_active
+    except AttributeError as missing_attr_error:
+        if _legacy_is_active_compat_enabled():
+            logging.warning(
+                f"Legacy schema compatibility path used for {identifier}: missing is_active attribute ({missing_attr_error})"
+            )
+            return True, "legacy_compat"
+
+        logging.warning(
+            f"Login denied: missing is_active attribute for {identifier} and compatibility flag is disabled"
+        )
+        return False, "deactivated"
+    except SQLAlchemyError as db_read_error:
+        logging.error(f"DB error path while reading is_active for {identifier}: {db_read_error}")
+        db.session.rollback()
+        return False, "db_error"
+
+    return (True, "active") if raw_is_active is None else (bool(raw_is_active), "active" if bool(raw_is_active) else "deactivated")
 
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
@@ -105,6 +134,7 @@ def login():
                     User.username,
                     User.email,
                     User.password_hash,
+                    User.is_active,
                 )
             ).filter(
                 (User.email == normalized_identifier) | (func.lower(User.username) == normalize_username(identifier))
@@ -119,6 +149,7 @@ def login():
                         User.id,
                         User.email,
                         User.password_hash,
+                        User.is_active,
                     )
                 ).filter(User.email == normalized_identifier).first()
             except Exception as fallback_error:
@@ -133,18 +164,11 @@ def login():
             is_password_valid, used_legacy_hash = (False, False)
 
         if user and is_password_valid:
-            # Some legacy databases may not have `is_active` yet. Treat missing
-            # column as active to avoid blocking valid logins.
-            try:
-                raw_is_active = user.is_active
-                # Legacy rows may have NULL is_active values even when the column
-                # exists. Treat NULL as active so valid historical accounts are
-                # not blocked from logging in.
-                is_user_active = True if raw_is_active is None else bool(raw_is_active)
-            except Exception as active_error:
-                logging.warning(f"Unable to read is_active for {identifier}: {active_error}. Defaulting to active.")
-                db.session.rollback()
-                is_user_active = True
+            is_user_active, active_status_reason = resolve_user_active_status(user, identifier)
+
+            if active_status_reason == "db_error":
+                flash('A server error occurred. Please try again in a moment.', 'error')
+                return render_template('login.html')
 
             if is_user_active:
                 if used_legacy_hash:
@@ -172,7 +196,7 @@ def login():
                     return redirect('/')
             else:
                 flash('Your account has been deactivated. Please contact an administrator.', 'error')
-                logging.warning(f"Deactivated user attempted login: {identifier}")
+                logging.warning(f"Explicit deactivated account path for login attempt: {identifier}")
         else:
             flash('Invalid email or password.', 'error')
             logging.warning(f"Failed verification for: {identifier}")
