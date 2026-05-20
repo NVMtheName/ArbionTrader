@@ -137,7 +137,7 @@ def login():
                     User.is_active,
                 )
             ).filter(
-                (User.email == normalized_identifier) | (func.lower(User.username) == normalize_username(identifier))
+                (func.lower(User.email) == normalized_identifier) | (func.lower(User.username) == normalize_username(identifier))
             ).first()
         except Exception as e:
             logging.warning(f"Primary login query failed, trying email-only fallback: {e}")
@@ -151,7 +151,7 @@ def login():
                         User.password_hash,
                         User.is_active,
                     )
-                ).filter(User.email == normalized_identifier).first()
+                ).filter(func.lower(User.email) == normalized_identifier).first()
             except Exception as fallback_error:
                 logging.error(f"Database error during login query fallback: {fallback_error}")
                 db.session.rollback()
