@@ -3,6 +3,7 @@ from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
 from models import User
 from app import db, limiter
+from sqlalchemy import func
 from sqlalchemy.orm import load_only
 from utils.auth_security import (
     hash_password,
@@ -107,7 +108,7 @@ def login():
                     User.password_hash,
                 )
             ).filter(
-                (User.email == normalized_identifier) | (User.username == normalize_username(identifier))
+                (User.email == normalized_identifier) | (func.lower(User.username) == normalize_username(identifier))
             ).first()
         except Exception as e:
             logging.warning(f"Primary login query failed, trying email-only fallback: {e}")
