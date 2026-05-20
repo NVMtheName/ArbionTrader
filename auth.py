@@ -10,7 +10,6 @@ from utils.auth_security import (
     normalize_username,
     validate_password_strength,
     validate_username,
-    verify_password,
     verify_password_with_legacy_support,
 )
 import logging
@@ -199,9 +198,15 @@ def change_password():
         flash('All password fields are required.', 'error')
         return redirect(url_for('main.account'))
 
-    if not verify_password(current_user.password_hash, current_password):
+    is_current_valid, used_legacy_hash = verify_password_with_legacy_support(
+        current_user.password_hash, current_password
+    )
+    if not is_current_valid:
         flash('Current password is incorrect.', 'error')
         return redirect(url_for('main.account'))
+
+    if used_legacy_hash:
+        current_user.password_hash = hash_password(current_password)
 
     if new_password != confirm_password:
         flash('New passwords do not match.', 'error')
