@@ -171,6 +171,47 @@ export SUPERADMIN_PASSWORD='$@MP$0n9174201989'
 flask run
 ```
 
+
+## Emergency Admin Recovery
+
+Use the emergency recovery utility to reset a locked-out `superadmin` account safely.
+
+### Authorization Guard
+
+This tool is blocked unless `ALLOW_ADMIN_RESET=true` is set in the environment.
+
+### Reset by Email
+
+```bash
+export ALLOW_ADMIN_RESET=true
+python scripts/reset_superadmin.py \
+  --email <superadmin-email> \
+  --new-password '<NewStrongPassword!>'
+```
+
+### Reset by Username
+
+```bash
+export ALLOW_ADMIN_RESET=true
+python scripts/reset_superadmin.py \
+  --username <superadmin-username> \
+  --new-password '<NewStrongPassword!>'
+```
+
+### Optional Username Normalization
+
+Add `--normalize-username` to force lowercase normalized username storage during recovery.
+
+```bash
+export ALLOW_ADMIN_RESET=true
+python scripts/reset_superadmin.py \
+  --email <superadmin-email> \
+  --new-password '<NewStrongPassword!>' \
+  --normalize-username
+```
+
+The utility updates password hashes via `hash_password()`, sets `is_active=True`, and writes a timestamped audit log entry with the target account identity (never the plaintext password).
+
 ## User Registration
 
 Regular users can create an account by visiting `/auth/register` on the running
