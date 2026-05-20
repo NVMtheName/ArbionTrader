@@ -28,6 +28,28 @@ def superadmin_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+
+
+def _would_remove_last_active_superadmin(user, action):
+    """Return True when the action would remove the final active superadmin account."""
+    if not user or user.role != 'superadmin' or not user.is_active:
+        return False
+
+    active_superadmin_count = User.query.filter(
+        User.role == 'superadmin',
+        User.is_active == True
+    ).count()
+
+    if active_superadmin_count <= 1:
+        actor_id = getattr(current_user, 'id', None)
+        target_id = getattr(user, 'id', None)
+        logging.warning(
+            f"Blocked action '{action}' removing last active superadmin: actor_id={actor_id}, target_id={target_id}"
+        )
+        flash('Cannot remove the last active superadmin.', 'error')
+        return True
+
+    return False
 def get_dashboard_market_data():
     """Get real-time market data for dashboard display with entire market coverage"""
     try:
@@ -1330,6 +1352,9 @@ def toggle_user_status():
         flash('You cannot deactivate your own account.', 'error')
         return redirect(url_for('main.user_management'))
     
+    if user.is_active and _would_remove_last_active_superadmin(user, 'deactivate'):
+        return redirect(url_for('main.user_management'))
+
     user.is_active = not user.is_active
     db.session.commit()
     
@@ -1362,6 +1387,9 @@ def change_user_role():
         flash('You cannot change your own role.', 'error')
         return redirect(url_for('main.user_management'))
 
+    if new_role != 'superadmin' and _would_remove_last_active_superadmin(user, 'change_role'):
+        return redirect(url_for('main.user_management'))
+
     old_role = user.role
     user.role = new_role
     db.session.commit()
@@ -1383,6 +1411,9 @@ def delete_user():
 
     if user.id == current_user.id:
         flash('You cannot delete your own account.', 'error')
+        return redirect(url_for('main.user_management'))
+
+    if _would_remove_last_active_superadmin(user, 'delete'):
         return redirect(url_for('main.user_management'))
 
     username = user.username
