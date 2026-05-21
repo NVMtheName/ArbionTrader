@@ -181,7 +181,7 @@ def create_app():
         except Exception as e:
             logging.error(f"Database table creation failed (tables may already exist): {e}")
 
-        # Create default superadmin user (only if configured via environment)
+        # Create or update default superadmin user (only if configured via environment)
         admin_email = os.environ.get("SUPERADMIN_EMAIL")
         admin_password = os.environ.get("SUPERADMIN_PASSWORD")
 
@@ -197,26 +197,31 @@ def create_app():
                         username="superadmin",
                         email=admin_email,
                         password_hash=hash_password(admin_password),
-                        role="superadmin"
+                        role="superadmin",
+                        is_active=True,
                     )
                     db.session.add(admin_user)
                     db.session.commit()
                     logging.info(f"Created default superadmin user: {admin_email}")
                 else:
                     stored_hash = existing_admin.password_hash
+                    existing_admin.username = "superadmin"
+                    existing_admin.role = "superadmin"
+                    existing_admin.is_active = True
+
                     if verify_password(stored_hash, admin_password):
+                        db.session.commit()
                         logging.info(f"Superadmin credentials verified for {admin_email}")
                     elif check_password_hash(stored_hash, admin_password):
                         existing_admin.password_hash = hash_password(admin_password)
                         db.session.commit()
                         logging.info(f"Migrated legacy superadmin password hash for {admin_email}")
                     else:
-                        logging.warning(
-                            "SUPERADMIN_PASSWORD does not match existing DB hash for "
-                            f"{admin_email}; skipping superadmin password mutation"
-                        )
+                        existing_admin.password_hash = hash_password(admin_password)
+                        db.session.commit()
+                        logging.info(f"Reset superadmin password from environment for {admin_email}")
             except Exception as e:
-                logging.error(f"Failed to create superadmin user: {e}")
+                logging.error(f"Failed to create or update superadmin user: {e}")
                 db.session.rollback()
         else:
             logging.info("No SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD set - skipping superadmin creation")
