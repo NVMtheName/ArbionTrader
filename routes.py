@@ -52,41 +52,63 @@ def _would_remove_last_active_superadmin(user, action):
     return False
 def get_dashboard_market_data():
     """Get real-time market data for dashboard display with entire market coverage"""
+    from utils.enhanced_market_data import EnhancedMarketDataProvider
+
+    enhanced_provider = EnhancedMarketDataProvider()
+    market_data = {}
+
     try:
         from utils.comprehensive_market_data import ComprehensiveMarketDataProvider
-        from utils.enhanced_market_data import EnhancedMarketDataProvider
-        
-        # Use comprehensive provider for entire market coverage
+
+        # Try comprehensive provider first for broad market coverage
         comprehensive_provider = ComprehensiveMarketDataProvider()
-        enhanced_provider = EnhancedMarketDataProvider()
-        
-        # Get data from comprehensive provider (entire market)
-        market_data = comprehensive_provider.get_comprehensive_market_data(15)
-        
-        # Add crypto data using enhanced provider
-        crypto_data = {}
-        for crypto_symbol in ['BTC', 'ETH', 'LTC']:
+        comprehensive_data = comprehensive_provider.get_comprehensive_market_data(15)
+        if isinstance(comprehensive_data, dict):
+            market_data.update(comprehensive_data)
+    except Exception as e:
+        logging.warning(f"Comprehensive provider unavailable, using fallback symbols: {str(e)}")
+
+    # Fallback and supplement with a stable watchlist so dashboard never renders empty
+    fallback_symbols = ['SPY', 'QQQ', 'AAPL', 'MSFT', 'NVDA', 'AMZN', 'TSLA']
+    for symbol in fallback_symbols:
+        if symbol in market_data:
+            continue
+        try:
+            stock_quote = enhanced_provider.get_stock_quote(symbol)
+            if stock_quote:
+                market_data[symbol] = {
+                    'price': stock_quote.get('price', 0),
+                    'change': stock_quote.get('change', 0),
+                    'change_percent': stock_quote.get('change_percent', 0),
+                    'volume': stock_quote.get('volume', 0),
+                    'high': stock_quote.get('high', 0),
+                    'low': stock_quote.get('low', 0)
+                }
+        except Exception as e:
+            logging.debug(f"Fallback stock quote failed for {symbol}: {e}")
+
+    # Add crypto data
+    for crypto_symbol in ['BTC', 'ETH', 'LTC']:
+        try:
             crypto_quote = enhanced_provider.get_crypto_price(crypto_symbol)
             if crypto_quote:
-                crypto_data[f'{crypto_symbol}-USD'] = {
-                    'price': crypto_quote['price'],
-                    'change': crypto_quote['change'],
-                    'change_percent': crypto_quote['change_percent'],
+                market_data[f'{crypto_symbol}-USD'] = {
+                    'price': crypto_quote.get('price', 0),
+                    'change': crypto_quote.get('change', 0),
+                    'change_percent': crypto_quote.get('change_percent', 0),
                     'volume': crypto_quote.get('volume', 0),
                     'high': crypto_quote.get('high', 0),
                     'low': crypto_quote.get('low', 0)
                 }
-        
-        # Combine stock and crypto data
-        market_data.update(crypto_data)
-        
-        logging.info(f"Comprehensive market data fetched: {len(market_data)} symbols from entire market")
-        return market_data
-        
-    except Exception as e:
-        logging.error(f"Error in get_dashboard_market_data: {str(e)}")
-        # Return empty dict if comprehensive provider fails
-        return {}
+        except Exception as e:
+            logging.debug(f"Crypto quote failed for {crypto_symbol}: {e}")
+
+    if not market_data:
+        logging.error("No market data sources returned data")
+    else:
+        logging.info(f"Dashboard market data fetched: {len(market_data)} symbols")
+
+    return market_data
 
 def get_account_balance():
     """Get REAL-TIME account balance from connected APIs with live data"""
