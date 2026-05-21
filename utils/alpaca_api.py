@@ -14,6 +14,8 @@ class AlpacaAPIClient:
     TRADING_BASE = "https://api.alpaca.markets"
     DATA_BASE = "https://data.alpaca.markets"
     BROKER_BASE = "https://broker-api.alpaca.markets"
+    AUTH_BASE = "https://authx.alpaca.markets/v1"
+    SANDBOX_AUTH_BASE = "https://authx.sandbox.alpaca.markets/v1"
 
     def __init__(self, api_key: Optional[str] = None, secret_key: Optional[str] = None, paper: bool = False):
         self.api_key = api_key or os.getenv("ALPACA_API_KEY")
@@ -38,13 +40,19 @@ class AlpacaAPIClient:
             "trading": self.TRADING_BASE,
             "market_data": self.DATA_BASE,
             "broker": self.BROKER_BASE,
+            "auth": self.SANDBOX_AUTH_BASE if self.paper else self.AUTH_BASE,
         }
         base_url = base_map.get(domain)
         if not base_url:
-            raise ValueError("domain must be one of: trading, market_data, broker")
+            raise ValueError("domain must be one of: trading, market_data, broker, auth")
 
         url = f"{base_url}{path if path.startswith('/') else '/' + path}"
-        response = requests.request(method.upper(), url, headers=self._headers(), params=params, json=json_data, timeout=25)
+        request_headers = self._headers() if domain != "auth" else {
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "User-Agent": "ArbionTrader/1.0",
+        }
+        response = requests.request(method.upper(), url, headers=request_headers, params=params, json=json_data, timeout=25)
 
         content_type = response.headers.get("content-type", "")
         payload: Any = response.json() if "application/json" in content_type else response.text
@@ -68,3 +76,40 @@ class AlpacaAPIClient:
             "balance": equity,
             "account": data,
         }
+
+
+    def issue_tokens(
+        self,
+        client_id: str,
+        client_secret: Optional[str] = None,
+        client_assertion_type: Optional[str] = None,
+        client_assertion: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Issue OAuth2 access token from Alpaca AuthX using client_credentials grant."""
+        form_data: Dict[str, Any] = {
+            "grant_type": "client_credentials",
+            "client_id": client_id,
+        }
+
+        if client_secret:
+            form_data["client_secret"] = client_secret
+        if client_assertion_type:
+            form_data["client_assertion_type"] = client_assertion_type
+        if client_assertion:
+            form_data["client_assertion"] = client_assertion
+
+        url = f"{self.SANDBOX_AUTH_BASE if self.paper else self.AUTH_BASE}/oauth2/token"
+        headers = {
+            "Accept": "application/json",
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "ArbionTrader/1.0",
+        }
+
+        response = requests.post(url, headers=headers, data=form_data, timeout=25)
+
+        content_type = response.headers.get("content-type", "")
+        payload: Any = response.json() if "application/json" in content_type else response.text
+        if response.status_code >= 400:
+            return {"success": False, "status_code": response.status_code, "error": payload}
+
+        return {"success": True, "status_code": response.status_code, "data": payload}
