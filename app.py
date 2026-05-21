@@ -67,6 +67,7 @@ def create_app():
     csrf.exempt("coinbase_advanced_trade.*")
     csrf.exempt("coinbase_payments.*")
     csrf.exempt("utils.openai_auth_routes.*")
+    csrf.exempt("utils.alpaca_routes.*")
 
     redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/1')
     try:
@@ -126,6 +127,7 @@ def create_app():
     from utils.ai_trading_bot_routes import ai_trading_bot_bp
     from utils.portfolio_routes import portfolio_bp
     from utils.claude_routes import claude_bp
+    from utils.alpaca_routes import alpaca_bp
     from sentiment.routes import sentiment_bp
     from analysis.routes import analysis_bp
     from neural.routes import neural_bp
@@ -146,6 +148,8 @@ def create_app():
     app.register_blueprint(ai_trading_bot_bp)
     app.register_blueprint(portfolio_bp)
     app.register_blueprint(claude_bp)
+    app.register_blueprint(alpaca_bp)
+    csrf.exempt(alpaca_bp)
     app.register_blueprint(sentiment_bp)
     app.register_blueprint(analysis_bp)
     app.register_blueprint(neural_bp)
