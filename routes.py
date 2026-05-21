@@ -254,6 +254,35 @@ def get_account_balance():
                         import traceback
                         traceback.print_exc()
                 
+
+                elif cred.provider == 'alpaca':
+                    try:
+                        paper = bool(decrypted_creds.get('paper', True))
+                        result = fetcher.get_live_alpaca_balance(
+                            decrypted_creds.get('api_key'),
+                            decrypted_creds.get('secret_key'),
+                            paper=paper
+                        )
+
+                        if result.get('success'):
+                            account_info['balance'] = result['balance']
+                            account_info['status'] = 'connected'
+                            account_info['account_type'] = 'brokerage'
+                            account_info['last_updated'] = result['timestamp']
+                            account_info['details'] = result.get('account', {})
+                            cred.test_status = 'success'
+                        else:
+                            account_info['status'] = 'error'
+                            error_msg = f"Alpaca: {result.get('error', 'Failed to fetch balance')}"
+                            balance_data['errors'].append(error_msg)
+                            cred.test_status = 'failed'
+                    except Exception as e:
+                        account_info['status'] = 'error'
+                        error_msg = f'Alpaca: {str(e)}'
+                        balance_data['errors'].append(error_msg)
+                        cred.test_status = 'failed'
+                        logging.error(f"Alpaca error for user {current_user.id}: {str(e)}")
+
                 elif cred.provider == 'etrade':
                     # Get LIVE E-trade balance using OAuth 1.0a
                     required_fields = ['client_key', 'client_secret', 'access_token', 'access_secret']
@@ -774,6 +803,22 @@ def api_settings():
                     db.session.commit()
                     flash('Schwab API credentials saved successfully!', 'success')
         
+
+        elif provider == 'alpaca':
+            api_key = request.form.get('alpaca_api_key')
+            secret_key = request.form.get('alpaca_secret_key')
+            paper = request.form.get('alpaca_paper', 'true').lower() == 'true'
+
+            if not api_key or not secret_key:
+                flash('Alpaca API key and secret key are required.', 'error')
+                return redirect(url_for('main.api_settings'))
+
+            credentials_data = {
+                'api_key': api_key,
+                'secret_key': secret_key,
+                'paper': paper
+            }
+
         elif provider == 'coinbase':
             # Handle Coinbase OAuth setup
             oauth_setup = request.form.get('oauth_setup')
@@ -970,6 +1015,16 @@ def test_api_connection():
                     result = {'success': False, 'message': 'Claude API returned empty response'}
             except Exception as claude_err:
                 result = {'success': False, 'message': f'Claude API error: {str(claude_err)}'}
+
+
+        elif provider == 'alpaca':
+            from utils.alpaca_api import AlpacaAPIClient
+
+            api_key = credentials.get('api_key')
+            secret_key = credentials.get('secret_key')
+            paper = bool(credentials.get('paper', True))
+            alpaca_client = AlpacaAPIClient(api_key=api_key, secret_key=secret_key, paper=paper)
+            result = alpaca_client.test_connection()
 
         elif provider == 'etrade':
             # Test E-trade OAuth 1.0a connection
@@ -2889,3 +2944,39 @@ def api_export_report():
         logging.error(f"Error exporting report: {str(e)}")
         return jsonify({'success': False, 'error': str(e)})
 
+
+
+@main_bp.route('/api/alpaca/request', methods=['POST'])
+@login_required
+def alpaca_proxy_request():
+    """Proxy request for Alpaca US API references (trading, market_data, broker)."""
+    try:
+        from utils.encryption import decrypt_credentials
+        from utils.alpaca_api import AlpacaAPIClient
+
+        payload = request.get_json() or {}
+        domain = payload.get('domain', 'trading')
+        method = payload.get('method', 'GET')
+        path = payload.get('path')
+        params = payload.get('params')
+        json_data = payload.get('json')
+
+        if not path:
+            return jsonify({'success': False, 'error': 'path is required'}), 400
+
+        cred = APICredential.query.filter_by(user_id=current_user.id, provider='alpaca', is_active=True).first()
+        if not cred:
+            return jsonify({'success': False, 'error': 'Alpaca credentials not configured'}), 404
+
+        credentials = decrypt_credentials(cred.encrypted_credentials)
+        client = AlpacaAPIClient(
+            api_key=credentials.get('api_key'),
+            secret_key=credentials.get('secret_key'),
+            paper=bool(credentials.get('paper', True))
+        )
+        result = client.request(domain=domain, method=method, path=path, params=params, json_data=json_data)
+        return jsonify(result), (200 if result.get('success') else result.get('status_code', 400))
+
+    except Exception as e:
+        logging.error(f"Alpaca proxy request failed: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
