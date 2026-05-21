@@ -193,6 +193,26 @@ class RealTimeDataFetcher:
         except Exception as e:
             logger.error(f"Error fetching Schwab balance: {str(e)}")
             return {'success': False, 'error': str(e)}
+
+    def get_live_alpaca_balance(self, api_key: str, secret_key: str, paper: bool = False) -> Dict[str, Any]:
+        """Get live balance from Alpaca Trading API."""
+        try:
+            from utils.alpaca_api import AlpacaAPIClient
+
+            client = AlpacaAPIClient(api_key=api_key, secret_key=secret_key, paper=paper)
+            result = client.get_account_balance()
+            if not result.get("success"):
+                return {"success": False, "error": result.get("error", "Alpaca API error")}
+
+            return {
+                "success": True,
+                "balance": result.get("balance", 0),
+                "account": result.get("account", {}),
+                "timestamp": datetime.utcnow().isoformat()
+            }
+        except Exception as e:
+            logger.error(f"Error fetching Alpaca balance: {str(e)}")
+            return {"success": False, "error": str(e)}
     
     def _get_crypto_price(self, currency: str) -> Optional[float]:
         """Get current crypto price for conversion.
@@ -377,4 +397,3 @@ class RealTimeDataFetcher:
         except Exception as e:
             logger.error(f"Error fetching E-trade positions: {str(e)}")
             return {'success': False, 'error': str(e)}
-
