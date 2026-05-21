@@ -8,7 +8,7 @@ from flask_wtf.csrf import CSRFProtect
 from flask_caching import Cache
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, load_only
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Configure logging
@@ -41,43 +41,38 @@ def create_app():
         database_url = database_url.replace("postgres://", "postgresql://", 1)
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
     app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-        "pool_recycle": 1800,  # Increased from 300 to 1800 (30 minutes)
+        "pool_recycle": 1800,
         "pool_pre_ping": True,
-        "pool_size": 10,  # Default connection pool size
-        "max_overflow": 20,  # Allow up to 20 connections beyond pool_size
-        "pool_timeout": 30,  # Timeout for getting connection from pool
+        "pool_size": 10,
+        "max_overflow": 20,
+        "pool_timeout": 30,
     }
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     
-    # Proxy fix for Heroku and custom domains
     app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1, x_for=1)
     
-    # Initialize extensions
     db.init_app(app)
     login_manager.init_app(app)
     migrate.init_app(app, db)
     csrf.init_app(app)
 
-    # CSRF Protection Configuration
     app.config['WTF_CSRF_ENABLED'] = True
-    app.config['WTF_CSRF_TIME_LIMIT'] = None  # Tokens don't expire (secured by session)
-    app.config['WTF_CSRF_SSL_STRICT'] = os.environ.get('FLASK_ENV') == 'production'  # Enforce HTTPS in production
-    app.config['WTF_CSRF_CHECK_DEFAULT'] = True  # Enable CSRF protection by default
+    app.config['WTF_CSRF_TIME_LIMIT'] = None
+    app.config['WTF_CSRF_SSL_STRICT'] = os.environ.get('FLASK_ENV') == 'production'
+    app.config['WTF_CSRF_CHECK_DEFAULT'] = True
 
-    # Exempt OAuth callback endpoints (use state parameter for CSRF protection)
     csrf.exempt("github_routes.github_callback")
-    csrf.exempt("utils.schwabdev_routes.*")  # Schwab OAuth callbacks
-    csrf.exempt("utils.coinbase_v2_routes.*")  # Coinbase OAuth callbacks
-    csrf.exempt("coinbase_advanced_trade.*")  # AT API (JSON, JWT-authenticated)
-    csrf.exempt("coinbase_payments.*")  # Payments API (JSON, JWT-authenticated)
-    csrf.exempt("utils.openai_auth_routes.*")  # OpenAI OAuth callbacks
+    csrf.exempt("utils.schwabdev_routes.*")
+    csrf.exempt("utils.coinbase_v2_routes.*")
+    csrf.exempt("coinbase_advanced_trade.*")
+    csrf.exempt("coinbase_payments.*")
+    csrf.exempt("utils.openai_auth_routes.*")
 
-    # Redis Cache Configuration
-    redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/1')  # Use DB 1 for cache (DB 0 for Celery)
+    redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/1')
     try:
         app.config['CACHE_TYPE'] = 'redis'
         app.config['CACHE_REDIS_URL'] = redis_url
-        app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutes default
+        app.config['CACHE_DEFAULT_TIMEOUT'] = 300
         app.config['CACHE_KEY_PREFIX'] = 'arbion_cache_'
         cache.init_app(app)
         logging.info(f"✓ Redis cache configured: {redis_url}")
@@ -86,19 +81,14 @@ def create_app():
         app.config['CACHE_TYPE'] = 'SimpleCache'
         cache.init_app(app)
 
-    # Rate Limiting Configuration (uses same Redis)
-    # Use DB 2 for rate limiting (separate from cache and Celery)
     rate_limit_redis_url = os.environ.get('REDIS_URL', 'redis://localhost:6379/2').replace('/1', '/2').replace('/0', '/2')
     app.config['RATELIMIT_STORAGE_URI'] = rate_limit_redis_url
-    app.config['RATELIMIT_SWALLOW_ERRORS'] = True  # Don't crash if Redis is unavailable
+    app.config['RATELIMIT_SWALLOW_ERRORS'] = True
     limiter.init_app(app)
-
-    # Exempt health checks from rate limiting
     limiter.exempt(lambda: request.blueprint == 'health' if hasattr(request, 'blueprint') else False)
 
     logging.info(f"✓ Rate limiting configured: {rate_limit_redis_url}")
 
-    # Login manager configuration
     login_manager.login_view = 'auth.login'
     login_manager.login_message = 'Please log in to access this page.'
     login_manager.login_message_category = 'info'
@@ -107,12 +97,21 @@ def create_app():
     def load_user(user_id):
         try:
             from models import User
-            return db.session.get(User, int(user_id))
+            return User.query.options(
+                load_only(
+                    User.id,
+                    User.username,
+                    User.email,
+                    User.password_hash,
+                    User.role,
+                    User.created_at,
+                    User.is_active,
+                )
+            ).filter_by(id=int(user_id)).first()
         except Exception as e:
             logging.error(f"Error loading user {user_id}: {e}")
             return None
     
-    # Import and register blueprints
     from routes import main_bp
     from auth import auth_bp
     from health import health_bp
@@ -131,9 +130,8 @@ def create_app():
     from analysis.routes import analysis_bp
     from neural.routes import neural_bp
 
-    # Register health checks first (no authentication/CSRF required)
     app.register_blueprint(health_bp)
-    csrf.exempt(health_bp)  # Health checks don't need CSRF protection
+    csrf.exempt(health_bp)
 
     app.register_blueprint(main_bp)
     app.register_blueprint(auth_bp, url_prefix='/auth')
@@ -152,11 +150,9 @@ def create_app():
     app.register_blueprint(analysis_bp)
     app.register_blueprint(neural_bp)
 
-    # Register simple OpenAI integration routes
     from utils.simple_openai_routes import simple_openai_bp
     app.register_blueprint(simple_openai_bp)
     
-    # Validate encryption configuration on startup
     try:
         from utils.encryption import validate_encryption_config
         is_valid, message = validate_encryption_config()
@@ -171,9 +167,7 @@ def create_app():
         logging.critical("Set ENCRYPTION_KEY or ENCRYPTION_SECRET+ENCRYPTION_SALT environment variables")
         raise
 
-    # Create tables and default admin user
     with app.app_context():
-        # Import models to ensure they're registered
         import models
 
         try:
@@ -181,7 +175,6 @@ def create_app():
         except Exception as e:
             logging.error(f"Database table creation failed (tables may already exist): {e}")
 
-        # Create or update default superadmin user (only if configured via environment)
         admin_email = os.environ.get("SUPERADMIN_EMAIL")
         admin_password = os.environ.get("SUPERADMIN_PASSWORD")
 
@@ -191,7 +184,16 @@ def create_app():
                 from utils.auth_security import hash_password, verify_password
                 from werkzeug.security import check_password_hash
 
-                existing_admin = User.query.filter_by(email=admin_email).first()
+                existing_admin = User.query.options(
+                    load_only(
+                        User.id,
+                        User.username,
+                        User.email,
+                        User.password_hash,
+                        User.role,
+                        User.is_active,
+                    )
+                ).filter_by(email=admin_email).first()
                 if not existing_admin:
                     admin_user = User(
                         username="superadmin",
@@ -226,7 +228,6 @@ def create_app():
         else:
             logging.info("No SUPERADMIN_EMAIL/SUPERADMIN_PASSWORD set - skipping superadmin creation")
 
-    # Register error handlers
     @app.errorhandler(500)
     def internal_error(error):
         db.session.rollback()
@@ -237,7 +238,6 @@ def create_app():
 
 if __name__ == '__main__':
     app = create_app()
-    # Start the background scheduler
     try:
         from utils.scheduler import start_scheduler
         start_scheduler()
