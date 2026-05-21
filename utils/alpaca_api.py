@@ -68,3 +68,46 @@ class AlpacaAPIClient:
             "balance": equity,
             "account": data,
         }
+
+    def get_historical_auctions(
+        self,
+        symbols: str,
+        start: Optional[str] = None,
+        end: Optional[str] = None,
+        limit: Optional[int] = None,
+        asof: Optional[str] = None,
+        feed: Optional[str] = None,
+        currency: Optional[str] = None,
+        page_token: Optional[str] = None,
+        sort: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Get historical opening and closing stock auctions from Alpaca market data.
+
+        Args:
+            symbols: Comma-separated stock symbols (e.g. "AAPL,TSLA").
+            start: Inclusive start timestamp/date in RFC-3339 or YYYY-MM-DD.
+            end: Inclusive end timestamp/date in RFC-3339 or YYYY-MM-DD.
+            limit: Max number of auction data points across all symbols (1..10000).
+            asof: Symbol mapping date (YYYY-MM-DD) or "-" to skip mapping.
+            feed: Auction feed. Alpaca currently accepts only "sip".
+            currency: ISO-4217 currency code, default USD.
+            page_token: Pagination token from prior response.
+            sort: "asc" or "desc".
+        """
+        if not symbols:
+            raise ValueError("symbols is required")
+
+        params: Dict[str, Any] = {"symbols": symbols}
+        optional_params = {
+            "start": start,
+            "end": end,
+            "limit": limit,
+            "asof": asof,
+            "feed": feed,
+            "currency": currency,
+            "page_token": page_token,
+            "sort": sort,
+        }
+        params.update({key: value for key, value in optional_params.items() if value is not None})
+
+        return self.request("market_data", "GET", "/v2/stocks/auctions", params=params)
